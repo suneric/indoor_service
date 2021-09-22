@@ -1,0 +1,218 @@
+<?xml version="1.0" ?>
+
+<robot xmlns:xacro="https://www.ros.org/wiki/xacro" >
+    <xacro:property name="PI" value="3.1415926535897931"/>
+    <xacro:property name="jazzy_m" value="40" />
+    <xacro:property name="wheel_m" value="0.5"/>
+    <xacro:property name="wheel_r" value="0.11"/>
+    <xacro:property name="wheel_l" value="0.0762"/>
+    <xacro:property name="caster_m" value="0.5"/>
+    <xacro:property name="frame_m" value="2"/>
+    <xacro:property name="vslider_m" value="2"/>
+    <xacro:property name="hslider_m" value="1"/>
+    <xacro:property name="plug_m" value="0.5"/>
+    <xacro:property name="battery_m" value="50"/>
+    <xacro:property name="hook_m" value="0.2"/>
+    <xacro:property name="tip_m" value="0.1"/>
+
+    <xacro:macro name="jazzy_base_macro">
+      <link name="world"/>
+      <joint name="joint_world_jazzy" type="floating">
+        <parent link="world"/>
+        <child link="link_jazzy"/>
+      </joint>
+      <link name="link_jazzy">
+        <visual>
+          <origin xyz="0 0 0" rpy="0 0 0" />
+          <geometry>
+            <mesh filename="package://ids_description/meshes/jazzy/base.obj" scale="0.1 0.1 0.1"/>
+          </geometry>
+        </visual>
+        <collision>
+          <origin xyz="0 0 0" rpy="0 0 0" />
+          <geometry>
+            <mesh filename="package://ids_description/meshes/jazzy/base.obj" scale="0.1 0.1 0.1"/>
+          </geometry>
+        </collision>
+        <inertial>
+          <mass value="${jazzy_m}"/>
+          <origin rpy="0 0 0" xyz="0 0 0"/>
+          <inertia ixx="${jazzy_m*(0.4*0.4*0.15*0.15)}" ixy="0" ixz="0" iyy="${jazzy_m*(0.6*0.6*0.15*0.15)}" iyz="0" izz="${jazzy_m*(0.6*0.6*0.4*0.4)}"/>
+        </inertial>
+      </link>
+      <!--battery-->
+      <joint name="joint_jazzy_battery" type="fixed">
+        <origin xyz="0 0 0" rpy="0 0 0" />
+        <parent link="link_jazzy"/>
+        <child link="link_battery"/>
+      </joint>
+      <link name="link_battery">
+        <visual>
+          <origin rpy="0 0 0" xyz="-0.15 0 0.155"/>
+          <geometry>
+            <box size="0.2 0.2 0.01"/>
+          </geometry>
+        </visual>
+        <collision>
+          <origin rpy="0 0 0" xyz="-0.15 0 0.155" />
+          <geometry>
+            <box size="0.2 0.2 0.01"/>
+          </geometry>
+        </collision>
+        <inertial>
+          <mass value="${battery_m}"/>
+          <origin rpy="0 0 0" xyz="-0.15 0 0.155"/>
+          <inertia ixx="${(1/12)*battery_m*(0.2*0.2+0.01*0.01)}" ixy="0" ixz="0" iyy="${(1/12)*battery_m*(0.2*0.2+0.01*0.01)}" iyz="0" izz="${(1/12)*battery_m*(0.2*0.2*0.2*0.2)}"/>
+        </inertial>
+      </link>
+      <!--left wheel-->
+      <joint name="joint_jazzy_lwheel" type="continuous">
+        <origin xyz="0.11 0.24 0.04" rpy="0 0 0" />
+        <parent link="link_jazzy"/>
+        <child link="link_lwheel"/>
+        <axis xyz="0 1 0" rpy="0 0 0" />
+      </joint>
+      <link name="link_lwheel">
+        <visual>
+          <origin rpy="${PI/2} 0 0" xyz="0 0 0"/>
+          <geometry>
+            <cylinder length="${wheel_l}" radius="${wheel_r}"/>
+          </geometry>
+        </visual>
+        <collision>
+          <origin rpy="${PI/2} 0 0" xyz="0 0 0" />
+          <geometry>
+            <cylinder length="${wheel_l}" radius="${wheel_r}"/>
+          </geometry>
+        </collision>
+        <inertial>
+          <mass value="${wheel_m}"/>
+          <origin rpy="${PI/2} 0 0" xyz="0 0 0"/>
+          <inertia ixx="${(1/12)*wheel_m*(3*wheel_r*wheel_r+wheel_l*wheel_l)}" ixy="0" ixz="0" iyy="${(1/12)*wheel_m*(3*wheel_r*wheel_r+wheel_l*wheel_l)}" iyz="0" izz="${(1/2)*wheel_m*wheel_r*wheel_r}"/>
+        </inertial>
+      </link>
+      <!--right wheel-->
+      <joint name="joint_jazzy_rwheel" type="continuous">
+        <origin xyz="0.11 -0.24 0.04" rpy="0 0 0" />
+        <parent link="link_jazzy"/>
+        <child link="link_rwheel"/>
+        <axis xyz="0 1 0" rpy="0 0 0" />
+      </joint>
+      <link name="link_rwheel">
+        <visual>
+          <origin rpy="${PI/2} 0 0" xyz="0 0 0"/>
+          <geometry>
+            <cylinder length="${wheel_l}" radius="${wheel_r}"/>
+          </geometry>
+        </visual>
+        <collision>
+          <origin rpy="${PI/2} 0 0" xyz="0 0 0" />
+          <geometry>
+            <cylinder length="${wheel_l}" radius="${wheel_r}"/>
+          </geometry>
+        </collision>
+        <inertial>
+          <mass value="${wheel_m}"/>
+          <origin rpy="${PI/2} 0 0" xyz="0 0 0"/>
+          <inertia ixx="${(1/12)*wheel_m*(3*wheel_r*wheel_r+wheel_l*wheel_l)}" ixy="0" ixz="0" iyy="${(1/12)*wheel_m*(3*wheel_r*wheel_r+wheel_l*wheel_l)}" iyz="0" izz="${(1/2)*wheel_m*wheel_r*wheel_r}"/>
+        </inertial>
+      </link>
+      <!--left caster-->
+      <joint name="joint_jazzy_lcaster" type="fixed">
+        <origin rpy="0 0 0" xyz="0 0 0"/>
+        <parent link="link_jazzy"/>
+        <child link="link_lcaster"/>
+      </joint>
+      <link name="link_lcaster">
+        <visual>
+          <origin rpy="0 0 0" xyz="-0.355 0.175 -0.04"/>
+          <geometry>
+            <sphere radius="0.04"/>
+          </geometry>
+        </visual>
+        <collision>
+          <origin rpy=" 0 0 0" xyz="-0.355 0.175 -0.04"/>
+          <geometry>
+            <sphere radius="0.04"/>
+          </geometry>
+        </collision>
+        <inertial>
+          <mass value="${caster_m}"/>
+          <origin rpy="0 0 0" xyz="-0.355 0.20 -0.04"/>
+          <inertia ixx="${caster_m*4.9e-4}" ixy="0" ixz="0" iyy="${caster_m*4.9e-4}" iyz="0" izz="${caster_m*4.9e-4}"/>
+        </inertial>
+      </link>
+      <!--right caster-->
+      <joint name="joint_jazzy_rcaster" type="fixed">
+        <origin rpy="0 0 0" xyz="0 0 0"/>
+        <parent link="link_jazzy"/>
+        <child link="link_rcaster"/>
+      </joint>
+      <link name="link_rcaster">
+        <visual>
+          <origin rpy="0 0 0" xyz="-0.355 -0.175 -0.04"/>
+          <geometry>
+            <sphere radius="0.04"/>
+          </geometry>
+        </visual>
+        <collision>
+          <origin rpy=" 0 0 0" xyz="-0.355 -0.175 -0.04"/>
+          <geometry>
+            <sphere radius="0.04"/>
+          </geometry>
+        </collision>
+        <inertial>
+          <mass value="${caster_m}"/>
+          <origin rpy="0 0 0" xyz="-0.355 -0.20 -0.04"/>
+          <inertia ixx="${caster_m*4.9e-4}" ixy="0" ixz="0" iyy="${caster_m*4.9e-4}" iyz="0" izz="${caster_m*4.9e-4}"/>
+        </inertial>
+      </link>
+
+      <!-- differential_drive_controller -->
+      <gazebo>
+        <plugin name="differential_drive_controller" filename="libgazebo_ros_diff_drive.so">
+          <updateRate>100</updateRate>
+          <leftJoint>joint_jazzy_lwheel</leftJoint>
+          <rightJoint>joint_jazzy_rwheel</rightJoint>
+          <wheelSeparation>0.48</wheelSeparation>
+          <wheelDiameter>0.22</wheelDiameter>
+          <wheelAcceleration>0.0</wheelAcceleration>
+          <wheelTorque>300</wheelTorque>
+          <commandTopic>cmd_vel</commandTopic>
+          <odometryTopic>odom</odometryTopic>
+          <odometryFrame>odom</odometryFrame>
+          <robotBaseFrame>link_jazzy</robotBaseFrame>
+          <odometrySource>1</odometrySource>
+          <publishWheelTF>true</publishWheelTF>
+          <publishOdom>true</publishOdom>
+          <publishOdomTF>1</publishOdomTF>
+          <publishTf>1</publishTf>
+          <publishWheelJointState>false</publishWheelJointState>
+          <legacyMode>false</legacyMode>
+          <rosDebugLevel>na</rosDebugLevel>
+        </plugin>
+      </gazebo>
+
+      <!--materials-->
+      <gazebo reference="link_jazzy">
+        <material>Gazebo/Grey</material>
+      </gazebo>
+      <gazebo reference="link_lwheel">
+        <mu1>0.98</mu1>
+        <mu2>0.98</mu2>
+        <material>Gazebo/Black</material>
+      </gazebo>
+      <gazebo reference="link_rwheel">
+        <mu1>0.98</mu1>
+        <mu2>0.98</mu2>
+        <material>Gazebo/Black</material>
+      </gazebo>
+      <gazebo reference="link_lcaster">
+        <material>Gazebo/Black</material>
+      </gazebo>
+      <gazebo reference="link_rcaster">
+        <material>Gazebo/Black</material>
+      </gazebo>
+
+    </xacro:macro>
+</robot>

@@ -1,0 +1,9 @@
+bool detectable
+float32 x
+float32 y
+float32 z
+float32 yaw
+float32 u
+float32 v
+float32 w
+float32 h

@@ -1,0 +1,42 @@
+<?xml version="1.0"?>
+
+<robot name="jazzy" xmlns:xacro="https://www.ros.org/wiki/xacro" >
+    <!--mobile base-->
+    <xacro:include filename="$(find ids_description)/urdf/wheeler_2.urdf.xacro" />
+      <xacro:property name="friction_k" value="0.8"/>
+      <xacro:property name="friction_s" value="0.7"/>
+    <xacro:fourwheeler_base_macro/>
+
+    <!--frame 3DOF-->
+    <xacro:include filename="$(find ids_description)/urdf/frame.urdf.xacro" />
+    <xacro:frame_macro parent="link_fbumper" name="mrobot">
+      <origin xyz="-0.11 0 0.14" rpy="0 0 0"/>
+    </xacro:frame_macro>
+
+    <!--RGB-D camera, look forward-->
+    <xacro:include filename="$(find ids_description)/urdf/realsense.urdf.xacro" />
+    <xacro:realsense_macro parent="link_hslider">
+      <xacro:property name="location_x" value="0.12"/>
+      <xacro:property name="location_y" value="0.0"/>
+      <xacro:property name="location_z" value="0.0325"/>
+      <xacro:property name="camera_width" value="640" />
+      <xacro:property name="camera_height" value="480" />
+      <xacro:property name="camera_name" value="rs435" />
+    </xacro:realsense_macro>
+
+    <!--camera, look upward-->
+    <xacro:include filename="$(find ids_description)/urdf/camera.urdf.xacro"/>
+    <xacro:camera_macro parent="link_tip">
+      <xacro:property name="location_x" value="0.02" />
+      <xacro:property name="location_y" value="0.0" />
+      <xacro:property name="location_z" value="0.015" />
+      <xacro:property name="location_r" value="0" />
+      <xacro:property name="location_p" value="-1.57" />
+      <xacro:property name="location_y" value="0" />
+      <xacro:property name="camera_width" value="600" />
+      <xacro:property name="camera_height" value="600" />
+      <xacro:property name="camera_name" value="cam_up"/>
+    </xacro:camera_macro>
+
+
+</robot>
