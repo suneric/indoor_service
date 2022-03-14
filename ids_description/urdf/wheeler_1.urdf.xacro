@@ -1,5 +1,7 @@
 <?xml version="1.0" ?>
 
+<!--four wheel base-->
+
 <robot xmlns:xacro="https://www.ros.org/wiki/xacro" >
     <xacro:property name="friction_k" value="0.98"/>
     <xacro:property name="friction_s" value="0.98"/>
@@ -13,8 +15,8 @@
     <xacro:property name="wheel_l" value="0.05"/>
     <xacro:property name="wheel_m" value="0.5"/>
 
-    <xacro:property name="wheelbase" value="0.25" /> <!--base on the wheel diameter and chassis_x-->
-    <xacro:property name="track" value="0.45" /> <!--base on the wheel width and chassis_y-->
+    <xacro:property name="wheelbase" value="0.25" />
+    <xacro:property name="track" value="0.45" />
     <xacro:property name="base_x" value="0.42" />
     <xacro:property name="base_y" value="0.4" />
     <xacro:property name="base_z" value="0.075" />
@@ -28,14 +30,6 @@
 
 
     <xacro:macro name="wheel_base_macro" params="*origin">
-      <!-- Used for fixing robot to Gazebo 'base_link'-->
-      <link name="world"/>
-      <joint name="joint_world_chassis" type="floating">
-        <xacro:insert_block name="origin"/>
-        <parent link="world"/>
-        <child link="link_chassis"/>
-      </joint>
-
       <link name="link_chassis">
         <visual>
           <origin xyz="0 0 0" rpy="0 0 0" />

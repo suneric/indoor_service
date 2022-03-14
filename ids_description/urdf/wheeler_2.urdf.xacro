@@ -28,13 +28,6 @@
 
     <!-- main triwheeler link -->
     <xacro:macro name="fourwheeler_base_macro">
-      <!-- Used for fixing robot to Gazebo 'base_link'-->
-      <link name="world"/>
-      <joint name="joint_world_chassis" type="floating">
-        <parent link="world"/>
-        <child link="link_chassis"/>
-      </joint>
-
       <link name="link_chassis">
         <visual>
           <origin xyz="0 0 0" rpy="0 0 0" />

@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # door handle detection with yolo and opencv
 import sys
 sys.path.append('..')
@@ -183,7 +183,7 @@ if __name__ == '__main__':
     dir = os.path.dirname(os.path.realpath(__file__))
     print(dir)
     config = os.path.join(dir,'..','classifier/yolo/yolo-door.cfg')
-    weights = os.path.join(dir, '..','classifier/yolo/yolo-obj.weights')
+    weights = os.path.join(dir, '..','classifier/yolo/doorhandle.weights')
     classes_path = os.path.join(dir,'..','classifier/yolo/door.names')
     with open(classes_path, 'r') as f:
         classes = [line.strip() for line in f.readlines()]

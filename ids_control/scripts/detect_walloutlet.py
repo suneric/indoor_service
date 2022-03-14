@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 # door handler detection with opencv cascade classifier
 import sys

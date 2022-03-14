@@ -18,20 +18,16 @@
     <arg name="headless" default="false"/>
   </include>
 
-  <!--spawn mobile robot-->
-  <param name="robot_description" command="$(find xacro)/xacro --inorder '$(arg model)'" />
-  <node name="urdf_spawner" pkg="gazebo_ros" type="spawn_model" respawn="false" output="screen"
-        args="-param robot_description
-           -urdf
-           -x $(arg x)
-           -y $(arg y)
-           -z $(arg z)
-           -R $(arg roll)
-           -P $(arg pitch)
-           -Y $(arg yaw)
-           -model mrobot" />
-
-  <include file="$(find ids_control)/launch/device_control.launch"/>
-  <include file="$(find ids_control)/launch/object_detection.launch"/>
+  <include file="$(find ids_gazebo)/launch/spawn_robot.launch">
+    <arg name="name" value="robot"/>
+    <arg name="model" value="$(arg model)"/>
+    <arg name="tf_prefix" value="ids_robot"/>
+    <arg name="x" value="$(arg x)"/>
+    <arg name="y" value="$(arg y)"/>
+    <arg name="z" value="$(arg z)"/>
+    <arg name="roll" value="$(arg roll)"/>
+    <arg name="pitch" value="$(arg pitch)"/>
+    <arg name="yaw" value="$(arg yaw)"/>
+  </include>
 
 </launch>

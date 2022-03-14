@@ -16,11 +16,6 @@
     <xacro:property name="tip_m" value="0.1"/>
 
     <xacro:macro name="jazzy_base_macro">
-      <link name="world"/>
-      <joint name="joint_world_jazzy" type="floating">
-        <parent link="world"/>
-        <child link="link_jazzy"/>
-      </joint>
       <link name="link_jazzy">
         <visual>
           <origin xyz="0 0 0" rpy="0 0 0" />

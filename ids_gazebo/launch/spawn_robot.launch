@@ -1,0 +1,30 @@
+<launch>
+  <arg name="name" default="robot"/>
+  <arg name="model" default="$(find ids_description)/urdf/mrobot_2.urdf.xacro"/>
+  <arg name="tf_prefix" default="$(optenv ROS_NAMESPACE)"/>
+
+  <arg name="x" default="1.5"/>
+  <arg name="y" default="0.5"/>
+  <arg name="z" default="0.075"/>
+  <arg name="roll" default="0"/>
+  <arg name="pitch" default="0"/>
+  <arg name="yaw" default="0"/>
+
+  <!--load controller-->
+  <include file="$(find ids_control)/launch/device_control.launch"/>
+  <include file="$(find ids_control)/launch/object_detection.launch"/>
+
+  <!--spawn mobile robot-->
+  <param name="robot_description" command="$(find xacro)/xacro --inorder '$(arg model)'" />
+  <node name="urdf_spawner" pkg="gazebo_ros" type="spawn_model" respawn="false" output="screen"
+        args="-param robot_description
+           -urdf
+           -x $(arg x)
+           -y $(arg y)
+           -z $(arg z)
+           -R $(arg roll)
+           -P $(arg pitch)
+           -Y $(arg yaw)
+           -model mrobot" />
+
+</launch>
