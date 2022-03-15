@@ -101,20 +101,25 @@ def door_handle_box(indices,classes,class_ids,boxes,confidences):
         if label == 'handle':
             handle_box = boxes[i]
             confidence = confidences[i]
-    return handle_box,confidence
+
+    box = None
+    if not handle_box:
+        # change to left, top, right, bottom
+        box = (handle_box[0], handle_box[1], handle_box[0]+handle_box[2], handle_box[1]+handle_box[3])
+    return box,confidence
 
 def draw_prediction(img,box,valid,info,confidence,label):
     H,W = sensor.image_size()
     text_horizontal = 0
     if valid:
-        x,y,w,h = box[0],box[1],box[2],box[3]
-        cv2.rectangle(img, (x,y), (x+w,y+h), (0,255,0), 2)
-        cv2.putText(img, label, (x-10,y-10), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,255,0), 2)
+        l,t,r,b = int(box[0]),int(box[1]),int(box[2]),int(box[3])
+        cv2.rectangle(img, (l,t), (r,b), (0,255,0), 2)
+        cv2.putText(img, label, (l-10,t-10), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,255,0), 2)
         texts = [
-            # ("x","{:.3f}".format(info[0])),
-            # ("y","{:.3f}".format(info[1])),
-            # ("z","{:.3f}".format(info[2])),
-            # ("dd","{:.3f}".format(info[3])),
+            ("x","{:.3f}".format(info[0])),
+            ("y","{:.3f}".format(info[1])),
+            ("z","{:.3f}".format(info[2])),
+            ("dd","{:.3f}".format(info[3])),
             ("confidence","{:.2f}".format(confidence))
         ]
         for (i,(k,v)) in enumerate(texts):
@@ -132,46 +137,18 @@ def detect_door_handle(sensor,net,classes):
     nms_threshold = 0.5
     class_ids, confidences, boxes = detection_output(img,net)
     indices = cv2.dnn.NMSBoxes(boxes, confidences, conf_threshold, nms_threshold)
-    handle_box,c = door_handle_box(indices,classes,class_ids,boxes,confidences)
-    # calculate door handle position in camera coordinate system
-    # valid,info = target_distance_and_yaw(handle_box,sensor)
-    valid = False
-    if handle_box != None:
-        info[4:7] = handle_box
-        valid = True
-    draw_prediction(img,handle_box,valid,info,c,"door handle")
+    box,c = door_handle_box(indices,classes,class_ids,boxes,confidences)
+    valid,info = target_box(box,sensor)
+    draw_prediction(img, box, valid, info, c,"door handle")
     return valid,info
 
-def target_distance_and_yaw(box,sensor):
+def target_box(box, sensor):
     info = [-1,-1,-1,-1,-1,-1,-1,-1]
-    if box == None:
+    if not box:
         return False,info
-    u = box[0]
-    v = box[1]
-    w = box[2]
-    h = box[3]
-    cu = u+w/2
-    cv = v+h/2
-    # H,W = sensor.image_size()
-    # if u+3 >= w or v+3 >= h:
-    #     return False, info
-    # validate the box
-    pt1 = sensor.point3d(u+5,cv)
-    pt2 = sensor.point3d(u+w-5,cv)
-    width = abs(pt1[0]-pt2[0])
-    if width > 0.3: # if the box width larger than 0.5 m
-        # print(width)
-        return False,info
-    # get the center point in 3d of the box
-    pt3d = sensor.point3d(cu,cv)
-    # get the yaw of the system with, by using the difference of the two symmetry points
-    # depth, if the yaw is zero, the depth difference should be zero too.
-    lu,ru = cu-w/5,cu+w/5
-    lpt = sensor.point3d(lu,cv)
-    rpt = sensor.point3d(ru,cv)
-    yaw = rpt[2]-lpt[2]
+    pt3d, nr3d = sensor.evaluate_distance_and_normal(box)
     info[0:2]=pt3d
-    info[3]=yaw
+    info[3]=0.0
     info[4:7]=box
     return True,info
 

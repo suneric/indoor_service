@@ -1,5 +1,5 @@
 <launch>
   <!--simulate rgbd camera-->
   <node pkg="ids_control" type="detect_doorhandle.py" name="door_handle_detection" output="screen"/>
-  <!-- <node pkg="ids_control" type="detection_walloutlet.py" name="walloutlet_detection" output="screen"/> -->
+  <node pkg="ids_control" type="detect_walloutlet.py" name="walloutlet_detection" output="screen"/>
 </launch>

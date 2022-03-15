@@ -9,15 +9,15 @@ import sensor_msgs.point_cloud2 as pc2
 
 # visual sensors
 
-# rosberry pi, digi-key camera
-class DigiKey:
-    def __init__(self,camera_name):
+# visual sensors
+class RPIv2:
+    def __init__(self):
         self.bridge=CvBridge()
         # camera information
         self.cameraInfoUpdate = False
         # ros-realsense
-        self.caminfo_sub = rospy.Subscriber('/'+camera_name+'/camera_info', CameraInfo, self._caminfo_callback)
-        self.color_sub = rospy.Subscriber('/'+camera_name+'/image_raw', Image, self._color_callback)
+        self.caminfo_sub = rospy.Subscriber('/rpi/image_info', CameraInfo, self._caminfo_callback)
+        self.color_sub = rospy.Subscriber('/rpi/image', Image, self._color_callback)
         # data
         self.cv_color = []
         self.width = 640
@@ -39,12 +39,17 @@ class DigiKey:
             self.cameraInfoUpdate = True
 
     def _color_callback(self, data):
-        print("color callback")
+        # print("color callback")
         if self.cameraInfoUpdate:
             try:
                 self.cv_color = self.bridge.imgmsg_to_cv2(data, "bgr8")
             except CvBridgeError as e:
                 print(e)
+
+    def draw(self):
+        cv.imshow('rpiv2',self.cv_color)
+        cv.waitKey(1)
+
 
 # realsense d435
 class RSD435:
@@ -89,7 +94,7 @@ class RSD435:
 
     #### find 3d point with pixel and depth information
     def point3d(self,u,v):
-        depth = self.distance(u,v)
+        depth = self.distance(int(u),int(v))
         if depth < 0:
             return [-1,-1,-1]
         # focal length
@@ -105,6 +110,29 @@ class RSD435:
         scale = 1
         point3d = [scale*depth*x,scale*depth*y,scale*depth]
         return point3d
+
+    ### evaluate normal given a pixel
+    def normal3d(self,u,v):
+        dzdx = (self.distance(u+1,v)-self.distance(u-1,v))/2.0
+        dzdy = (self.distance(u,v+1)-self.distance(u,v-1))/2.0
+        dir = (-dzdx, -dzdy, 1.0)
+        magnitude = sqrt(dir[0]**2+dir[1]**2+dir[2]**2)
+        normal = dir/magnitude
+        return normal
+
+
+    def evaluate_distance_and_normal(self, box):
+        l, t, r, b = box[0], box[1], box[2], box[3]
+        us = np.random.randint(l,r,10)
+        vs = np.random.randint(t,b,10)
+
+        pt3ds = [self.point3d(us[i],vs[i]) for i in range(10)]
+        nm3ds = [self.normal3d(us[i],vs[i]) for i in range(10)]
+
+        pt3d = np.mean(pt3ds)
+        nm3d = np.mean(nm3ds)
+        print(pt3d, nm3d)
+        return pt3d, nm3d
 
     #### data
     def depth_image(self):

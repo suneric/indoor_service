@@ -1,86 +1,86 @@
 #!/usr/bin/env python3
 
-# door handler detection with opencv cascade classifier
 import sys
 sys.path.append('..')
 sys.path.append('.')
 import rospy
 import numpy as np
-import cv2
-import time
-from camera import FrontCam, RSD435
+from camera import RPIv2, RSD435
 import os
 from ids_control.msg import WalloutletInfo
+import torch
+import cv2
+import time
 
 def socket_boxes(img,classifer):
     # detect outles in gray image
-    gray = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
-    gray = cv2.GaussianBlur(gray, (3,3), 0)
-    handles = classifer.detectMultiScale(gray, 1.1, 20, minSize=(10,10))
-    # print(handles,len(handles)==0)
-    return handles
+    # gray = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
+    # gray = cv2.GaussianBlur(gray, (3,3), 0)
+    results = classifer(img)
+    labels, cords = results.xyxy[0][:,-1].cpu().numpy(), results.xyxy[0][:,:-1].cpu().numpy()
 
-def draw_prediction(img,boxes,valid,info,label):
-    H,W = sensor.image_size()
-    text_horizontal = 0
+    if len(cords)==0 or cords[0][4] < 0.1: # confidence
+        return None, 0.0
+
+    # return first box
+    box = cords[0][0:3]
+    confidence = cords[0][4]
+    return box, confidence
+
+def draw_prediction(img,boxes,valid,info,confidence,label):
     if valid:
-        (x,y,w,h) = boxes[0]
-        cv2.rectangle(img, (x,y), (x+w,y+h), (255,0,0), 2)
-        cv2.putText(img, label, (x-10,y-10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255,0,0), 1)
+        H,W = img.shape[:2]
+        text_horizontal = 0
+        box = boxes[0]
+        l,t,r,b = int(box[0]),int(box[1]),int(box[2]),int(box[3])
+        cv2.rectangle(img, (l,t), (r,b), (0,255,0), 2)
+        cv2.putText(img, label, (l-10,t-10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0,255,0), 1)
         texts = [
             ("x","{:.3f}".format(info[0])),
             ("y","{:.3f}".format(info[1])),
             ("z","{:.3f}".format(info[2])),
             ("dd","{:.3f}".format(info[3])),
+            ("confidence","{:.2f}".format(confidence))
         ]
         for (i,(k,v)) in enumerate(texts):
             text = "{}:{}".format(k,v)
-            cv2.putText(img, text, (10+text_horizontal*100,H-((i*20)+20)),cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255,0,0), 1)
+            cv2.putText(img, text, (10+text_horizontal*100,H-((i*20)+20)),cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0,255,0), 1)
     cv2.imshow('walloutlet detection',img)
     cv2.waitKey(1)
 
-def target_distance_and_yaw(boxes,sensor):
-    info = [-1,-1,-1,-1,-1,-1,-1,-1]
-    if len(boxes)==0:
-        return False,info
-    (u,v,w,h) =boxes[0]
-    cu = u+w/2
-    cv = v+h/2
-    # get the center point in 3d of the box
-    pt3d = sensor.point3d(u,v)
-    # get the yaw of the system with, by using the difference of the two symmetry points
-    # depth, if the yaw is zero, the depth difference should be zero too.
-    lu,ru = cu-w/5,cu+w/5
-    lpt = sensor.point3d(lu,cv)
-    rpt = sensor.point3d(ru,cv)
-    yaw = rpt[2]-lpt[2]
-    info[0:2]=pt3d
-    info[3]=yaw
-    info[4:7]=boxes[0]
-    return True,info
-
-def detect_walloutlet(sensor,classifer):
+def detect_walloutlet(sensor, classfier, depth=False):
     info = [-1,-1,-1,-1,-1,-1,-1,-1]
     if not sensor.ready():
         return False,info
     img = sensor.color_image()
-    boxes = socket_boxes(img,classifer)
-    valid,info = target_distance_and_yaw(boxes,sensor)
-    draw_prediction(img,boxes,valid,info,"electric socket")
-    return valid,info
+    labels, boxes = socket_boxes(img,classifer)
+    box, c = target_box(boxes)
+    valid,info = target_box(box, sensor)
+    draw_prediction(img, box, valid, info, c, "electric socket")
+    return valid, info
+
+def target_box(valid, box,sensor):
+    info = [-1,-1,-1,-1,-1,-1,-1,-1]
+    if not box:
+        return False,info
+    pt3d, nr3d = sensor.evaluate_distance_and_normal(box)
+    info[0:2]=pt3d
+    info[3]=0.0
+    info[4:7]=box
+    return True,info
 
 if __name__ == '__main__':
     pub = rospy.Publisher('detection/walloutlet', WalloutletInfo, queue_size=1)
     rospy.init_node("walloutlet_detection", anonymous=True, log_level=rospy.INFO)
-    sensor = RSD435()
-    # load classfier
+    rospy.sleep(1)
+    cam = RSD435()
     dir = os.path.dirname(os.path.realpath(__file__))
-    dir = os.path.join(dir,'../classifier/opencv/cascade.xml')
-    classifer = cv2.CascadeClassifier(dir)
+    dir = os.path.join(dir,'../classifier/yolo/walloutlet.pt')
+    classifer = torch.hub.load('ultralytics/yolov5','custom',path=dir)
     rate = rospy.Rate(30)
     try:
         while not rospy.is_shutdown():
-            detectable,info = detect_walloutlet(sensor,classifer)
+            detectable,info = detect_walloutlet(cam, classifer, depth=False)
             msg = WalloutletInfo()
             msg.detectable = detectable
             msg.x = info[0]

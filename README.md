@@ -1,12 +1,16 @@
 # Indoor Service Robot
-This is a simulation of a mobile robot for performing indoor service, including autonomous navigation, self charging, and door opening.
+This is a simulation of a mobile robot for performing indoor service, including autonomous navigation, self-charging, and door opening.
 
 ## prerequisite
 - Linux: Ubuntu 20.04
 - ROS: Noetic
 - OpenCV
 - RealSense SDK
-
+- tensorflow
+- pytorch
+  - pandas
+  - tqdm
+  - seaborn
 
 ## packages
 1. ids_gazebo
