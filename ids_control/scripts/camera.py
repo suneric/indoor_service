@@ -3,6 +3,7 @@ import rospy
 import numpy as np
 import cv2 as cv
 from cv_bridge import CvBridge, CvBridgeError
+import math
 
 from sensor_msgs.msg import Image, CameraInfo, PointCloud2
 import sensor_msgs.point_cloud2 as pc2
@@ -116,7 +117,7 @@ class RSD435:
         dzdx = (self.distance(u+1,v)-self.distance(u-1,v))/2.0
         dzdy = (self.distance(u,v+1)-self.distance(u,v-1))/2.0
         dir = (-dzdx, -dzdy, 1.0)
-        magnitude = sqrt(dir[0]**2+dir[1]**2+dir[2]**2)
+        magnitude = math.sqrt(dir[0]**2+dir[1]**2+dir[2]**2)
         normal = dir/magnitude
         return normal
 

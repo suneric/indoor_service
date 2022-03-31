@@ -380,28 +380,30 @@
         </collision>
       </link>
     </model>
-    <light name="light0" type="point">
+    <light name="light0" type="directional">
       <cast_shadows>0</cast_shadows>
-      <diffuse>1 1 1 1</diffuse>
+      <intensity>1</intensity>
+      <diffuse>0.7 0.7 0.7 1</diffuse>
       <specular>0.3 0.3 0.3 1</specular>
-      <pose>2 1 3 0 0 0</pose>
+      <pose>2 0 2.8 0 0 0</pose>
       <direction>0 0 -1</direction>
       <attenuation>
         <range>10</range>
         <linear>0</linear>
-        <constant>0.5</constant>
+        <constant>1</constant>
       </attenuation>
     </light>
-    <light name="light1" type="point">
+    <light name="light1" type="directional">
       <cast_shadows>0</cast_shadows>
-      <diffuse>1 1 1 1</diffuse>
+      <intensity>1</intensity>
+      <diffuse>0.7 0.7 0.7 1</diffuse>
       <specular>0.3 0.3 0.3 1</specular>
-      <pose>-1.0 1 3 0 0 0</pose>
+      <pose>2 2 2.8 0 0 0</pose>
       <direction>0 0 -1</direction>
       <attenuation>
         <range>10</range>
         <linear>0</linear>
-        <constant>0.5</constant>
+        <constant>1</constant>
       </attenuation>
     </light>
 
