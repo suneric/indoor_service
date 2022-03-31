@@ -101,9 +101,8 @@ def door_handle_box(indices,classes,class_ids,boxes,confidences):
         if label == 'handle':
             handle_box = boxes[i]
             confidence = confidences[i]
-
     box = None
-    if not handle_box:
+    if handle_box:
         # change to left, top, right, bottom
         box = (handle_box[0], handle_box[1], handle_box[0]+handle_box[2], handle_box[1]+handle_box[3])
     return box,confidence
@@ -144,7 +143,7 @@ def detect_door_handle(sensor,net,classes):
 
 def target_box(box, sensor):
     info = [-1,-1,-1,-1,-1,-1,-1,-1]
-    if not box:
+    if box == None:
         return False,info
     pt3d, nr3d = sensor.evaluate_distance_and_normal(box)
     info[0:2]=pt3d

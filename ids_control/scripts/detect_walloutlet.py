@@ -53,15 +53,14 @@ def detect_walloutlet(sensor, classfier, depth=False):
     if not sensor.ready():
         return False,info
     img = sensor.color_image()
-    labels, boxes = socket_boxes(img,classifer)
-    box, c = target_box(boxes)
+    box, c = socket_boxes(img,classifer)
     valid,info = target_box(box, sensor)
     draw_prediction(img, box, valid, info, c, "electric socket")
     return valid, info
 
-def target_box(valid, box,sensor):
+def target_box(box,sensor):
     info = [-1,-1,-1,-1,-1,-1,-1,-1]
-    if not box:
+    if box == None:
         return False,info
     pt3d, nr3d = sensor.evaluate_distance_and_normal(box)
     info[0:2]=pt3d
