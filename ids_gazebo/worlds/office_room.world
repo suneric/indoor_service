@@ -203,7 +203,7 @@
           <material>
             <script>
               <uri>file://media/materials/scripts/Gazebo.material</uri>
-              <name>Gazebo/White</name>
+              <name>Gazebo/Grey</name>
             </script>
           </material>
         </visual>
@@ -227,7 +227,7 @@
           <material>
             <script>
               <uri>file://media/materials/scripts/Gazebo.material</uri>
-              <name>Gazebo/White</name>
+              <name>Gazebo/Grey</name>
             </script>
           </material>
         </visual>
@@ -251,7 +251,7 @@
           <material>
             <script>
               <uri>file://media/materials/scripts/Gazebo.material</uri>
-              <name>Gazebo/White</name>
+              <name>Gazebo/Grey</name>
             </script>
           </material>
         </visual>
@@ -275,7 +275,7 @@
           <material>
             <script>
               <uri>file://media/materials/scripts/Gazebo.material</uri>
-              <name>Gazebo/White</name>
+              <name>Gazebo/Grey</name>
             </script>
           </material>
         </visual>
@@ -299,7 +299,7 @@
           <material>
             <script>
               <uri>file://media/materials/scripts/Gazebo.material</uri>
-              <name>Gazebo/White</name>
+              <name>Gazebo/Grey</name>
             </script>
           </material>
         </visual>
@@ -323,7 +323,7 @@
           <material>
             <script>
               <uri>file://media/materials/scripts/Gazebo.material</uri>
-              <name>Gazebo/White</name>
+              <name>Gazebo/Grey</name>
             </script>
           </material>
         </visual>
@@ -385,7 +385,7 @@
       <intensity>1</intensity>
       <diffuse>0.7 0.7 0.7 1</diffuse>
       <specular>0.3 0.3 0.3 1</specular>
-      <pose>2 0 2.8 0 0 0</pose>
+      <pose>2 0 2.5 0 0 0</pose>
       <direction>0 0 -1</direction>
       <attenuation>
         <range>10</range>
@@ -398,7 +398,7 @@
       <intensity>1</intensity>
       <diffuse>0.7 0.7 0.7 1</diffuse>
       <specular>0.3 0.3 0.3 1</specular>
-      <pose>2 2 2.8 0 0 0</pose>
+      <pose>0.5 2.5 2.5 0 0 0</pose>
       <direction>0 0 -1</direction>
       <attenuation>
         <range>10</range>

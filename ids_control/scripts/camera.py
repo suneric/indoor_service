@@ -118,21 +118,18 @@ class RSD435:
         dzdy = (self.distance(u,v+1)-self.distance(u,v-1))/2.0
         dir = (-dzdx, -dzdy, 1.0)
         magnitude = math.sqrt(dir[0]**2+dir[1]**2+dir[2]**2)
-        normal = dir/magnitude
+        normal = [dir[0]/magnitude,dir[1]/magnitude,dir[2],magnitude]
         return normal
-
 
     def evaluate_distance_and_normal(self, box):
         l, t, r, b = box[0], box[1], box[2], box[3]
-        us = np.random.randint(l,r,10)
-        vs = np.random.randint(t,b,10)
-
-        pt3ds = [self.point3d(us[i],vs[i]) for i in range(10)]
-        nm3ds = [self.normal3d(us[i],vs[i]) for i in range(10)]
-
-        pt3d = np.mean(pt3ds)
-        nm3d = np.mean(nm3ds)
-        print(pt3d, nm3d)
+        us = np.random.randint(l+5,r-5,30)
+        vs = np.random.randint(t+5,b-5,30)
+        pt3ds = [self.point3d(us[i],vs[i]) for i in range(30)]
+        nm3ds = [self.normal3d(us[i],vs[i]) for i in range(30)]
+        pt3d = np.mean(pt3ds,axis=0)
+        nm3d = np.mean(nm3ds,axis=0)
+        # print(pt3d, nm3d)
         return pt3d, nm3d
 
     #### data

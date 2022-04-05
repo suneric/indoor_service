@@ -23,15 +23,14 @@ def socket_boxes(img,classifer):
         return None, 0.0
 
     # return first box
-    box = cords[0][0:3]
+    box = cords[0][0:4]
     confidence = cords[0][4]
     return box, confidence
 
-def draw_prediction(img,boxes,valid,info,confidence,label):
+def draw_prediction(img,box,valid,info,confidence,label):
     if valid:
         H,W = img.shape[:2]
         text_horizontal = 0
-        box = boxes[0]
         l,t,r,b = int(box[0]),int(box[1]),int(box[2]),int(box[3])
         cv2.rectangle(img, (l,t), (r,b), (0,255,0), 2)
         cv2.putText(img, label, (l-10,t-10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0,255,0), 1)
@@ -39,7 +38,9 @@ def draw_prediction(img,boxes,valid,info,confidence,label):
             ("x","{:.3f}".format(info[0])),
             ("y","{:.3f}".format(info[1])),
             ("z","{:.3f}".format(info[2])),
-            ("dd","{:.3f}".format(info[3])),
+            ("nx","{:.3f}".format(info[3])),
+            ("ny","{:.3f}".format(info[4])),
+            ("nz","{:.3f}".format(info[5])),
             ("confidence","{:.2f}".format(confidence))
         ]
         for (i,(k,v)) in enumerate(texts):
@@ -49,24 +50,25 @@ def draw_prediction(img,boxes,valid,info,confidence,label):
     cv2.waitKey(1)
 
 def detect_walloutlet(sensor, classfier, depth=False):
-    info = [-1,-1,-1,-1,-1,-1,-1,-1]
+    info = [-1,-1,-1,-1,-1,-1,-1,-1,-1,-1]
     if not sensor.ready():
         return False,info
     img = sensor.color_image()
     box, c = socket_boxes(img,classifer)
-    valid,info = target_box(box, sensor)
+    valid,info = target_box(box, c, sensor)
     draw_prediction(img, box, valid, info, c, "electric socket")
     return valid, info
 
-def target_box(box,sensor):
-    info = [-1,-1,-1,-1,-1,-1,-1,-1]
-    if box == None:
+def target_box(box,c,sensor):
+    info = [-1,-1,-1,-1,-1,-1,-1,-1,-1,-1]
+    if c > 0.3:
+        pt3d,nm3d = sensor.evaluate_distance_and_normal(box)
+        info[0:3]=pt3d
+        info[3:6]=nm3d
+        info[6:]=box
+        return True,info
+    else:
         return False,info
-    pt3d, nr3d = sensor.evaluate_distance_and_normal(box)
-    info[0:2]=pt3d
-    info[3]=0.0
-    info[4:7]=box
-    return True,info
 
 if __name__ == '__main__':
     pub = rospy.Publisher('detection/walloutlet', WalloutletInfo, queue_size=1)
@@ -85,11 +87,13 @@ if __name__ == '__main__':
             msg.x = info[0]
             msg.y = info[1]
             msg.z = info[2]
-            msg.yaw = info[3]
-            msg.u = info[4]
-            msg.v = info[5]
-            msg.h = info[6]
-            msg.w = info[7]
+            msg.nx = info[3]
+            msg.ny = info[4]
+            msg.nz = info[5]
+            msg.l = info[6]
+            msg.t = info[7]
+            msg.r = info[8]
+            msg.b = info[9]
             pub.publish(msg)
             rate.sleep()
     except rospy.ROSInterruptException:

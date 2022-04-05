@@ -182,34 +182,34 @@ class DoorHandleDetection:
             return abs(cu-320) < 20
 
     def doorhandle_position(self):
-        u = int(self.detect_info.u)
-        v = int(self.detect_info.v)
-        w = int(self.detect_info.w)
-        h = int(self.detect_info.h)
-        cu = u+int(w/2)
-        cv = v+int(h/2)
+        l = int(self.detect_info.l)
+        t = int(self.detect_info.t)
+        r = int(self.detect_info.r)
+        b = int(self.detect_info.b)
+        cu = int((l+r)/2)
+        cv = int((t+b)/2)
         return cu,cv
 
     # two reference distancces for determining the yaw of the camera
     def referece_distance(self, offset_u=20, offset_v=0):
-        u = int(self.detect_info.u)
-        v = int(self.detect_info.v)
-        w = int(self.detect_info.w)
-        h = int(self.detect_info.h)
-        u1 = int(u-offset_u)
-        u2 = int(u+w+offset_u)
+        u = int(self.detect_info.l)
+        v = int(self.detect_info.t)
+        w = int(self.detect_info.r)
+        h = int(self.detect_info.b)
+        u1 = int(l-offset_u)
+        u2 = int(r+offset_u)
         d1 = self.camera.distance(u1,v)
         d2 = self.camera.distance(u2,v)
         print("RGBD Sensor: reference distance (left, right)", d1, d2)
         return d1, d2
 
     def center_distance(self):
-        u = int(self.detect_info.u)
-        v = int(self.detect_info.v)
-        w = int(self.detect_info.w)
-        h = int(self.detect_info.h)
-        cu = int(u+w/2)
-        cv = int(v+h/2)
+        u = int(self.detect_info.l)
+        v = int(self.detect_info.r)
+        w = int(self.detect_info.t)
+        h = int(self.detect_info.b)
+        cu = int((l+r)/2)
+        cv = int((t+b)/2)
         d = self.camera.distance(cu,cv)
         print("RGBD Sensor: center distance", d)
         return d
