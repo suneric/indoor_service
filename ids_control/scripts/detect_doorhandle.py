@@ -111,7 +111,7 @@ def draw_prediction(img,box,valid,info,confidence,label):
     H,W = sensor.image_size()
     text_horizontal = 0
     if valid:
-        l,t,r,b = int(box[0]),int(box[1]),int(box[0]+box[2]),int(box[1]+box[3])
+        l,t,r,b = int(box[0]),int(box[1]),int(box[2]),int(box[3])
         cv2.rectangle(img, (l,t), (r,b), (0,255,0), 2)
         cv2.putText(img, label, (l-10,t-10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0,255,0), 1)
         texts = [
