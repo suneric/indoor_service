@@ -13,36 +13,49 @@ import cv2
 import time
 
 def socket_boxes(img,classifer):
-    # detect outles in gray image
-    # gray = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
-    # gray = cv2.GaussianBlur(gray, (3,3), 0)
     results = classifer(img)
     labels, cords = results.xyxy[0][:,-1].cpu().numpy(), results.xyxy[0][:,:-1].cpu().numpy()
+    return cords, labels
 
-    if len(cords)==0 or cords[0][4] < 0.1: # confidence
-        return None, 0.0
+def target_box(boxes,labels,classes,sensor):
+    valid = False
+    info = -1*np.ones(10)
+    if len(boxes) == 0:
+        return valid, info
 
-    # return first box
-    box = cords[0][0:4]
-    confidence = cords[0][4]
-    return box, confidence
+    for i in range(len(boxes)):
+        box = boxes[i][0:4]
+        c = boxes[i][4]
+        label = classes[int(labels[i])]
+        if label != "Outlet" or c < 0.3:
+            continue
+        else:
+            pt3d,nm3d = sensor.evaluate_distance_and_normal(box)
+            info[0:3]=pt3d
+            info[3:6]=nm3d
+            info[6:]=box
+            valid = True
+    return valid,info
 
-def draw_prediction(img,box,valid,info,confidence,label):
+def draw_prediction(img,boxes,labels,classes,valid,info):
     if valid:
         H,W = img.shape[:2]
         text_horizontal = 0
-        l,t,r,b = int(box[0]),int(box[1]),int(box[2]),int(box[3])
-        cv2.rectangle(img, (l,t), (r,b), (0,255,0), 2)
-        cv2.putText(img, label, (l-10,t-10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0,255,0), 1)
+        for i in range(len(boxes)):
+            box = boxes[i]
+            label = classes[int(labels[i])]
+            l,t,r,b = int(box[0]),int(box[1]),int(box[2]),int(box[3])
+            cv2.rectangle(img, (l,t), (r,b), (0,255,0), 2)
+            cv2.putText(img, label, (l-10,t-10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0,255,0), 1)
+
         texts = [
             ("x","{:.3f}".format(info[0])),
             ("y","{:.3f}".format(info[1])),
             ("z","{:.3f}".format(info[2])),
             ("nx","{:.3f}".format(info[3])),
             ("ny","{:.3f}".format(info[4])),
-            ("nz","{:.3f}".format(info[5])),
-            ("confidence","{:.2f}".format(confidence))
-        ]
+            ("nz","{:.3f}".format(info[5]))
+            ]
         for (i,(k,v)) in enumerate(texts):
             text = "{}:{}".format(k,v)
             cv2.putText(img, text, (10+text_horizontal*100,H-((i*20)+20)),cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0,255,0), 1)
@@ -50,25 +63,14 @@ def draw_prediction(img,box,valid,info,confidence,label):
     cv2.waitKey(1)
 
 def detect_walloutlet(sensor, classfier, depth=False):
-    info = [-1,-1,-1,-1,-1,-1,-1,-1,-1,-1]
-    if not sensor.ready():
-        return False,info
+    info = -1*np.ones(10)
     img = sensor.color_image()
-    box, c = socket_boxes(img,classifer)
-    valid,info = target_box(box, c, sensor)
-    draw_prediction(img, box, valid, info, c, "electric socket")
+    boxes, labels = socket_boxes(img,classifer)
+    classes = ["Outlet", "Type B"]
+    valid, info = target_box(boxes, labels, classes, sensor)
+    draw_prediction(img, boxes, labels, classes, valid, info)
     return valid, info
 
-def target_box(box,c,sensor):
-    info = [-1,-1,-1,-1,-1,-1,-1,-1,-1,-1]
-    if c > 0.3:
-        pt3d,nm3d = sensor.evaluate_distance_and_normal(box)
-        info[0:3]=pt3d
-        info[3:6]=nm3d
-        info[6:]=box
-        return True,info
-    else:
-        return False,info
 
 if __name__ == '__main__':
     pub = rospy.Publisher('detection/walloutlet', WalloutletInfo, queue_size=1)
@@ -80,7 +82,7 @@ if __name__ == '__main__':
     classifer = torch.hub.load('ultralytics/yolov5','custom',path=dir)
     rate = rospy.Rate(30)
     try:
-        while not rospy.is_shutdown():
+        while not rospy.is_shutdown() and cam.ready():
             detectable,info = detect_walloutlet(cam, classifer, depth=False)
             msg = WalloutletInfo()
             msg.detectable = detectable
