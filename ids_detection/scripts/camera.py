@@ -9,8 +9,6 @@ from sensor_msgs.msg import Image, CameraInfo, PointCloud2
 import sensor_msgs.point_cloud2 as pc2
 
 # visual sensors
-
-# visual sensors
 class RPIv2:
     def __init__(self):
         self.bridge=CvBridge()
@@ -123,8 +121,8 @@ class RSD435:
 
     def evaluate_distance_and_normal(self, box):
         l, t, r, b = box[0], box[1], box[2], box[3]
-        us = np.random.randint(l+3,r-3,10)
-        vs = np.random.randint(t+3,b-3,10)
+        us = np.random.randint(l,r,10)
+        vs = np.random.randint(t,b,10)
         pt3ds = [self.point3d(us[i],vs[i]) for i in range(10)]
         nm3ds = [self.normal3d(us[i],vs[i]) for i in range(10)]
         pt3d = np.mean(pt3ds,axis=0)

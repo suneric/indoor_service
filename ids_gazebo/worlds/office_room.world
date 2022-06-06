@@ -203,7 +203,7 @@
           <material>
             <script>
               <uri>file://media/materials/scripts/Gazebo.material</uri>
-              <name>Gazebo/Grey</name>
+              <name>Gazebo/White</name>
             </script>
           </material>
         </visual>
@@ -227,7 +227,7 @@
           <material>
             <script>
               <uri>file://media/materials/scripts/Gazebo.material</uri>
-              <name>Gazebo/Grey</name>
+              <name>Gazebo/White</name>
             </script>
           </material>
         </visual>
@@ -251,7 +251,7 @@
           <material>
             <script>
               <uri>file://media/materials/scripts/Gazebo.material</uri>
-              <name>Gazebo/Grey</name>
+              <name>Gazebo/White</name>
             </script>
           </material>
         </visual>
@@ -275,7 +275,7 @@
           <material>
             <script>
               <uri>file://media/materials/scripts/Gazebo.material</uri>
-              <name>Gazebo/Grey</name>
+              <name>Gazebo/White</name>
             </script>
           </material>
         </visual>
@@ -299,7 +299,7 @@
           <material>
             <script>
               <uri>file://media/materials/scripts/Gazebo.material</uri>
-              <name>Gazebo/Grey</name>
+              <name>Gazebo/White</name>
             </script>
           </material>
         </visual>
@@ -323,7 +323,7 @@
           <material>
             <script>
               <uri>file://media/materials/scripts/Gazebo.material</uri>
-              <name>Gazebo/Grey</name>
+              <name>Gazebo/White</name>
             </script>
           </material>
         </visual>
@@ -342,7 +342,7 @@
           <material>
             <script>
               <uri>file://media/materials/scripts/Gazebo.material</uri>
-              <name>Gazebo/White</name>
+              <name>PR2/Grey0</name>
             </script>
           </material>
         </visual>
@@ -366,7 +366,7 @@
           <material>
             <script>
               <uri>file://media/materials/scripts/Gazebo.material</uri>
-              <name>Gazebo/White</name>
+              <name>PR2/Grey0</name>
             </script>
           </material>
         </visual>
@@ -380,31 +380,31 @@
         </collision>
       </link>
     </model>
-    <light name="light0" type="directional">
-      <cast_shadows>0</cast_shadows>
-      <intensity>1</intensity>
-      <diffuse>0.7 0.7 0.7 1</diffuse>
-      <specular>0.3 0.3 0.3 1</specular>
-      <pose>2 0 2.5 0 0 0</pose>
-      <direction>0 0 -1</direction>
+    <light name='light_0' type='directional'>
+      <pose>1 1 2.8 0 -0 0</pose>
+      <diffuse>0.5 0.5 0.5 1</diffuse>
+      <specular>0.1 0.1 0.1 1</specular>
+      <direction>0.1 0.1 -0.9</direction>
       <attenuation>
-        <range>10</range>
-        <linear>0</linear>
-        <constant>1</constant>
+        <range>20</range>
+        <constant>0.5</constant>
+        <linear>0.01</linear>
+        <quadratic>0.001</quadratic>
       </attenuation>
+      <cast_shadows>1</cast_shadows>
     </light>
-    <light name="light1" type="directional">
-      <cast_shadows>0</cast_shadows>
-      <intensity>1</intensity>
-      <diffuse>0.7 0.7 0.7 1</diffuse>
-      <specular>0.3 0.3 0.3 1</specular>
-      <pose>0.5 2.5 2.5 0 0 0</pose>
-      <direction>0 0 -1</direction>
+    <light name='light_1' type='directional'>
+      <pose>3 1 2.8 0 -0 0</pose>
+      <diffuse>0.5 0.5 0.5 1</diffuse>
+      <specular>0.1 0.1 0.1 1</specular>
+      <direction>0.1 0.1 -0.9</direction>
       <attenuation>
-        <range>10</range>
-        <linear>0</linear>
-        <constant>1</constant>
+        <range>20</range>
+        <constant>0.5</constant>
+        <linear>0.01</linear>
+        <quadratic>0.001</quadratic>
       </attenuation>
+      <cast_shadows>1</cast_shadows>
     </light>
 
     <physics type="ode">

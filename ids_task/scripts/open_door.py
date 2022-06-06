@@ -5,7 +5,7 @@ from sensors.camera import RSD435, DigiKey
 from sensors.ftsensor import FTSensor
 from sensors.joints_controller import HookController, VSliderController, HSliderController, PlugController
 from sensors.robot_driver import RobotDriver
-from ids_control.msg import DoorHandleInfo
+from ids_detection.msg import DetectionInfo
 from gazebo_msgs.msg import ModelStates, ModelState, LinkStates
 import tf.transformations as tft
 from policy.ppo_mixed import PPOMixedAgent
@@ -163,7 +163,7 @@ class DoorHandleDetection:
     def __init__(self,driver):
         self.camera = RSD435()
         self.driver = driver
-        self.detection_sub = rospy.Subscriber('/detection/door_handle', DoorHandleInfo, self._detection_cb)
+        self.detection_sub = rospy.Subscriber('/detection', DetectionInfo, self._detection_cb)
         self.detect_info = None
 
     def _detection_cb(self,data):
@@ -175,7 +175,7 @@ class DoorHandleDetection:
     def detect_doorhandle(self):
         if self.detect_info == None:
             return False
-        elif self.detect_info.detectable == False:
+        elif self.detect_info.type == 1:
             return False
         else:
             cu,cv = self.doorhandle_position()
@@ -530,7 +530,7 @@ class DoorOpeningTask:
         plt.show()
 
 if __name__ == '__main__':
-    rospy.init_node("door_handle_operation", anonymous=True, log_level=rospy.INFO)
+    rospy.init_node("door_opening", anonymous=True, log_level=rospy.INFO)
     env = EnvPoseReset()
     env.reset_robot(2.5,0.2,2.0)
     task = DoorOpeningTask(env)

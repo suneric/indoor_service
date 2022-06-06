@@ -1,0 +1,10 @@
+bool detectable
+int32 type
+float32 c
+float32 l
+float32 t
+float32 r
+float32 b
+float32 x
+float32 y
+float32 z
