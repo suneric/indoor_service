@@ -17,14 +17,14 @@
         <collision>
           <origin xyz="0 0 0" rpy="0 0 0"/>
           <geometry>
-            <box size="0.05 0.05 0.05"/>
+            <box size="0.03 0.03 0.03"/>
           </geometry>
         </collision>
 
         <visual>
           <origin xyz="0 0 0" rpy="0 0 0"/>
           <geometry>
-            <box size="0.05 0.05 0.05"/>
+            <box size="0.03 0.03 0.03"/>
           </geometry>
         </visual>
 
@@ -52,14 +52,14 @@
               </horizontal>
             </scan>
             <range>
-              <min>0.01</min>
-              <max>100.0</max>
-              <resolution>0.005</resolution>
+              <min>0.05</min>
+              <max>30.0</max>
+              <resolution>0.01</resolution>
             </range>
             <noise>
               <type>gaussian</type>
               <mean>0.0</mean>
-              <stddev>0.001</stddev>
+              <stddev>0.01</stddev>
             </noise>
           </ray>
           <plugin name="gazebo_ros_head_hokuyo_controller" filename="libgazebo_ros_gpu_laser.so">

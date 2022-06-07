@@ -23,11 +23,11 @@ def draw_prediction(sensor,detections,names):
         cv2.rectangle(img, (l,t), (r,b), (0,255,0), 2)
         cv2.putText(img, label, (l-10,t-10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0,255,0), 1)
     cv2.imshow('object detection',img)
-    cv2.waitKey(1)
+    cv2.waitKey(3) # delay for 3 milliseconds
 
 def detect_object(doorDetector, socketDetector):
     threshold = 0.8
-    info1 = doorDetector.detect(sensor,0,threshold)
+    info1 = [] #doorDetector.detect(sensor,0,threshold)
     info2 = socketDetector.detect(sensor,4,threshold)
     info_list = info1+info2
     msgs = []
@@ -58,11 +58,10 @@ if __name__ == '__main__':
     try:
         while not rospy.is_shutdown():
             if sensor.ready():
-                draw_prediction(sensor,[],names)
                 detections = detect_object(doorDetector,socketDetector)
-                draw_prediction(sensor,detections,names)
                 for msg in detections:
                     pub.publish(msg)
+                draw_prediction(sensor,detections,names)
             rate.sleep()
     except rospy.ROSInterruptException:
         pass

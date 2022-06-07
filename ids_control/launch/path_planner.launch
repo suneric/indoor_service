@@ -1,15 +1,16 @@
 <launch>
-  <arg name="x" default="-1.0"/>
-  <arg name="y" default="0.7"/>
+  <arg name="x" default="0.0"/>
+  <arg name="y" default="0.0"/>
   <arg name="z" default="0.0"/>
-  <arg name="map_file" default="$(find ids_control)/map/room1.yaml"/>
+  <arg name="map_file" default="$(find ids_task)/maps/office.yaml"/>
+
   <!--use amcl to localize robot-->
   <include file="$(find ids_control)/launch/amcl_filter.launch">
     <arg name="x" value="$(arg x)"/>
     <arg name="y" value="$(arg y)"/>
     <arg name="z" value="$(arg z)"/>
-    <arg name="use_map" default="false"/>
-    <arg name="first_map" default="true"/>
+    <arg name="use_map" default="true"/>
+    <arg name="first_map" default="false"/>
   </include>
 
   <!--load existing map-->

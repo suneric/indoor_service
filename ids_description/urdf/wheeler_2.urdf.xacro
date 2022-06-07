@@ -275,13 +275,15 @@
           <rightRearJoint>joint_chassis_rrwheel</rightRearJoint>
           <wheelSeparation>${wheelbase}</wheelSeparation>
           <wheelDiameter>2*${wheel_r}</wheelDiameter>
-          <robotBaseFrame>link_chassis</robotBaseFrame>
-          <odometryFrame>odom</odometryFrame>
           <torque>30</torque>
           <topicName>cmd_vel</topicName>
+          <commandTopic>cmd_vel</commandTopic>
+          <robotBaseFrame>link_chassis</robotBaseFrame>
+          <odometryFrame>odom</odometryFrame>
+          <publish_odom>true</publish_odom>
+          <publish_odom_tf>false</publish_odom_tf>
           <odometryTopic>odom</odometryTopic>
           <broadcastTF>true</broadcastTF>
-          <commandTopic>cmd_vel</commandTopic>
           <covariance_x>0.0001</covariance_x>
           <covariance_y>0.0000</covariance_y>
           <covariance_yaw>0.01</covariance_yaw>

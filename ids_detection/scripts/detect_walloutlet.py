@@ -21,15 +21,23 @@ class SocketDetector:
     '''
     def detect(self, sensor, id_offset=0, confidence_threshold=0.3):
         img = sensor.color_image()
+        W = img.shape[1]
+        H = img.shape[0]
         boxes, labels = self.socket_boxes(img)
         # print(boxes, labels)
         info_list = []
         for i in range(len(boxes)):
+            # check confidence
             confidence = boxes[i][4]
             if confidence < confidence_threshold:
                 continue
-
+                
+            # check box size
             box = boxes[i][0:4]
+            l,t,r,b = box[0],box[1],box[2],box[3]
+            if l < 3 or r > W-3 or t < 3 or b > H-3 or r-l < 6 or b-t < 6:
+                continue
+
             class_id = int(labels[i])+id_offset
             pt3d,nm3d = sensor.evaluate_distance_and_normal(box)
 

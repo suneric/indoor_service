@@ -1,0 +1,10 @@
+<launch>
+  <include file="$(find ids_control)/launch/path_planner.launch">
+    <arg name="x" default="1.5"/>
+    <arg name="y" default="0.5"/>
+    <arg name="z" default="0.0"/>
+    <arg name="map_file" value="$(find ids_task)/maps/office.yaml"/>
+  </include>
+
+  <node pkg="ids_task" type="plug_charge.py" name="auto_charge" output="screen"/>
+</launch>

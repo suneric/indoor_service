@@ -112,3 +112,50 @@ class PlugController:
             rate = rospy.Rate(1)
             self.pub.publish(pos)
             rate.sleep()
+
+
+# class for device controling
+class FrameDeviceController:
+    def __init__(self):
+        self.hook = HookController()
+        self.vslider = VSliderController()
+        self.hslider = HSliderController()
+        self.plug = PlugController()
+
+    def set_position(self,hk=True,vs=0.0,hs=0.0,pg=0.0):
+        self.move_hook(release = hk)
+        self.move_vslider(vs)
+        self.move_hslider(hs)
+        self.move_plug(pg)
+
+    def vslider_height(self):
+        return self.vslider.height()
+
+    def hslider_pos(self):
+        return self.hslider.pos()
+
+    def plug_pos(self):
+        return self.plug.pos()
+
+    def hook_released(self):
+        return self.hook.is_released()
+
+    def move_vslider(self,vs=0.0):
+        self.vslider.set_height(vs)
+        print("Device Controller: set vslider height", vs)
+
+    def move_hslider(self,hs=0.0):
+        self.hslider.set_pos(hs)
+        print("Device Controller: set hslider position", hs)
+
+    def move_hook(self,release=True):
+        if release:
+            self.hook.release()
+            print("Device Controller: release sidebar")
+        else:
+            self.hook.fold()
+            print("Device Controller: fold sidebar")
+
+    def move_plug(self, pg=0.0):
+        self.plug.set_pos(pg)
+        print("Device Controller: set plug position", pg)

@@ -7,6 +7,7 @@ import math
 
 from sensor_msgs.msg import Image, CameraInfo, PointCloud2
 import sensor_msgs.point_cloud2 as pc2
+from ids_detection.msg import DetectionInfo
 
 # visual sensors
 class RPIv2:
@@ -44,11 +45,6 @@ class RPIv2:
                 self.cv_color = self.bridge.imgmsg_to_cv2(data, "bgr8")
             except CvBridgeError as e:
                 print(e)
-
-    def draw(self):
-        cv.imshow('rpiv2',self.cv_color)
-        cv.waitKey(1)
-
 
 # realsense d435
 class RSD435:

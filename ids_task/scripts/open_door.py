@@ -3,7 +3,7 @@ import rospy
 import numpy as np
 from sensors.camera import RSD435, DigiKey
 from sensors.ftsensor import FTSensor
-from sensors.joints_controller import HookController, VSliderController, HSliderController, PlugController
+from sensors.joints_controller import FrameDeviceController, HookController, VSliderController, HSliderController, PlugController
 from sensors.robot_driver import RobotDriver
 from ids_detection.msg import DetectionInfo
 from gazebo_msgs.msg import ModelStates, ModelState, LinkStates
@@ -110,53 +110,6 @@ class EnvPoseReset:
         t_mat = tft.translation_matrix([p.x,p.y,p.z])
         r_mat = tft.quaternion_matrix([q.x,q.y,q.z,q.w])
         return np.dot(t_mat,r_mat)
-
-# class for device controling
-class FrameDeviceController:
-    def __init__(self):
-        self.hook = HookController()
-        self.vslider = VSliderController()
-        self.hslider = HSliderController()
-        self.plug = PlugController()
-
-    def set_position(self,hk=True,vs=0.0,hs=0.0,pg=0.0):
-        self.move_hook(release = hk)
-        self.move_vslider(vs)
-        self.move_hslider(hs)
-        self.move_plug(pg)
-
-    def vslider_height(self):
-        return self.vslider.height()
-
-    def hslider_pos(self):
-        return self.hslider.pos()
-
-    def plug_pos(self):
-        return self.plug.pos()
-
-    def hook_released(self):
-        return self.hook.is_released()
-
-    def move_vslider(self,vs=0.0):
-        self.vslider.set_height(vs)
-        print("Device Controller: set vslider height", vs)
-
-    def move_hslider(self,hs=0.0):
-        self.hslider.set_pos(hs)
-        print("Device Controller: set hslider position", hs)
-
-    def move_hook(self,release=True):
-        if release:
-            self.hook.release()
-            print("Device Controller: release sidebar")
-        else:
-            self.hook.fold()
-            print("Device Controller: fold sidebar")
-
-    def move_plug(self, pg=0.0):
-        self.plug.set_pos(pg)
-        print("Device Controller: set plug position", pg)
-
 
 # class for door handle detection
 class DoorHandleDetection:
