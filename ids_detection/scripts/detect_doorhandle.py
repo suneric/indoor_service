@@ -24,7 +24,8 @@ class DoorDetector:
         indices = cv2.dnn.NMSBoxes(boxes,confidences,confidence_threshold,nms_threshold)
         info_list = []
         for i in indices:
-            i = i[0]
+            if isinstance(i,list):
+                i = i[0]
             class_id = class_ids[i]+id_offset
             confidence = confidences[i]
             box = boxes[i]
@@ -88,7 +89,13 @@ class DoorDetector:
 
     def get_output_layers(self):
         layer_names = self.net.getLayerNames()
-        output_layers = [layer_names[i[0] - 1] for i in self.net.getUnconnectedOutLayers()]
+        output_layers = layer_names
+        try:
+            output_layers = [layer_names[i[0] - 1] for i in self.net.getUnconnectedOutLayers()]
+        except IndexError:
+            # in case getUnconnectedOutLayers() returns 1D array when CUDA isn't available
+            output_layers = [layer_names[i - 1] for i in self.net.getUnconnectedOutLayers()]
+
         return output_layers
 
     def split_image(self,image):
