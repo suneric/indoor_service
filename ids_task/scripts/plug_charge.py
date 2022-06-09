@@ -4,6 +4,7 @@ import numpy as np
 from sensors.joints_controller import FrameDeviceController, HookController, VSliderController, HSliderController, PlugController
 from sensors.robot_driver import RobotDriver
 from ids_detection.msg import DetectionInfo
+from gazebo_msgs.msg import ModelStates, ModelState, LinkStates
 from geometry_msgs.msg import Pose, Twist, PoseWithCovarianceStamped
 import tf.transformations as tft
 import os
@@ -15,51 +16,197 @@ import math
 from actionlib_msgs.msg import GoalStatus
 from move_base_msgs.msg import MoveBaseAction, MoveBaseGoal
 import actionlib
+from sensors.ftsensor import FTSensor
 
-class AutoChagerTask:
+class EnvPoseReset:
+    def __init__(self):
+        self.sub1 = rospy.Subscriber('/gazebo/link_states', LinkStates ,self._pose_cb1)
+        self.sub2 = rospy.Subscriber('/gazebo/model_states', ModelStates, self._pose_cb2)
+        self.pub = rospy.Publisher('/gazebo/set_model_state', ModelState, queue_size=1)
+        self.pose1 = None
+        self.pose2 = None
+        self.trajectory1 = []
+        self.trajectory2 = []
+        self.index1 = 0
+        self.index2 = 0
+
+    def _pose_cb1(self,data):
+        index = data.name.index('hinged_door::door')
+        self.pose1 = data.pose[index]
+        self.index1 += 1
+        if self.index1 % 1000 == 0:
+            self.trajectory1.append(data.pose[index])
+
+    def _pose_cb2(self,data):
+        index = data.name.index('mrobot')
+        self.pose2 = data.pose[index]
+        self.index2 += 1
+        if self.index2 % 1000 == 0:
+            self.trajectory2.append(data.pose[index])
+
+    def door_pose(self):
+        return self.pose1
+
+    def robot_pose(self):
+        return self.pose2
+
+    def door_trajectory(self):
+        return self.trajectory1
+
+    def robot_trajectory(self):
+        return self.trajectory2
+
+    def reset_robot(self,x,y,yaw):
+        #ref = np.random.uniform(size=3)
+        robot = ModelState()
+        robot.model_name = 'mrobot'
+        robot.pose.position.x = x
+        robot.pose.position.y = y
+        # robot.pose.position.z = 0.072
+        rq = tft.quaternion_from_euler(0,0,yaw)
+        robot.pose.orientation.x = rq[0]
+        robot.pose.orientation.y = rq[1]
+        robot.pose.orientation.z = rq[2]
+        robot.pose.orientation.w = rq[3]
+        self.pub.publish(robot)
+        # check if reset success
+        rospy.sleep(0.5)
+        if not self._same_position(self.pose2, robot.pose):
+            print("required reset to ", robot.pose)
+            print("current ", self.pose2)
+            self.pub.publish(robot)
+
+    def _same_position(self, pose1, pose2):
+        x1, y1 = pose1.position.x, pose1.position.y
+        x2, y2 = pose2.position.x, pose2.position.y
+        tolerance = 0.001
+        if abs(x1-x2) > tolerance or abs(y1-y2) > tolerance:
+            return False
+        else:
+            return True
+
+    def door_position(self,cp,w):
+        door_matrix = self._pose_matrix(cp)
+        door_edge = np.array([[1,0,0,w],
+                            [0,1,0,0],
+                            [0,0,1,0],
+                            [0,0,0,1]])
+        door_edge_mat = np.dot(door_matrix, door_edge)
+        open_angle = math.atan2(door_edge_mat[0,3],door_edge_mat[1,3])
+        return w, open_angle
+
+    def robot_position(self,cp,x,y):
+        robot_matrix = self._pose_matrix(cp)
+        footprint_trans = np.array([[1,0,0,x],
+                                    [0,1,0,y],
+                                    [0,0,1,0],
+                                    [0,0,0,1]])
+        fp_mat = np.dot(robot_matrix, footprint_trans)
+        return fp_mat
+
+    def _pose_matrix(self,cp):
+        p = cp.position
+        q = cp.orientation
+        t_mat = tft.translation_matrix([p.x,p.y,p.z])
+        r_mat = tft.quaternion_matrix([q.x,q.y,q.z,q.w])
+        return np.dot(t_mat,r_mat)
+
+
+class Navigator:
     def __init__(self, goal):
         self.goal = goal
-        self.goal_status = 'ready' # moving, reached
-        self.pos_sub = rospy.Subscriber('amcl_pose', PoseWithCovarianceStamped, self._pose_cb)
-        self.amcl_pose = goal
         self.client = actionlib.SimpleActionClient('move_base', MoveBaseAction)
         self.client.wait_for_server()
-        self.last_time = rospy.Time.now()
+        self.reached = False
 
-    def _pose_cb(self,msg):
-        self.amcl_pose = msg.pose.pose
+    def arrived(self):
+        return self.reached
 
-    def reach_cb(self,msg,result):
-        if msg == GoalStatus.SUCCEEDED: # 3
-            self.goal_status = 'reached'
+    def done_cb(self,status,result):
+        if status == 3:
+            rospy.loginfo("Goal pose is reached.")
+            self.reached = True
         else:
-            print("update path plan: ")
-            self.move2goal()
+            rospy.loginfo("Goal pose is aborted.")
 
-    def moving_cb(self):
-        self.goal_status = "moving"
+    def active_cb(self):
+        rospy.loginfo("Goal pose is now being processed.")
 
     def feedback_cb(self, feedback):
-        # reset the goal every minute
-        # print(feedback)
-        current_time = rospy.Time.now()
-        duration = current_time.secs - self.last_time.secs
-        if duration > 120:
-            print("update path plan: ")
-            self.move2goal()
+        rospy.loginfo("Feedback is receive.")
 
     def move2goal(self):
+        print("move to goal...")
         self.last_time = rospy.Time.now()
         goal = MoveBaseGoal()
         goal.target_pose.header.frame_id = "map"
-        goal.target_pose.header.stamp = self.last_time
+        goal.target_pose.header.stamp = rospy.Time.now()
         goal.target_pose.pose = self.goal
-        self.client.send_goal(goal, self.reach_cb, self.moving_cb, self.feedback_cb)
-        self.goal_status = 'moving'
-        rospy.loginfo("autonomously moving to ")
-        rospy.loginfo(self.goal)
+        self.client.send_goal(goal, self.done_cb, self.active_cb, self.feedback_cb)
 
 
+
+class AutoChagerTask:
+    def __init__(self):
+        self.driver = RobotDriver()
+        self.fdController = FrameDeviceController()
+        self.task_status = "unknown"
+        self.detect_sub = rospy.Subscriber("detection", DetectionInfo, self.detect_cb)
+        self.ftsensor = FTSensor('/tf_sensor_hook')
+        self.info = None
+        self.target = None
+
+    def detect_cb(self,info):
+        if info.type == 5:
+            self.info = info
+
+    def status(self):
+        return self.task_status
+
+    def prepare(self):
+        self.task_status = "preparing"
+        self.driver.stop()
+        self.fdController.set_position(hk=False,vs=0.1,hs=0.0,pg=0.0)
+        self.task_status = "prepared"
+
+    def searching(self):
+        print("searching outlet and socket")
+        self.task_status = "searching"
+
+        # search socket
+        while self.info == None or self.info.type != 5:
+            self.driver.drive(-1.0,0.0)
+
+        self.target = self.info
+        self.driver.stop()
+        print("found socket", self.target)
+
+        # align
+        pos = self.fdController.hslider_pos()
+        self.fdController.move_hslider(pos - self.target.x)
+        pos = self.fdController.vslider_height()
+        self.fdController.move_vslider(pos - self.target.y + 0.0325)
+
+        self.target = self.info
+        print("align", self.target)
+
+        # touch
+        forces = self.ftsensor.forces()
+        vx = 1.5
+        while abs(forces[0]) < 5:
+            self.driver.drive(vx,0)
+            rospy.sleep(0.01)
+            forces = self.ftsensor.forces()
+            print("Force Sensor 1: detected forces [x, y, z]", forces)
+        self.driver.stop()
+        self.fdController.move_plug(1.0)
+        self.task_status = "ready"
+
+    def plugin(self):
+        print("plugin to charge...")
+        self.task_status == "plugin"
+
+## transformations
 def quaternion_pose(x,y,yaw):
     pose = Pose()
     pose.position.x = x
@@ -75,14 +222,28 @@ def quaternion_pose(x,y,yaw):
 
 if __name__ == '__main__':
     rospy.init_node("auto_charge", anonymous=True, log_level=rospy.INFO)
+
+    env = EnvPoseReset()
+    env.reset_robot(1,2,1.57)
+
     rate = rospy.Rate(50)
-    task = AutoChagerTask(quaternion_pose(1,2,1.57))
+
+    # navigate to target pose
+    # nav = Navigator(quaternion_pose(1,2,1.57))
+    # nav.move2goal()
+    # while not nav.arrived():
+    #     rate.sleep()
+
+    task = AutoChagerTask()
     try:
         while not rospy.is_shutdown():
-            if task.goal_status == "ready":
-                task.move2goal()
-            if task.goal_status == "reached":
-                print("ready to plugin.")
+            status = task.status()
+            if status == "unknown":
+                task.prepare()
+            elif status == "prepared":
+                task.searching()
+            elif status == "prepared":
+                task.plugin()
         rate.sleep()
     except rospy.ROSInterruptException:
         pass

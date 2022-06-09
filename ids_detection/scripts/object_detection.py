@@ -27,7 +27,7 @@ def draw_prediction(sensor,detections,names):
 
 def detect_object(doorDetector, socketDetector):
     threshold = 0.8
-    info1 = doorDetector.detect(sensor,0,threshold)
+    info1 = [] #doorDetector.detect(sensor,0,threshold)
     info2 = socketDetector.detect(sensor,4,threshold)
     info_list = info1+info2
     msgs = []

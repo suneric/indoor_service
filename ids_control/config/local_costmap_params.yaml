@@ -2,8 +2,8 @@ local_costmap:
   global_frame: "map"
   static_map: false
   rolling_window: true
-  width: 6.0
-  height: 6.0
+  width: 2.0
+  height: 2.0
   plugins:
     - {name: obstacles, type: "costmap_2d::VoxelLayer"}
     - {name: inflation, type: "costmap_2d::InflationLayer"}

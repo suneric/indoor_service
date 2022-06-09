@@ -12,8 +12,9 @@ if using the skid_steer_drive_controller plugin, make sure the odom data is publ
 
 
 ## reference
-1. [setup and configuration of the navigation stack on a robot](https://wiki.ros.org/navigation/Tutorials/RobotSetup)
+1. [Setup and configuration of the navigation stack on a robot](https://wiki.ros.org/navigation/Tutorials/RobotSetup)
 2. [How to make better maps using gmapping](https://answers.ros.org/question/269280/how-to-make-better-maps-using-gmapping/?answer=269293#post-id-269293)
+3. [Navigation](https://kaiyuzheng.me/documents/navguide.pdf)
 
 
 ## play
