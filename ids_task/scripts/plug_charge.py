@@ -157,8 +157,7 @@ class AutoChagerTask:
         self.target = None
 
     def detect_cb(self,info):
-        if info.type == 5:
-            self.info = info
+        self.info = info
 
     def status(self):
         return self.task_status
@@ -173,38 +172,58 @@ class AutoChagerTask:
         print("searching outlet and socket")
         self.task_status = "searching"
 
-        # search socket
-        while self.info == None or self.info.type != 5:
+        # search electric outlet on wall (type = 3)
+        while self.info == None or self.info.type != 3:
             self.driver.drive(-1.0,0.0)
 
         self.target = self.info
         self.driver.stop()
-        print("found socket", self.target)
+        print("found wall outlet", self.target)
 
         # align
         pos = self.fdController.hslider_pos()
         self.fdController.move_hslider(pos - self.target.x)
-        pos = self.fdController.vslider_height()
-        self.fdController.move_vslider(pos - self.target.y + 0.0325)
 
-        self.target = self.info
-        print("align", self.target)
+        pos = self.fdController.vslider_height()
+        self.fdController.move_vslider(pos - self.target.y + 0.0725)
 
         # touch
-        forces = self.ftsensor.forces()
-        vx = 1.5
-        while abs(forces[0]) < 5:
-            self.driver.drive(vx,0)
-            rospy.sleep(0.01)
+        self.driver.drive(1.0,0)
+        while 1:
             forces = self.ftsensor.forces()
             print("Force Sensor 1: detected forces [x, y, z]", forces)
-        self.driver.stop()
-        self.fdController.move_plug(1.0)
+            if abs(forces[0]) > 5:
+                self.driver.stop()
+                break
+            rospy.sleep(0.1)
+
+        # backward
+        self.driver.drive(-1.0,0)
+        while 1:
+            rospy.sleep(1)
+            print(self.info)
+            if self.info.type == 4:
+                self.driver.stop()
+                break
+
         self.task_status = "ready"
 
     def plugin(self):
         print("plugin to charge...")
         self.task_status == "plugin"
+
+        self.driver.stop()
+        rospy.sleep(2)
+        self.target = self.info
+        # adjust position of adaptor
+        pos = self.fdController.hslider_pos()
+        self.fdController.move_hslider(pos - self.target.x)
+        # have an offset in y 0.0725 to the center of camera
+        pos = self.fdController.vslider_height()
+        self.fdController.move_vslider(pos - self.target.y + 0.0725)
+        print("pluging")
+        self.fdController.move_plug(0.1)
+        self.task_status = "done"
 
 ## transformations
 def quaternion_pose(x,y,yaw):
@@ -227,13 +246,11 @@ if __name__ == '__main__':
     env.reset_robot(1,2,1.57)
 
     rate = rospy.Rate(50)
-
     # navigate to target pose
     # nav = Navigator(quaternion_pose(1,2,1.57))
     # nav.move2goal()
     # while not nav.arrived():
     #     rate.sleep()
-
     task = AutoChagerTask()
     try:
         while not rospy.is_shutdown():
@@ -242,7 +259,7 @@ if __name__ == '__main__':
                 task.prepare()
             elif status == "prepared":
                 task.searching()
-            elif status == "prepared":
+            elif status == "ready":
                 task.plugin()
         rate.sleep()
     except rospy.ROSInterruptException:

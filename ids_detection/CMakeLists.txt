@@ -102,7 +102,7 @@ catkin_package(
  INCLUDE_DIRS
  LIBRARIES ids_detection
  CATKIN_DEPENDS message_runtime
- DEPENDS system_lib
+ DEPENDS
 )
 
 ###########

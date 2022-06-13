@@ -98,7 +98,7 @@
         <parent link="link_hslider"/>
         <child link="link_plug"/>
         <axis xyz="1 0 0"/>
-        <limit upper="0.1" lower="0" effort="300.0" velocity="0.1"/>
+        <limit upper="0.1" lower="0" effort="100.0" velocity="0.02"/>
       </joint>
       <link name="link_plug">
         <visual>

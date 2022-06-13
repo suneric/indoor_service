@@ -16,9 +16,9 @@
     <!--RGB-D camera, look forward-->
     <xacro:include filename="$(find ids_description)/urdf/realsense.urdf.xacro" />
     <xacro:realsense_macro parent="link_hslider">
-      <xacro:property name="location_x" value="0.12"/>
+      <xacro:property name="location_x" value="0.06"/>
       <xacro:property name="location_y" value="0.0"/>
-      <xacro:property name="location_z" value="0.0325"/>
+      <xacro:property name="location_z" value="0.0725"/>
       <xacro:property name="camera_width" value="640" />
       <xacro:property name="camera_height" value="480" />
       <xacro:property name="camera_name" value="rs435" />

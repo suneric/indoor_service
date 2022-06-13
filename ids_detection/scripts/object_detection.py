@@ -9,9 +9,7 @@ import os
 import rospy
 from camera import RSD435
 from ids_detection.msg import DetectionInfo
-from detect_doorhandle import DoorDetector
-from detect_walloutlet import SocketDetector
-import torch
+from detector import ObjectDetector
 
 def draw_prediction(sensor,detections,names):
     img = sensor.color_image()
@@ -25,11 +23,10 @@ def draw_prediction(sensor,detections,names):
     cv2.imshow('object detection',img)
     cv2.waitKey(3) # delay for 3 milliseconds
 
-def detect_object(doorDetector, socketDetector):
-    threshold = 0.8
-    info1 = [] #doorDetector.detect(sensor,0,threshold)
-    info2 = socketDetector.detect(sensor,4,threshold)
-    info_list = info1+info2
+def detect_object(detector):
+    # increse the threshold when have better trained model
+    threshold = 0.5
+    info_list = detector.detect(sensor, threshold)
     msgs = []
     for info in info_list:
         msg = DetectionInfo()
@@ -50,15 +47,14 @@ if __name__ == '__main__':
     pub = rospy.Publisher('detection', DetectionInfo, queue_size=1)
     rospy.init_node("object_detection", anonymous=True, log_level=rospy.INFO)
     dir = os.path.join(os.path.dirname(os.path.realpath(__file__)),'..','classifier/yolo')
-    doorDetector = DoorDetector(dir)
-    socketDetector = SocketDetector(dir)
-    names = ["door","handle","cabinet","refrigerator","Outlet","Socket"]
+    detector = ObjectDetector(dir)
+    names = ["door","door handle","human body","electric outlet","socket type B"]
     rate = rospy.Rate(50)
     sensor = RSD435()
     try:
         while not rospy.is_shutdown():
             if sensor.ready():
-                detections = detect_object(doorDetector,socketDetector)
+                detections = detect_object(detector)
                 for msg in detections:
                     pub.publish(msg)
                 draw_prediction(sensor,detections,names)
