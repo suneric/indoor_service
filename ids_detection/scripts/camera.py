@@ -8,6 +8,7 @@ import math
 from sensor_msgs.msg import Image, CameraInfo, PointCloud2
 import sensor_msgs.point_cloud2 as pc2
 from ids_detection.msg import DetectionInfo
+from sne import SNE
 
 # visual sensors
 class RPIv2:
@@ -75,36 +76,36 @@ class RSD435:
     #### depth info
     # calculate mean distance in a small pixel frame around u,v
     # a non-zero mean value for the pixel with its neighboring pixels
-    def distance(self,u,v,size=3):
-        dist_list=[]
-        for i in range(-size,size):
-            for j in range(-size,size):
-                value = self.cv_depth[v+j,u+i]
-                if value > 0.0:
-                    dist_list.append(value)
-        if not dist_list:
-            return -1
-        else:
-            return np.mean(dist_list)
-
-    #### find 3d point with pixel and depth information
-    def point3d(self,u,v):
-        depth = self.distance(int(u),int(v))
-        if depth < 0:
-            return [-1,-1,-1]
-        # focal length
-        fx = self.intrinsic[0]
-        fy = self.intrinsic[4]
-        # principle point
-        cx = self.intrinsic[2]
-        cy = self.intrinsic[5]
-        # deproject
-        x = (u-cx)/fx
-        y = (v-cy)/fy
-        # scale = 0.001 # for simulation is 1
-        scale = 1
-        point3d = [scale*depth*x,scale*depth*y,scale*depth]
-        return point3d
+    # def distance(self,u,v,size=3):
+    #     dist_list=[]
+    #     for i in range(-size,size):
+    #         for j in range(-size,size):
+    #             value = self.cv_depth[v+j,u+i]
+    #             if value > 0.0:
+    #                 dist_list.append(value)
+    #     if not dist_list:
+    #         return -1
+    #     else:
+    #         return np.mean(dist_list)
+    #
+    # #### find 3d point with pixel and depth information
+    # def point3d(self,u,v):
+    #     depth = self.distance(int(u),int(v))
+    #     if depth < 0:
+    #         return [-1,-1,-1]
+    #     # focal length
+    #     fx = self.intrinsic[0]
+    #     fy = self.intrinsic[4]
+    #     # principle point
+    #     cx = self.intrinsic[2]
+    #     cy = self.intrinsic[5]
+    #     # deproject
+    #     x = (u-cx)/fx
+    #     y = (v-cy)/fy
+    #     # scale = 0.001 # for simulation is 1
+    #     scale = 1
+    #     point3d = [scale*depth*x,scale*depth*y,scale*depth]
+    #     return point3d
 
     ### evaluate normal given a pixel
     def normal3d(self,u,v):
@@ -116,11 +117,17 @@ class RSD435:
         return normal
 
     def evaluate_distance_and_normal(self, box):
+        normal_estimator = SNE(self.cv_color,self.cv_depth,self.intrinsic,self.width,self.height)
+        pcd = normal_estimator.estimate() # (H,W,6): x,y,z,nx,ny,nz
+        # display normal
+        # cv.imshow('normal',(1-pcd[:,:,3:6])/2)
+        # cv.waitKey(1)
+        # randomly select 10 points in the box and evaluate mean point and normal
         l, t, r, b = box[0], box[1], box[2], box[3]
         us = np.random.randint(l,r,10)
         vs = np.random.randint(t,b,10)
-        pt3ds = [self.point3d(us[i],vs[i]) for i in range(10)]
-        nm3ds = [self.normal3d(us[i],vs[i]) for i in range(10)]
+        pt3ds = [pcd[vs[i],us[i],0:3] for i in range(10)]
+        nm3ds = [pcd[vs[i],us[i],3:6] for i in range(10)]
         pt3d = np.mean(pt3ds,axis=0)
         nm3d = np.mean(nm3ds,axis=0)
         # print(pt3d, nm3d)
