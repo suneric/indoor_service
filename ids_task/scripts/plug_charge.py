@@ -175,54 +175,73 @@ class AutoChagerTask:
         # search electric outlet on wall (type = 3)
         while self.info == None or self.info.type != 3:
             self.driver.drive(-1.0,0.0)
-
         self.target = self.info
-        self.driver.stop()
         print("found wall outlet", self.target)
 
-        # align
+        nx = self.info.nx
+        while abs(nx) > 0.001:
+            self.driver.drive(0.0,np.sign(nx)*1.0)
+            if self.info and self.info.type == 3:
+                nx = self.info.nx
+                print(self.info.nx, self.info.ny, self.info.nz)
+                self.target = self.info
+            else:
+                self.driver.stop()
+
+        self.driver.stop()
+        print(self.target)
+
+        # algin robot
         pos = self.fdController.hslider_pos()
         self.fdController.move_hslider(pos - self.target.x)
 
         pos = self.fdController.vslider_height()
         self.fdController.move_vslider(pos - self.target.y + 0.0725)
 
-        # touch
-        self.driver.drive(1.0,0)
-        while 1:
-            forces = self.ftsensor.forces()
-            print("Force Sensor 1: detected forces [x, y, z]", forces)
-            if abs(forces[0]) > 5:
+        # move to 0.7 meter to the walloutlet
+        z = self.target.z
+        while z > 0.7:
+            self.driver.drive(1.0,0.0)
+            if self.info and self.info.type == 3:
+                z = self.info.z
+                print(self.info.x, self.info.y, self.info.z)
+                self.target = self.info
+            else:
                 self.driver.stop()
-                break
-            rospy.sleep(0.1)
-
-        # backward
-        self.driver.drive(-1.0,0)
-        while 1:
-            rospy.sleep(1)
-            print(self.info)
-            if self.info.type == 4:
-                self.driver.stop()
-                break
-
-        self.task_status = "ready"
-
-    def plugin(self):
-        print("plugin to charge...")
-        self.task_status == "plugin"
 
         self.driver.stop()
-        rospy.sleep(2)
+
+        while self.info == None or self.info.type != 4:
+            rospy.sleep(0.1)
         self.target = self.info
+        print("found socket B", self.target)
+        print(self.target)
         # adjust position of adaptor
         pos = self.fdController.hslider_pos()
         self.fdController.move_hslider(pos - self.target.x)
         # have an offset in y 0.0725 to the center of camera
         pos = self.fdController.vslider_height()
         self.fdController.move_vslider(pos - self.target.y + 0.0725)
+
+        print("ready to plug")
+
+        self.task_status = "ready"
+
+    def plugin(self):
+        print("plugin to charge...")
+        self.task_status == "plugin"
         print("pluging")
         self.fdController.move_plug(0.1)
+
+        forces = self.ftsensor.forces()
+        print("Force Sensor 1: detected forces [x, y, z]", forces)
+        while abs(forces[0]) < 10:
+            self.driver.drive(1.0,0)
+            forces = self.ftsensor.forces()
+            print("Force Sensor 1: detected forces [x, y, z]", forces)
+            rospy.sleep(0.1)
+
+        self.driver.stop()
         self.task_status = "done"
 
 ## transformations
@@ -243,7 +262,11 @@ if __name__ == '__main__':
     rospy.init_node("auto_charge", anonymous=True, log_level=rospy.INFO)
 
     env = EnvPoseReset()
-    env.reset_robot(1,2,1.57)
+    rad = np.random.uniform(size=3)
+    rx = 0.2*(rad[0]-0.5) + 1.0
+    ry = 0.2*(rad[1]-0.5) + 1.5
+    rt = 0.5*(rad[2]-0.5) + 1.57
+    env.reset_robot(rx,ry,rt)
 
     rate = rospy.Rate(50)
     # navigate to target pose

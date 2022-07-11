@@ -31,10 +31,7 @@ class ObjectDetector:
             l,t,r,b = box[0],box[1],box[2],box[3]
             if l < 3 or r > W-3 or t < 3 or b > H-3 or r-l < 6 or b-t < 6:
                 continue
-
             class_id = int(labels[i])
-            pt3d,nm3d = sensor.evaluate_distance_and_normal(box)
-
             info = [True] # detachable
             info.append(class_id)
             info.append(confidence)
@@ -42,9 +39,14 @@ class ObjectDetector:
             info.append(box[1])
             info.append(box[2])
             info.append(box[3])
+            pt3d,nm3d = sensor.evaluate_distance_and_normal(box)
             info.append(pt3d[0])
             info.append(pt3d[1])
             info.append(pt3d[2])
+            info.append(nm3d[0])
+            info.append(nm3d[1])
+            info.append(nm3d[2])
+                
             info_list.append(info)
         return info_list
 

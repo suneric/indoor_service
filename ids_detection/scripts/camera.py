@@ -8,7 +8,7 @@ import math
 from sensor_msgs.msg import Image, CameraInfo, PointCloud2
 import sensor_msgs.point_cloud2 as pc2
 from ids_detection.msg import DetectionInfo
-from sne import SNE
+from normal_estimator import SNE
 
 # visual sensors
 class RPIv2:
@@ -124,8 +124,8 @@ class RSD435:
         # cv.waitKey(1)
         # randomly select 10 points in the box and evaluate mean point and normal
         l, t, r, b = box[0], box[1], box[2], box[3]
-        us = np.random.randint(l,r,10)
-        vs = np.random.randint(t,b,10)
+        us = np.random.randint(l,r,20)
+        vs = np.random.randint(t,b,20)
         pt3ds = [pcd[vs[i],us[i],0:3] for i in range(10)]
         nm3ds = [pcd[vs[i],us[i],3:6] for i in range(10)]
         pt3d = np.mean(pt3ds,axis=0)
@@ -136,6 +136,7 @@ class RSD435:
     #### data
     def depth_image(self):
         return self.cv_depth
+
     def color_image(self):
         return self.cv_color
 

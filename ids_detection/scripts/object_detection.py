@@ -40,6 +40,9 @@ def detect_object(detector):
         msg.x = info[7]
         msg.y = info[8]
         msg.z = info[9]
+        msg.nx = info[10]
+        msg.ny = info[11]
+        msg.nz = info[12]
         msgs.append(msg)
     return msgs
 
