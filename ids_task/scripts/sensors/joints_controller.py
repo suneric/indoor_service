@@ -27,13 +27,13 @@ class HookController:
         self.set_pos(0)
 
     def fold(self):
-        self.set_pos(1.48)
+        self.set_pos(1.57)
 
     def set_pos(self,angle):
         if angle < 0:
             angle = 0
-        elif angle > 1.48:
-            angle = 1.48
+        elif angle > 1.57:
+            angle = 1.57
 
         while abs(self.hook_angle - angle) > 0.0001:
             rate = rospy.Rate(1)

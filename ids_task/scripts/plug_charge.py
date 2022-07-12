@@ -179,7 +179,7 @@ class AutoChagerTask:
         print("found wall outlet", self.target)
 
         nx = self.info.nx
-        while abs(nx) > 0.001:
+        while abs(nx) > 0.005:
             self.driver.drive(0.0,np.sign(nx)*1.0)
             if self.info and self.info.type == 3:
                 nx = self.info.nx
@@ -200,7 +200,7 @@ class AutoChagerTask:
 
         # move to 0.7 meter to the walloutlet
         z = self.target.z
-        while z > 0.7:
+        while z > 0.8:
             self.driver.drive(1.0,0.0)
             if self.info and self.info.type == 3:
                 z = self.info.z
@@ -222,7 +222,6 @@ class AutoChagerTask:
         # have an offset in y 0.0725 to the center of camera
         pos = self.fdController.vslider_height()
         self.fdController.move_vslider(pos - self.target.y + 0.0725)
-
         print("ready to plug")
 
         self.task_status = "ready"
@@ -230,18 +229,30 @@ class AutoChagerTask:
     def plugin(self):
         print("plugin to charge...")
         self.task_status == "plugin"
-        print("pluging")
-        self.fdController.move_plug(0.1)
 
         forces = self.ftsensor.forces()
         print("Force Sensor 1: detected forces [x, y, z]", forces)
-        while abs(forces[0]) < 10:
-            self.driver.drive(1.0,0)
+        while abs(forces[0]) < 5:
+            self.driver.drive(0.5,0)
+            forces = self.ftsensor.forces()
+            print("Force Sensor 1: detected forces [x, y, z]", forces)
+            rospy.sleep(0.01)
+
+        self.driver.stop()
+        self.driver.drive(-1.0,0.0)
+        rospy.sleep(1)
+        self.driver.stop()
+
+        print("pluging")
+        position = 0.01
+        forces = self.ftsensor.forces()
+        while abs(forces[0]) < 5 and position < 0.1:
+            self.fdController.move_plug(position)
             forces = self.ftsensor.forces()
             print("Force Sensor 1: detected forces [x, y, z]", forces)
             rospy.sleep(0.1)
+            position += 0.01
 
-        self.driver.stop()
         self.task_status = "done"
 
 ## transformations
@@ -263,8 +274,8 @@ if __name__ == '__main__':
 
     env = EnvPoseReset()
     rad = np.random.uniform(size=3)
-    rx = 0.2*(rad[0]-0.5) + 1.0
-    ry = 0.2*(rad[1]-0.5) + 1.5
+    rx = 0.1*(rad[0]-0.5) + 1.0
+    ry = 0.1*(rad[1]-0.5) + 1.5
     rt = 0.5*(rad[2]-0.5) + 1.57
     env.reset_robot(rx,ry,rt)
 

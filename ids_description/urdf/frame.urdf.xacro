@@ -41,8 +41,7 @@
         <child link="link_vslider"/>
         <axis xyz="0 0 1"/>
         <limit upper="0.96" lower="0" effort="300.0" velocity="0.1"/>
-        <!-- <safety_controller k_velocity="3"/>
-        <dynamics damping="0" friction="0.0"/> -->
+        <dynamics damping="0" friction="30.0"/>
       </joint>
       <link name="link_vslider">
         <visual>
@@ -70,8 +69,7 @@
         <child link="link_hslider"/>
         <axis xyz="0 1 0"/>
         <limit upper="0.13" lower="-0.13" effort="300.0" velocity="0.1"/>
-        <!-- <safety_controller k_velocity="3"/>
-        <dynamics damping="0" friction="0.0"/> -->
+        <dynamics damping="0" friction="30.0"/>
       </joint>
       <link name="link_hslider">
         <visual>
@@ -98,7 +96,8 @@
         <parent link="link_hslider"/>
         <child link="link_plug"/>
         <axis xyz="1 0 0"/>
-        <limit upper="0.1" lower="0" effort="100.0" velocity="0.02"/>
+        <limit upper="0.1" lower="0" effort="300.0" velocity="0.1"/>
+        <dynamics damping="0" friction="50.0"/>
       </joint>
       <link name="link_plug">
         <visual>
@@ -126,7 +125,7 @@
         <parent link="link_frame"/>
         <child link="link_hook"/>
         <axis xyz="0 -1 0"/>
-        <limit upper="1.48" lower="0" effort="300.0" velocity="0.1"/>
+        <limit upper="1.57" lower="0" effort="300.0" velocity="0.1"/>
       </joint>
       <link name="link_hook">
         <visual>

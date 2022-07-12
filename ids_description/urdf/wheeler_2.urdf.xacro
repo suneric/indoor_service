@@ -7,7 +7,7 @@
     <xacro:property name="chassis_x" value="0.42" />
     <xacro:property name="chassis_y" value="0.4" />
     <xacro:property name="chassis_z" value="0.05" />
-    <xacro:property name="chassis_m" value="28" />
+    <xacro:property name="chassis_m" value="40" />
 
     <xacro:property name="wheel_r" value="0.075"/>
     <xacro:property name="wheel_l" value="0.05"/>
@@ -18,7 +18,7 @@
     <xacro:property name="base_x" value="0.42" />
     <xacro:property name="base_y" value="0.4" />
     <xacro:property name="base_z" value="0.075" />
-    <xacro:property name="base_m" value="2" />
+    <xacro:property name="base_m" value="20" />
 
     <xacro:property name="bumper_x" value="0.04" />
     <xacro:property name="bumper_y" value="0.46" />
@@ -275,7 +275,7 @@
           <rightRearJoint>joint_chassis_rrwheel</rightRearJoint>
           <wheelSeparation>${wheelbase}</wheelSeparation>
           <wheelDiameter>2*${wheel_r}</wheelDiameter>
-          <torque>30</torque>
+          <torque>200</torque>
           <topicName>cmd_vel</topicName>
           <commandTopic>cmd_vel</commandTopic>
           <robotBaseFrame>link_chassis</robotBaseFrame>

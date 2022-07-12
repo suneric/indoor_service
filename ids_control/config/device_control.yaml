@@ -7,17 +7,17 @@ mrobot:
   joint_vslider_controller:
     type: effort_controllers/JointPositionController
     joint: joint_frame_vslider
-    pid: {p: 1000.0, i: 0.0, d: 10.0}
+    pid: {p: 100000.0, i: 0.0, d: 10.0}
 
   joint_hslider_controller:
     type: effort_controllers/JointPositionController
     joint: joint_vslider_hslider
-    pid: {p: 1000.0, i: 0.0, d: 10.0}
+    pid: {p: 100000.0, i: 0.0, d: 10.0}
 
   joint_plug_controller:
     type: effort_controllers/JointPositionController
     joint: joint_hslider_plug
-    pid: {p: 1000.0, i: 0.0, d: 10.0}
+    pid: {p: 100000.0, i: 0.0, d: 10.0}
 
   joint_hook_controller:
     type: effort_controllers/JointPositionController
