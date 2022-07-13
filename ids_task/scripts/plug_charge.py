@@ -230,6 +230,9 @@ class AutoChagerTask:
         print("plugin to charge...")
         self.task_status == "plugin"
 
+        self.fdController.move_plug(0.05)
+        self.fdController.plug.lock()
+
         forces = self.ftsensor.forces()
         print("Force Sensor 1: detected forces [x, y, z]", forces)
         while abs(forces[0]) < 5:
@@ -239,21 +242,8 @@ class AutoChagerTask:
             rospy.sleep(0.01)
 
         self.driver.stop()
-        self.driver.drive(-1.0,0.0)
-        rospy.sleep(1)
-        self.driver.stop()
-
-        print("pluging")
-        position = 0.01
-        forces = self.ftsensor.forces()
-        while abs(forces[0]) < 5 and position < 0.1:
-            self.fdController.move_plug(position)
-            forces = self.ftsensor.forces()
-            print("Force Sensor 1: detected forces [x, y, z]", forces)
-            rospy.sleep(0.1)
-            position += 0.01
-
         self.task_status = "done"
+        self.fdController.plug.unlock()
 
 ## transformations
 def quaternion_pose(x,y,yaw):

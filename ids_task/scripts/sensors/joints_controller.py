@@ -3,6 +3,8 @@ import rospy
 import numpy as np
 from std_msgs.msg import Float64
 from control_msgs.msg import JointControllerState
+from gazebo_msgs.msg import ODEJointProperties
+from gazebo_msgs.srv import SetJointProperties, SetJointPropertiesRequest
 
 # controller: joint controllers
 class HookController:
@@ -95,11 +97,35 @@ class PlugController:
         self.pub = rospy.Publisher('/mrobot/joint_plug_controller/command', Float64, queue_size=1)
         self.sub = rospy.Subscriber('/mrobot/joint_plug_controller/state', JointControllerState, self._sub_cb)
 
+        service_name = '/gazebo/set_joint_properties'
+        print("Waiting for service " + str(service_name))
+        rospy.wait_for_service(service_name)
+        print("Service Found " + str(service_name))
+        self.set_properties = rospy.ServiceProxy(service_name, SetJointProperties)
+
     def _sub_cb(self,data):
         self.plug_pos = data.set_point
 
     def pos(self):
         return self.plug_pos
+
+    def lock(self):
+        r = SetJointPropertiesRequest()
+        r.joint_name = 'joint_hslider_plug'
+        r.ode_joint_config = ODEJointProperties()
+        r.ode_joint_config.hiStop = [self.plug_pos]
+        r.ode_joint_config.loStop = [self.plug_pos]
+        result = self.set_properties(r)
+        print("lock plug ", result.success, result.status_message)
+
+    def unlock(self):
+        r = SetJointPropertiesRequest()
+        r.joint_name = 'joint_hslider_plug'
+        r.ode_joint_config = ODEJointProperties()
+        r.ode_joint_config.hiStop = [0.1]
+        r.ode_joint_config.loStop = [0.0]
+        result = self.set_properties(r)
+        print("unlock plug ", result.success, result.status_message)
 
     # hook angle [0,0.1]
     def set_pos(self,pos):

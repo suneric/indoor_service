@@ -97,7 +97,7 @@
         <child link="link_plug"/>
         <axis xyz="1 0 0"/>
         <limit upper="0.1" lower="0" effort="300.0" velocity="0.1"/>
-        <dynamics damping="0" friction="50.0"/>
+        <dynamics damping="0" friction="30.0"/>
       </joint>
       <link name="link_plug">
         <visual>
