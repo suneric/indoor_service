@@ -17,6 +17,7 @@ from actionlib_msgs.msg import GoalStatus
 from move_base_msgs.msg import MoveBaseAction, MoveBaseGoal
 import actionlib
 from sensors.ftsensor import FTSensor
+from sensors.bpsensor import BumpSensor
 
 class EnvPoseReset:
     def __init__(self):
@@ -153,6 +154,7 @@ class AutoChagerTask:
         self.task_status = "unknown"
         self.detect_sub = rospy.Subscriber("detection", DetectionInfo, self.detect_cb)
         self.ftsensor = FTSensor('/tf_sensor_hook')
+        self.contact = BumpSensor('/bumper_plug')
         self.info = None
         self.target = None
 
@@ -179,7 +181,7 @@ class AutoChagerTask:
         print("found wall outlet", self.target)
 
         nx = self.info.nx
-        while abs(nx) > 0.005:
+        while abs(nx) > 0.001:
             self.driver.drive(0.0,np.sign(nx)*1.0)
             if self.info and self.info.type == 3:
                 nx = self.info.nx
@@ -235,11 +237,26 @@ class AutoChagerTask:
 
         forces = self.ftsensor.forces()
         print("Force Sensor 1: detected forces [x, y, z]", forces)
-        while abs(forces[0]) < 5:
+        while not self.contact.connected():
+            # self.fdController.vslider.lock()
+            # self.fdController.hslider.lock()
             self.driver.drive(0.5,0)
+            rospy.sleep(0.01)
             forces = self.ftsensor.forces()
             print("Force Sensor 1: detected forces [x, y, z]", forces)
-            rospy.sleep(0.01)
+            if abs(forces[0]) > 5:
+                self.driver.drive(-0.5,0)
+                rospy.sleep(0.1)
+                self.driver.stop()
+                # self.fdController.vslider.unlock()
+                # self.fdController.hslider.unlock()
+                posh = self.fdController.hslider_pos()
+                posv = self.fdController.vslider_height()
+                rad = np.random.uniform(size=2)
+                dh = 0.001*(rad[0]-0.5)
+                dv = 0.001*(rad[1]-0.5)
+                self.fdController.move_hslider(posh+dh)
+                self.fdController.move_vslider(posv+dv)
 
         self.driver.stop()
         self.task_status = "done"

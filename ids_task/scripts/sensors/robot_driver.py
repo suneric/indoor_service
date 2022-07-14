@@ -4,7 +4,6 @@ import numpy as np
 from geometry_msgs.msg import Twist
 from gazebo_msgs.msg import ODEJointProperties
 from gazebo_msgs.srv import SetJointProperties, SetJointPropertiesRequest
-from std_srvs.srv import Empty
 
 # controller: mobile base driver
 

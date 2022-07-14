@@ -49,6 +49,12 @@ class VSliderController:
         self.pub = rospy.Publisher('/mrobot/joint_vslider_controller/command', Float64, queue_size=1)
         self.sub = rospy.Subscriber('/mrobot/joint_vslider_controller/state', JointControllerState, self._sub_cb)
 
+        service_name = '/gazebo/set_joint_properties'
+        print("Waiting for service " + str(service_name))
+        rospy.wait_for_service(service_name)
+        print("Service Found " + str(service_name))
+        self.set_properties = rospy.ServiceProxy(service_name, SetJointProperties)
+
     def _sub_cb(self,data):
         self.slider_height = data.set_point
 
@@ -67,11 +73,35 @@ class VSliderController:
             self.pub.publish(height)
             rate.sleep()
 
+    def lock(self):
+        r = SetJointPropertiesRequest()
+        r.joint_name = 'joint_frame_vslider'
+        r.ode_joint_config = ODEJointProperties()
+        r.ode_joint_config.hiStop = [self.slider_height]
+        r.ode_joint_config.loStop = [self.slider_height]
+        result = self.set_properties(r)
+        print("lock plug ", result.success, result.status_message)
+
+    def unlock(self):
+        r = SetJointPropertiesRequest()
+        r.joint_name = 'joint_frame_vslider'
+        r.ode_joint_config = ODEJointProperties()
+        r.ode_joint_config.hiStop = [0.96]
+        r.ode_joint_config.loStop = [0.0]
+        result = self.set_properties(r)
+        print("unlock plug ", result.success, result.status_message)
+
 class HSliderController:
     def __init__(self):
         self.slider_pos = 0
         self.pub = rospy.Publisher('/mrobot/joint_hslider_controller/command', Float64, queue_size=1)
         self.sub = rospy.Subscriber('/mrobot/joint_hslider_controller/state', JointControllerState, self._sub_cb)
+
+        service_name = '/gazebo/set_joint_properties'
+        print("Waiting for service " + str(service_name))
+        rospy.wait_for_service(service_name)
+        print("Service Found " + str(service_name))
+        self.set_properties = rospy.ServiceProxy(service_name, SetJointProperties)
 
     def _sub_cb(self,data):
         self.slider_pos = data.set_point
@@ -90,6 +120,24 @@ class HSliderController:
             rate = rospy.Rate(1)
             self.pub.publish(pos)
             rate.sleep()
+
+    def lock(self):
+        r = SetJointPropertiesRequest()
+        r.joint_name = 'joint_vslider_hslider'
+        r.ode_joint_config = ODEJointProperties()
+        r.ode_joint_config.hiStop = [self.slider_pos]
+        r.ode_joint_config.loStop = [self.slider_pos]
+        result = self.set_properties(r)
+        print("lock plug ", result.success, result.status_message)
+
+    def unlock(self):
+        r = SetJointPropertiesRequest()
+        r.joint_name = 'joint_vslider_hslider'
+        r.ode_joint_config = ODEJointProperties()
+        r.ode_joint_config.hiStop = [0.13]
+        r.ode_joint_config.loStop = [-0.13]
+        result = self.set_properties(r)
+        print("unlock plug ", result.success, result.status_message)
 
 class PlugController:
     def __init__(self):
@@ -185,3 +233,13 @@ class FrameDeviceController:
     def move_plug(self, pg=0.0):
         self.plug.set_pos(pg)
         print("Device Controller: set plug position", pg)
+
+    def lock(self):
+        self.vslider.lock()
+        self.hslider.lock()
+        self.plug.lock()
+
+    def unlock(self):
+        self.vslider.unlock()
+        self.hslider.unlock()
+        self.plug.lock()

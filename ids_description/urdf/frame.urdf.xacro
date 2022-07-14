@@ -2,7 +2,7 @@
 
 <robot xmlns:xacro="https://www.ros.org/wiki/xacro" >
     <xacro:property name="PI" value="3.1415926535897931"/>
-    <xacro:property name="frame_m" value="2"/>
+    <xacro:property name="frame_m" value="20"/>
     <xacro:property name="vslider_m" value="2"/>
     <xacro:property name="hslider_m" value="1"/>
     <xacro:property name="plug_m" value="0.5"/>
@@ -115,7 +115,35 @@
         <inertial>
           <mass value="${plug_m}"/>
           <origin rpy="0 0 0" xyz="0.015 0 0"/>
-            <inertia ixx="${(1/12)*plug_m*(0.022*0.022+0.022*0.022)}" ixy="0" ixz="0" iyy="${(1/12)*plug_m*(0.022*0.022+0.07*0.07)}" iyz="0" izz="${(1/12)*plug_m*(0.07*0.07+0.022*0.022)}"/>
+          <inertia ixx="${(1/12)*plug_m*(0.022*0.022+0.022*0.022)}" ixy="0" ixz="0" iyy="${(1/12)*plug_m*(0.022*0.022+0.07*0.07)}" iyz="0" izz="${(1/12)*plug_m*(0.07*0.07+0.022*0.022)}"/>
+        </inertial>
+      </link>
+
+      <!--contact bumper-->
+      <joint name="joint_contact_bp" type="revolute">
+        <origin xyz="0.1405 0 0" rpy="0 0 0"/>
+        <parent link="link_plug"/>
+        <child link="link_contact_bp"/>
+        <axis xyz="1 0 0"/>
+        <limit upper="0" lower="0" effort="0.0" velocity="0.0"/>
+      </joint>
+      <link name="link_contact_bp">
+        <visual>
+          <origin rpy="0 0 0" xyz="0 0 0"/>
+          <geometry>
+            <box size="0.001 0.002 0.005"/>
+          </geometry>
+        </visual>
+        <collision name="bump_sensor_collision">
+          <origin rpy="0 0 0" xyz="0 0 0"/>
+          <geometry>
+            <box size="0.001 0.002 0.005"/>
+          </geometry>
+        </collision>
+        <inertial>
+          <mass value="0.01"/>
+          <origin rpy="0 0 0" xyz="0 0 0"/>
+          <inertia ixx="0.001" ixy="0" ixz="0" iyy="0.001" iyz="0" izz="0.001"/>
         </inertial>
       </link>
 
@@ -143,9 +171,10 @@
         <inertial>
           <mass value="${hook_m}"/>
           <origin rpy="0 0 0" xyz="0.1 0 0"/>
-            <inertia ixx="${(1/3)*hook_m*(0.01*0.01+0.02*0.02)}" ixy="0" ixz="0" iyy="${(1/3)*hook_m*(4*0.2*0.2+0.01*0.01)}" iyz="0" izz="${(1/3)*hook_m*(4*0.2*0.2+0.02*0.02)}"/>
+          <inertia ixx="${(1/3)*hook_m*(0.01*0.01+0.02*0.02)}" ixy="0" ixz="0" iyy="${(1/3)*hook_m*(4*0.2*0.2+0.01*0.01)}" iyz="0" izz="${(1/3)*hook_m*(4*0.2*0.2+0.02*0.02)}"/>
         </inertial>
       </link>
+
       <joint name="joint_hook_tip" type="fixed">
         <origin xyz="0.225 0 0" rpy="0 0 0"/>
         <parent link="link_hook"/>
@@ -167,7 +196,7 @@
         <inertial>
           <mass value="${tip_m}"/>
           <origin rpy="0 0 0" xyz="0.01 0.02 0"/>
-            <inertia ixx="${(1/12)*tip_m*(0.06*0.06+0.01*0.01)}" ixy="0" ixz="0" iyy="${(1/3)*tip_m*(0.02*0.02+0.01*0.01)}" iyz="0" izz="${(1/12)*tip_m*(0.02*0.02+0.06*0.06)}"/>
+          <inertia ixx="${(1/12)*tip_m*(0.06*0.06+0.01*0.01)}" ixy="0" ixz="0" iyy="${(1/3)*tip_m*(0.02*0.02+0.01*0.01)}" iyz="0" izz="${(1/12)*tip_m*(0.02*0.02+0.06*0.06)}"/>
         </inertial>
       </link>
 
@@ -243,6 +272,10 @@
       <gazebo reference="link_tip">
         <material>Gazebo/Black</material>
       </gazebo>
+      <gazebo reference="link_contact_bp">
+        <material>Gazebo/Blue</material>
+      </gazebo>
+
 
       <!--force torque sensor-->
       <gazebo reference="joint_frame_hook">
@@ -275,6 +308,20 @@
             <stddev>0.003</stddev>
           </noise>
         </plugin>
+      </gazebo>
+
+      <gazebo reference="link_contact_bp">
+        <sensor name="main_bumper" type="contact">
+          <contact>
+            <collision>link_contact_bp_fixed_joint_lump__bump_sensor_collision_collision</collision>
+          </contact>
+          <plugin name="gazebo_ros_bumper_controller" filename="libgazebo_ros_bumper.so">
+            <bumperTopicName>bumper_plug</bumperTopicName>
+            <frameName>world</frameName>
+            <alwaysOn>true</alwaysOn>
+            <updateRate>5.0</updateRate>
+          </plugin>
+        </sensor>
       </gazebo>
 
     </xacro:macro>
