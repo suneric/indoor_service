@@ -39,10 +39,9 @@ private:
 
   struct
   {
-    Button check;
+    Button stop;
     Button forward;
     Button backward;
-
   } buttons;
 
 
@@ -50,6 +49,7 @@ private:
   void motorCallback(const std_msgs::Float32MultiArray::ConstPtr& status);
   double getAxis(const sensor_msgs::JoyConstPtr& joy, const Axis &axis);
   bool getButton(const sensor_msgs::JoyConstPtr& joy, const Button &button);
+  void stop();
 
   ros::NodeHandle nh;
   ros::Subscriber joy_sub, motor_sub;
@@ -63,7 +63,7 @@ TeleopIDS::TeleopIDS()
   ros::param::get("/teleop/angular_axis", axes.angular.axis);
   ros::param::get("/teleop/vertical_axis", axes.vertical.axis);
   ros::param::get("/teleop/horizontal_axis", axes.horizontal.axis);
-  ros::param::get("/teleop/check_btn", buttons.check.button);
+  ros::param::get("/teleop/stop_btn", buttons.stop.button);
   ros::param::get("/teleop/forward_btn", buttons.forward.button);
   ros::param::get("/teleop/backward_btn", buttons.backward.button);
   ros::param::get("/teleop/linear_scale", axes.linear.factor);
@@ -81,29 +81,24 @@ TeleopIDS::TeleopIDS()
 
 void TeleopIDS::motorCallback(const std_msgs::Float32MultiArray::ConstPtr& status)
 {
-  std::cout << "status" << std::endl;
+  // std::cout << "status" << std::endl;
 }
 
 void TeleopIDS::joyCallback(const sensor_msgs::Joy::ConstPtr& joy)
 {
   // validate before start
-  if (getButton(joy, buttons.check))
+  if (getButton(joy, buttons.stop))
   {
-
+    stop();
   }
 
   // motor driving
-  if (getButton(joy, buttons.forward))
+  bool push = getButton(joy, buttons.forward);
+  bool pull = getButton(joy, buttons.backward);
+  if (push || pull)
   {
     std_msgs::Int32 msg;
-    msg.data = 1;
-    robo2_pub.publish(msg);
-  }
-
-  if (getButton(joy, buttons.backward))
-  {
-    std_msgs::Int32 msg;
-    msg.data = -1;
+    msg.data = push ? 1 : -1;
     robo2_pub.publish(msg);
   }
 
@@ -158,6 +153,14 @@ bool TeleopIDS::getButton(const sensor_msgs::JoyConstPtr &joy, const Button &but
   return joy->buttons[button.button];
 }
 
+void TeleopIDS::stop()
+{
+  std_msgs::Int32 stop;
+  stop.data = 0;
+  robo1_pub.publish(stop);
+  robo2_pub.publish(stop);
+  robo3_pub.publish(stop);
+}
 
 //////////////////////////////////////////////
 int main(int argc, char** argv)

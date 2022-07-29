@@ -14,7 +14,7 @@
       angular_axis: 0
       horizontal_axis: 4
       vertical_axis: 5
-      check_btn : 0
+      stop_btn : 0
       forward_btn: 4
       backward_btn: 5
 
