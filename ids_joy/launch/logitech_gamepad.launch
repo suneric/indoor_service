@@ -1,0 +1,28 @@
+<?xml version="1.0"?>
+
+<launch>
+  <arg name="joy_dev" default="/dev/input/js0" />
+  <node name="joy" pkg="joy" type="joy_node" output="screen" >
+    <param name="dev" value="$(arg joy_dev)" />
+    <param name="autorepeat_rate" value="10" />
+    <param name="coalesce_interval" value="0.01" />
+  </node>
+
+  <node name="teleop" pkg="ids_joy" type="ids_joy_node" output="screen">
+    <rosparam subst_value="true">
+      linear_axis: 1
+      angular_axis: 0
+      horizontal_axis: 4
+      vertical_axis: 5
+      check_btn : 0
+      forward_btn: 4
+      backward_btn: 5
+
+      linear_scale: 2.0
+      angular_scale: 2.0
+      horizontal_scale: 1.0
+      vertical_scale: 1.0
+
+    </rosparam>
+  </node>
+</launch>
