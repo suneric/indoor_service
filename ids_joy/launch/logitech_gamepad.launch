@@ -10,7 +10,7 @@
 
   <node name="teleop" pkg="ids_joy" type="ids_joy_node" output="screen">
     <rosparam subst_value="true">
-      linear_axis: 1
+      linear_axis: 3
       angular_axis: 0
       horizontal_axis: 4
       vertical_axis: 5
@@ -18,8 +18,8 @@
       forward_btn: 4
       backward_btn: 5
 
-      linear_scale: 2.0
-      angular_scale: 2.0
+      linear_scale: 1.0
+      angular_scale: 1.0
       horizontal_scale: 1.0
       vertical_scale: 1.0
 

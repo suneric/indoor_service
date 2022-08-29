@@ -47,13 +47,14 @@ def detect_object(detector):
     return msgs
 
 if __name__ == '__main__':
-    pub = rospy.Publisher('detection', DetectionInfo, queue_size=1)
     rospy.init_node("object_detection", anonymous=True, log_level=rospy.INFO)
+    simulation = int(rospy.get_param('/detection/simulation')) # simulation or real robot
+    pub = rospy.Publisher('detection', DetectionInfo, queue_size=1)
     dir = os.path.join(os.path.dirname(os.path.realpath(__file__)),'..','classifier/yolo')
     detector = ObjectDetector(dir)
     names = ["door","door handle","human body","electric outlet","socket type B"]
     rate = rospy.Rate(50)
-    sensor = RSD435()
+    sensor = RSD435(compressed = (simulation==0))
     try:
         while not rospy.is_shutdown():
             if sensor.ready():

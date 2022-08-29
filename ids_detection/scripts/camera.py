@@ -5,107 +5,37 @@ import cv2 as cv
 from cv_bridge import CvBridge, CvBridgeError
 import math
 
-from sensor_msgs.msg import Image, CameraInfo, PointCloud2
+from sensor_msgs.msg import Image, CameraInfo, PointCloud2, CompressedImage
 import sensor_msgs.point_cloud2 as pc2
 from ids_detection.msg import DetectionInfo
 from normal_estimator import SNE
 
-# visual sensors
-class RPIv2:
-    def __init__(self):
-        self.bridge=CvBridge()
-        # camera information
-        self.cameraInfoUpdate = False
-        # ros-realsense
-        self.caminfo_sub = rospy.Subscriber('/rpi/image_info', CameraInfo, self._caminfo_callback)
-        self.color_sub = rospy.Subscriber('/rpi/image', Image, self._color_callback)
-        # data
-        self.cv_color = []
-        self.width = 640
-        self.height = 480
-
-    def ready(self):
-        return self.cameraInfoUpdate and len(self.cv_color) > 0
-
-    def image_size(self):
-        return self.height, self.width
-
-    def color_image(self):
-        return self.cv_color
-
-    def _caminfo_callback(self, data):
-        if self.cameraInfoUpdate == False:
-            self.width = data.width
-            self.height = data.height
-            self.cameraInfoUpdate = True
-
-    def _color_callback(self, data):
-        # print("color callback")
-        if self.cameraInfoUpdate:
-            try:
-                self.cv_color = self.bridge.imgmsg_to_cv2(data, "bgr8")
-            except CvBridgeError as e:
-                print(e)
-
 # realsense d435
 class RSD435:
     # create a image view with a frame size for the ROI
-    def __init__(self):
+    def __init__(self, compressed = False):
         print("create realsense d435 instance...")
+        print(compressed)
         self.bridge=CvBridge()
-        # camera information
         self.cameraInfoUpdate = False
         self.intrinsic = None
-        # ros-realsense
-        self.caminfo_sub = rospy.Subscriber('/rs435/color/camera_info', CameraInfo, self._caminfo_callback)
-        self.depth_sub = rospy.Subscriber('/rs435/depth/image_raw', Image, self._depth_callback)
-        self.color_sub = rospy.Subscriber('/rs435/color/image_raw', Image, self._color_callback)
-
-        # data
-        self.cv_color = []
-        self.cv_depth = []
-        self.width = 1024
-        self.height = 720
+        self.caminfo_sub = rospy.Subscriber('/camera/color/camera_info', CameraInfo, self._caminfo_callback)
+        self.cv_color = None
+        self.cv_depth = None
+        self.width = 640
+        self.height = 480
+        if compressed:
+            self.depth_sub = rospy.Subscriber('/camera/depth/compressed', CompressedImage, self._depth_callback)
+            self.color_sub = rospy.Subscriber('/camera/color/compressed', CompressedImage, self._color_callback)
+        else:
+            self.depth_sub = rospy.Subscriber('/camera/depth/image_rect_raw', Image, self._depth_callback)
+            self.color_sub = rospy.Subscriber('/camera/color/image_raw', Image, self._color_callback)
 
     def ready(self):
-        return self.cameraInfoUpdate and len(self.cv_color) > 0 and len(self.cv_depth) > 0
+        return self.cameraInfoUpdate and self.cv_color is not None and self.cv_depth is not None
 
     def image_size(self):
         return self.height, self.width
-
-    #### depth info
-    # calculate mean distance in a small pixel frame around u,v
-    # a non-zero mean value for the pixel with its neighboring pixels
-    # def distance(self,u,v,size=3):
-    #     dist_list=[]
-    #     for i in range(-size,size):
-    #         for j in range(-size,size):
-    #             value = self.cv_depth[v+j,u+i]
-    #             if value > 0.0:
-    #                 dist_list.append(value)
-    #     if not dist_list:
-    #         return -1
-    #     else:
-    #         return np.mean(dist_list)
-    #
-    # #### find 3d point with pixel and depth information
-    # def point3d(self,u,v):
-    #     depth = self.distance(int(u),int(v))
-    #     if depth < 0:
-    #         return [-1,-1,-1]
-    #     # focal length
-    #     fx = self.intrinsic[0]
-    #     fy = self.intrinsic[4]
-    #     # principle point
-    #     cx = self.intrinsic[2]
-    #     cy = self.intrinsic[5]
-    #     # deproject
-    #     x = (u-cx)/fx
-    #     y = (v-cy)/fy
-    #     # scale = 0.001 # for simulation is 1
-    #     scale = 1
-    #     point3d = [scale*depth*x,scale*depth*y,scale*depth]
-    #     return point3d
 
     ### evaluate normal given a pixel
     def normal3d(self,u,v):
@@ -120,8 +50,8 @@ class RSD435:
         normal_estimator = SNE(self.cv_color,self.cv_depth,self.intrinsic,self.width,self.height)
         pcd = normal_estimator.estimate() # (H,W,6): x,y,z,nx,ny,nz
         # display normal
-        # cv.imshow('normal',(1-pcd[:,:,3:6])/2)
-        # cv.waitKey(1)
+        cv.imshow('normal',(1-pcd[:,:,3:6])/2)
+        cv.waitKey(1)
         # randomly select 10 points in the box and evaluate mean point and normal
         l, t, r, b = box[0], box[1], box[2], box[3]
         us = np.random.randint(l,r,20)
@@ -147,16 +77,37 @@ class RSD435:
             self.height = data.height
             self.cameraInfoUpdate = True
 
+    def convertCompressedDepthToCV2(self, depthComp):
+        fmt, type = depthComp.format.split(';')
+        fmt = fmt.strip() # remove white space
+        type = type.strip() # remove white space
+        if type != "compressedDepth":
+            raise Exception("Compression type is not 'compressedDepth'.")
+        depthRaw = cv.imdecode(np.frombuffer(depthComp.data[12:], np.uint8),-1)
+        if depthRaw is None:
+            raise Exception("Could not decode compressed depth image.")
+        return depthRaw
+
+    def convertCompressedColorToCV2(self, colorComp):
+        rawData = np.frombuffer(colorComp.data, np.uint8)
+        return cv.imdecode(rawData, cv.IMREAD_COLOR)
+
     def _depth_callback(self, data):
         if self.cameraInfoUpdate:
             try:
-                self.cv_depth = self.bridge.imgmsg_to_cv2(data, data.encoding) #"16UC1"
+                if data._type == 'sensor_msgs/CompressedImage':
+                    self.cv_depth = self.convertCompressedDepthToCV2(data)
+                else:
+                    self.cv_depth = self.bridge.imgmsg_to_cv2(data, data.encoding) #"16UC1"
             except CvBridgeError as e:
                 print(e)
 
     def _color_callback(self, data):
         if self.cameraInfoUpdate:
             try:
-                self.cv_color = self.bridge.imgmsg_to_cv2(data, "bgr8")
+                if data._type == 'sensor_msgs/CompressedImage':
+                    self.cv_color = self.convertCompressedColorToCV2(data)
+                else:
+                    self.cv_color = self.bridge.imgmsg_to_cv2(data, "bgr8")
             except CvBridgeError as e:
                 print(e)

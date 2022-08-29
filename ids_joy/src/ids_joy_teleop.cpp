@@ -160,6 +160,11 @@ void TeleopIDS::stop()
   robo1_pub.publish(stop);
   robo2_pub.publish(stop);
   robo3_pub.publish(stop);
+
+  geometry_msgs::Twist twist;
+  twist.angular.z = 0;
+  twist.linear.x = 0;
+  base_pub.publish(twist);
 }
 
 //////////////////////////////////////////////
