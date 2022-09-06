@@ -35,10 +35,8 @@ class SNE:
         depth = np.array(self.depth_img)
         # if the value equals 0, the point is infinite
         depth[depth < 1e-7]=1e10
-
         u_map = np.ones((self.H,1))*np.array(range(0,self.W))-self.K[2] # cx = self.K[2]
         v_map = (np.ones((self.W,1))*np.array(range(0,self.H))-self.K[5]).T #cy = self.K[5]
-
         # scale = 0.001 # 1.0 for simulation
         scale = 1.0
         Z = scale*depth
@@ -65,7 +63,7 @@ class SNE:
             nz_t_volume[:,:,i] = -(nx_t*np.array(X_d)+ny_t*np.array(Y_d))/np.array(Z_d)
         # mean filter
         nz_t = np.nanmean(nz_t_volume,2)
-
+        print(nz_t)
         nx_t[np.isnan(nz_t)] = 0
         ny_t[np.isnan(nz_t)] = 0
         nz_t[np.isnan(nz_t)] = -1

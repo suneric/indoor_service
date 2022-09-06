@@ -15,7 +15,6 @@ class RSD435:
     # create a image view with a frame size for the ROI
     def __init__(self, compressed = False):
         print("create realsense d435 instance...")
-        print(compressed)
         self.bridge=CvBridge()
         self.cameraInfoUpdate = False
         self.intrinsic = None
@@ -37,22 +36,13 @@ class RSD435:
     def image_size(self):
         return self.height, self.width
 
-    ### evaluate normal given a pixel
-    def normal3d(self,u,v):
-        dzdx = (self.distance(u+1,v)-self.distance(u-1,v))/2.0
-        dzdy = (self.distance(u,v+1)-self.distance(u,v-1))/2.0
-        dir = (-dzdx, -dzdy, 1.0)
-        magnitude = math.sqrt(dir[0]**2+dir[1]**2+dir[2]**2)
-        normal = [dir[0]/magnitude,dir[1]/magnitude,dir[2]/magnitude]
-        return normal
-
     def evaluate_distance_and_normal(self, box):
         normal_estimator = SNE(self.cv_color,self.cv_depth,self.intrinsic,self.width,self.height)
         pcd = normal_estimator.estimate() # (H,W,6): x,y,z,nx,ny,nz
         # display normal
         cv.imshow('normal',(1-pcd[:,:,3:6])/2)
         cv.waitKey(1)
-        # randomly select 10 points in the box and evaluate mean point and normal
+        # randomly select 20 points in the box and evaluate mean point and normal
         l, t, r, b = box[0], box[1], box[2], box[3]
         us = np.random.randint(l,r,20)
         vs = np.random.randint(t,b,20)
