@@ -37,6 +37,10 @@ class RSD435:
         return self.height, self.width
 
     def evaluate_distance_and_normal(self, box):
+        if self.cv_color is None or self.cv_depth is None:
+            print("invalid color image or depth image")
+            return None, None
+            
         normal_estimator = SNE(self.cv_color,self.cv_depth,self.intrinsic,self.width,self.height)
         pcd = normal_estimator.estimate() # (H,W,6): x,y,z,nx,ny,nz
         # display normal
