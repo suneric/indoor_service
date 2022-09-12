@@ -146,7 +146,6 @@ class Navigator:
         self.client.send_goal(goal, self.done_cb, self.active_cb, self.feedback_cb)
 
 
-
 class AutoChagerTask:
     def __init__(self):
         self.driver = RobotDriver()
@@ -171,61 +170,67 @@ class AutoChagerTask:
         self.task_status = "prepared"
 
     def searching(self):
-        print("searching outlet and socket")
-        self.task_status = "searching"
+        def detect_info(type):
+            rate = rospy.Rate(10)
+            while self.info == None or self.info.type != type:
+                rate.sleep()
+            print(self.info)
+            return self.info
 
-        # search electric outlet on wall (type = 3)
+        def align_endeffector(x,y):
+            print("aligning endeffector to ({:.4f},{:.4f})".format(x,y))
+            pos = self.fdController.hslider_pos()
+            self.fdController.move_hslider(pos - x)
+            pos = self.fdController.vslider_height()
+            self.fdController.move_vslider(pos - y + 0.0725)
+
+        def align_normal(info, tolerance=0.01):
+            print("adjusting orientation to nx < {:.4f}".format(tolerance))
+            detect = info
+            rate = rospy.Rate(10)
+            while abs(detect.nx) > tolerance:
+                self.driver.drive(0.0,np.sign(detect.nx)*0.2)
+                if self.info and self.info.type == detect.type:
+                    detect = self.info
+                    print(" === outlet normal: ({:.4f},{:.4f},{:.4f})".format(detect.nx,detect.ny,detect.nz))
+                rate.sleep()
+            self.driver.stop()
+            return detect
+
+        def move_closer(info, target=0.8):
+            print("moving closer to {:.4f}".format(target))
+            detect = info
+            rate = rospy.Rate(10)
+            while detect.z > target:
+                self.driver.drive(1.0,0.0)
+                if self.info and self.info.type == detect.type:
+                    detect = self.info
+                    print(" === outlet position: ({:.4f},{:.4f},{:.4f})".format(detect.x,detect.y,detect.z))
+                rate.sleep()
+            self.driver.stop()
+            return detect
+
+        self.driver.stop()
+        self.task_status = "searching"
+        print("searching outlet...")
+        rate = rospy.Rate(10)
         while self.info == None or self.info.type != 3:
             self.driver.drive(-1.0,0.0)
-        self.target = self.info
-        print("found wall outlet", self.target)
-
-        nx = self.info.nx
-        while abs(nx) > 0.001:
-            self.driver.drive(0.0,np.sign(nx)*1.0)
-            if self.info and self.info.type == 3:
-                nx = self.info.nx
-                print(self.info.nx, self.info.ny, self.info.nz)
-                self.target = self.info
-            else:
-                self.driver.stop()
-
-        self.driver.stop()
-        print(self.target)
-
-        # algin robot
-        pos = self.fdController.hslider_pos()
-        self.fdController.move_hslider(pos - self.target.x)
-
-        pos = self.fdController.vslider_height()
-        self.fdController.move_vslider(pos - self.target.y + 0.0725)
-
-        # move to 0.7 meter to the walloutlet
-        z = self.target.z
-        while z > 0.8:
-            self.driver.drive(1.0,0.0)
-            if self.info and self.info.type == 3:
-                z = self.info.z
-                print(self.info.x, self.info.y, self.info.z)
-                self.target = self.info
-            else:
-                self.driver.stop()
-
+            rate.sleep()
+        detect = self.info
         self.driver.stop()
 
-        while self.info == None or self.info.type != 4:
-            rospy.sleep(0.1)
-        self.target = self.info
-        print("found socket B", self.target)
-        print(self.target)
-        # adjust position of adaptor
-        pos = self.fdController.hslider_pos()
-        self.fdController.move_hslider(pos - self.target.x)
-        # have an offset in y 0.0725 to the center of camera
-        pos = self.fdController.vslider_height()
-        self.fdController.move_vslider(pos - self.target.y + 0.0725)
-        print("ready to plug")
+        detect = align_normal(detect,tolerance=0.005)
+        align_endeffector(detect.x,detect.y)
+        detect = detect_info(type=3)
+        detect = move_closer(detect, target=0.8)
 
+        print("searching socket hole...")
+        detect = detect_info(type=4)
+        detect = align_normal(detect,tolerance=0.005)
+        align_endeffector(detect.x,detect.y)
+        self.target = detect_info(type=4)
+        print(self.target)
         self.task_status = "ready"
 
     def plugin(self):
@@ -278,21 +283,14 @@ def quaternion_pose(x,y,yaw):
 
 if __name__ == '__main__':
     rospy.init_node("auto_charge", anonymous=True, log_level=rospy.INFO)
-
     env = EnvPoseReset()
     rad = np.random.uniform(size=3)
-    rx = 0.1*(rad[0]-0.5) + 1.0
-    ry = 0.1*(rad[1]-0.5) + 1.5
-    rt = 0.5*(rad[2]-0.5) + 1.57
+    rx = 0.05*(rad[0]-0.5) + 1.0
+    ry = 0.05*(rad[1]-0.5) + 1.5
+    rt = 0.1*(rad[2]-0.5) + 1.57
     env.reset_robot(rx,ry,rt)
-
-    rate = rospy.Rate(50)
-    # navigate to target pose
-    # nav = Navigator(quaternion_pose(1,2,1.57))
-    # nav.move2goal()
-    # while not nav.arrived():
-    #     rate.sleep()
     task = AutoChagerTask()
+    rate = rospy.Rate(10)
     try:
         while not rospy.is_shutdown():
             status = task.status()
@@ -302,6 +300,6 @@ if __name__ == '__main__':
                 task.searching()
             elif status == "ready":
                 task.plugin()
-        rate.sleep()
+            rate.sleep()
     except rospy.ROSInterruptException:
         pass

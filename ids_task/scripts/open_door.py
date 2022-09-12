@@ -298,7 +298,7 @@ class DoorhandleOperation:
 # class for pulling door
 class DoorPulling:
     def __init__(self, driver, fdController):
-        self.camera = DigiKey("cam_up")
+        self.camera = DigiKey("arducam")
         self.ftsensor = FTSensor('/tf_sensor_hook')
         self.driver = driver
         self.fdController = fdController

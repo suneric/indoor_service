@@ -21,7 +21,7 @@
       <xacro:property name="location_z" value="0.0725"/>
       <xacro:property name="camera_width" value="640" />
       <xacro:property name="camera_height" value="480" />
-      <xacro:property name="camera_name" value="rs435" />
+      <xacro:property name="camera_name" value="camera" />
     </xacro:realsense_macro>
 
     <!--camera, look upward-->
@@ -35,7 +35,7 @@
       <xacro:property name="location_y" value="0" />
       <xacro:property name="camera_width" value="600" />
       <xacro:property name="camera_height" value="600" />
-      <xacro:property name="camera_name" value="cam_up"/>
+      <xacro:property name="camera_name" value="arducam"/>
     </xacro:camera_macro>
 
     <!-- laser -->

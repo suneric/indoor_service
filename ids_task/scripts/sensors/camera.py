@@ -78,9 +78,9 @@ class RSD435:
         self.cameraInfoUpdate = False
         self.intrinsic = None
         # ros-realsense
-        self.caminfo_sub = rospy.Subscriber('/rs435/color/camera_info', CameraInfo, self._caminfo_callback)
-        self.depth_sub = rospy.Subscriber('/rs435/depth/image_raw', Image, self._depth_callback)
-        self.color_sub = rospy.Subscriber('/rs435/color/image_raw', Image, self._color_callback)
+        self.caminfo_sub = rospy.Subscriber('/camera/color/camera_info', CameraInfo, self._caminfo_callback)
+        self.depth_sub = rospy.Subscriber('/camera/depth/image_rect_raw', Image, self._depth_callback)
+        self.color_sub = rospy.Subscriber('/camera/color/image_raw', Image, self._color_callback)
 
         # data
         self.cv_color = []

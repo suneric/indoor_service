@@ -70,7 +70,7 @@
             <cameraName>${camera_name}</cameraName>
             <imageTopicName>color/image_raw</imageTopicName>
             <cameraInfoTopicName>color/camera_info</cameraInfoTopicName>
-            <depthImageTopicName>depth/image_raw</depthImageTopicName>
+            <depthImageTopicName>depth/image_rect_raw</depthImageTopicName>
             <depthImageCameraInfoTopicName>depth/camera_info</depthImageCameraInfoTopicName>
             <pointCloudTopicName>depth/points</pointCloudTopicName>
             <frameName>rs435_frame</frameName>

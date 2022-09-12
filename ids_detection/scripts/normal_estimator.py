@@ -15,16 +15,17 @@ from scipy.ndimage.filters import convolve
 from scipy.signal import convolve2d
 
 class SNE:
-    def __init__(self, color, depth, K, W, H):
+    def __init__(self, color, depth, K, W, H, scale=1.0):
         self.color = color
         self.depth = depth
         self.K = K
         self.W = W
         self.H = H
+        self.scale = scale
 
     def estimate(self, thirdFilter='mean'):
         Gx,Gy = self.set_kernel(name='fd', size=3)
-        X,Y,Z = self.range_image()
+        X,Y,Z = self.range_image(scale=self.scale)
         D = 1.0/Z # inverse depth
         Gv = self.conv2(D,Gy)
         Gu = self.conv2(D,Gx)

@@ -23,6 +23,7 @@ class RSD435:
         self.cv_depth = None
         self.width = 640
         self.height = 480
+        self.simulation = (not compressed) # if real robot, use compressed
         if compressed:
             self.depth_sub = rospy.Subscriber('/camera/depth/compressed', CompressedImage, self._depth_callback)
             self.color_sub = rospy.Subscriber('/camera/color/compressed', CompressedImage, self._color_callback)
@@ -40,18 +41,20 @@ class RSD435:
         if self.cv_color is None or self.cv_depth is None:
             print("invalid color image or depth image")
             return None, None
-            
-        normal_estimator = SNE(self.cv_color,self.cv_depth,self.intrinsic,self.width,self.height)
+        scale = 1.0
+        if not self.simulation:
+            scale = 0.001
+        normal_estimator = SNE(self.cv_color,self.cv_depth,self.intrinsic,self.width,self.height,scale)
         pcd = normal_estimator.estimate() # (H,W,6): x,y,z,nx,ny,nz
         # display normal
-        cv.imshow('normal',(1-pcd[:,:,3:6])/2)
-        cv.waitKey(1)
+        # cv.imshow('normal',(1-pcd[:,:,3:6])/2)
+        # cv.waitKey(1)
         # randomly select 20 points in the box and evaluate mean point and normal
         l, t, r, b = box[0], box[1], box[2], box[3]
-        us = np.random.randint(l,r,20)
-        vs = np.random.randint(t,b,20)
-        pt3ds = [pcd[vs[i],us[i],0:3] for i in range(10)]
-        nm3ds = [pcd[vs[i],us[i],3:6] for i in range(10)]
+        us = np.random.randint(l,r,15)
+        vs = np.random.randint(t,b,15)
+        pt3ds = [pcd[vs[i],us[i],0:3] for i in range(15)]
+        nm3ds = [pcd[vs[i],us[i],3:6] for i in range(15)]
         pt3d = np.mean(pt3ds,axis=0)
         nm3d = np.mean(nm3ds,axis=0)
         # print(pt3d, nm3d)

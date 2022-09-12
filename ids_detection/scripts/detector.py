@@ -25,7 +25,6 @@ class ObjectDetector:
             confidence = boxes[i][4]
             if confidence < confidence_threshold:
                 continue
-
             # check box size
             box = boxes[i][0:4]
             l,t,r,b = box[0],box[1],box[2],box[3]
@@ -46,7 +45,7 @@ class ObjectDetector:
             info.append(nm3d[0])
             info.append(nm3d[1])
             info.append(nm3d[2])
-                
+
             info_list.append(info)
         return info_list
 
