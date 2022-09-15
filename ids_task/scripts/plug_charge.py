@@ -310,7 +310,7 @@ class AutoChagerTask:
             print("Force Sensor 1: detected forces [x, y, z]", forces)
             rate = rospy.Rate(10)
             while not success and forces[0] > -10 and abs(forces[1]) < 0.5 and abs(forces[2]) < 0.25:
-                self.driver.drive(1.0,0)
+                self.driver.drive(0.2,0)
                 rate.sleep()
                 forces = self.ftsensor.forces()
                 print("Force Sensor 1: detected forces [x, y, z]", forces)
@@ -332,23 +332,24 @@ class AutoChagerTask:
                 h = detect.b-detect.t
             self.driver.stop()
 
-        def adjust(hpos,vpos):
-            # cu = (self.target.r+self.target.l)/2
-            # cv = (self.target.t+self.target.b)/2
-            # # horizontal adjust
-            # detect = self.detect_info(type=4,size=1)
-            # uerr = cu-(detect.l+detect.r)/2
-            # print("pixel errer u:",uerr,cu, (detect.l+detect.r)/2)
-            # while abs(uerr) > 2:
-            #     self.fdController.move_hslider(hpos+0.001*np.sign(uerr))
-            #     detect = self.detect_info(type=4,size=1)
-            #     uerr = cu-(detect.l+detect.r)/2
-            #     print("pixel errer u:", uerr,cu,(detect.l+detect.r)/2)
-            # vertical adjust
-            dh = 0.002*(np.random.uniform()-0.5)
-            self.fdController.move_vslider(vpos+dh)
-            dv = 0.002*(np.random.uniform()-0.5)
-            self.fdController.move_hslider(hpos+dv)
+        def adjust():
+            delta = 0.001
+            forces = self.ftsensor.forces()
+            dh = 0
+            if (forces[1] > 0.2):
+                dh = delta
+            elif (forces[1] < -0.2):
+                dh = -delta
+            dv = 0
+            if (forces[2] > 0.2):
+                dv = delta
+            elif (forces[2] < -0.2):
+                dv = -delta
+            hpos = self.fdController.hslider_pos()
+            self.fdController.move_hslider(hpos+dh)
+            vpos = self.fdController.vslider_height()
+            self.fdController.move_vslider(vpos+dv)
+
 
         print("plugin to charge...")
         self.task_status == "plugin"
@@ -362,7 +363,7 @@ class AutoChagerTask:
             success = plug()
             if not success:
                 # leave(vel=-0.5)
-                adjust(hpos,vpos)
+                adjust()
             else:
                 break
         self.driver.stop()
