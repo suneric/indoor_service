@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-
 from __future__ import absolute_import, division, print_function
 
 import numpy as np
@@ -7,215 +6,12 @@ import rospy
 import os
 from .gym_gazebo_env import GymGazeboEnv
 from gym.envs.registration import register
-from std_msgs.msg import Float64
-from gazebo_msgs.msg import LinkStates, ModelStates, ModelState, LinkState
-from std_msgs.msg import Float32MultiArray
-from geometry_msgs.msg import Pose, Twist, WrenchStamped
-from sensor_msgs.msg import Image
 import tf.transformations as tft
-import cv2
-from cv_bridge import CvBridge, CvBridgeError
 import math
-import skimage
+from sensors import ArduCam, RSD435, FTSensor, PoseSensor
+from robot_driver import RobotDriver
+from joints_controller import FrameDeviceController
 
-
-"""
-CameraSensor with resolution, topic and guassian noise level by default variance = 0.0, mean = 0.0
-"""
-class CameraSensor():
-    def __init__(self, resolution=(64,64), topic='/cam_up/image_raw', noise=0):
-        self.resolution = resolution
-        self.topic = topic
-        self.noise = noise
-        self.bridge = CvBridge()
-        self.image_sub = rospy.Subscriber(self.topic, Image, self._image_cb)
-        self.rgb_image = None
-        self.grey_image = None
-
-    def _image_cb(self,data):
-        try:
-            image = self.bridge.imgmsg_to_cv2(data, "bgr8")
-            self.rgb_image = self._guass_noisy(image, self.noise)
-            self.grey_image = cv2.cvtColor(self.rgb_image, cv2.COLOR_BGR2GRAY)
-        except CvBridgeError as e:
-            print(e)
-
-    def show(self):
-        cv2.imshow('up',self.rgb_image)
-        cv2.waitKey(1)
-
-    def check_camera_ready(self):
-        self.rgb_image = None
-        while self.rgb_image is None and not rospy.is_shutdown():
-            try:
-                data = rospy.wait_for_message(self.topic, Image, timeout=5.0)
-                image = self.bridge.imgmsg_to_cv2(data, "bgr8")
-                self.rgb_image = self._guass_noisy(image, self.noise)
-                rospy.logdebug("Current image READY=>")
-            except:
-                rospy.logerr("Current image not ready yet, retrying for getting image")
-
-    def image_arr(self):
-        img = cv2.resize(self.rgb_image, self.resolution)
-        # normalize the image for easier training
-        img_arr = np.array(img)/255.0 - 0.5
-        img_arr = img_arr.reshape((64,64,3))
-        return img_arr
-
-    def grey_arr(self):
-        img = cv2.resize(self.grey_image, self.resolution)
-        # normalize the image for easier training
-        img_arr = np.array(img)/255.0 - 0.5
-        img_arr = img_arr.reshape((64,64,1))
-        return img_arr
-
-    # blind camera
-    def zero_arr(self):
-        img_arr = np.zeros(self.resolution)
-        img_arr = img_arr.reshape((64,64,1))
-        return img_arr
-
-    def _guass_noisy(self,image,var):
-        if var > 0:
-            img = skimage.util.img_as_float(image)
-            noisy = skimage.util.random_noise(img,'gaussian',mean=0.0,var=var)
-            return skimage.util.img_as_ubyte(noisy)
-        else:
-            return image
-
-"""
-ForceSensor for the sidebar tip hook joint
-"""
-class ForceSensor():
-    def __init__(self, topic='/tf_sensor_hook'):
-        self.topic=topic
-        self.force_sub = rospy.Subscriber(self.topic, WrenchStamped, self._force_cb)
-        self.record = []
-        self.number_of_points = 8
-        self.filtered_record = []
-        self.step_record = []
-
-    def _force_cb(self,data):
-        force = data.wrench.force
-        if len(self.record) <= self.number_of_points:
-            self.record.append([force.x,force.y,force.z])
-        else:
-            self.record.pop(0)
-            self.record.append([force.x,force.y,force.z])
-            self.filtered_record.append(self.data())
-            self.step_record.append(self.data())
-
-    def _moving_average(self):
-        force_array = np.array(self.record)
-        return np.mean(force_array,axis=0)
-
-    # get sensored force data in x,y,z direction
-    def data(self):
-        return self._moving_average()
-
-    # get force record of entire trajectory
-    def reset_filtered(self):
-        self.filtered_record = []
-
-    # get force record of a step range
-    def reset_step(self):
-        self.step_record = []
-
-    def step(self):
-        return self.step_record
-
-    def filtered(self):
-        return self.filtered_record
-
-    def check_sensor_ready(self):
-        self.force_data = None
-        while self.force_data is None and not rospy.is_shutdown():
-            try:
-                data = rospy.wait_for_message(self.topic, WrenchStamped, timeout=5.0)
-                self.force_data = data.wrench.force
-                rospy.logdebug("Current force sensor READY=>")
-            except:
-                rospy.logerr("Current force sensor not ready yet, retrying for getting force info")
-
-"""
-pose sensor
-"""
-class PoseSensor():
-    def __init__(self, noise=0.0):
-        self.noise = noise
-        self.door_pose_sub = rospy.Subscriber('/gazebo/link_states', LinkStates, self._door_pose_cb)
-        self.robot_pos_sub = rospy.Subscriber('/gazebo/model_states', ModelStates, self._robot_pose_cb)
-        self.robot_pose = None
-        self.door_pose = None
-
-    def _door_pose_cb(self,data):
-        index = data.name.index('hinged_door::door')
-        self.door_pose = data.pose[index]
-
-    def _robot_pose_cb(self,data):
-        index = data.name.index('mrobot')
-        self.robot_pose = data.pose[index]
-
-    def robot(self):
-        return self.robot_pose
-
-    def door(self):
-        return self.door_pose
-
-    def check_sensor_ready(self):
-        self.robot_pose = None
-        rospy.logdebug("Waiting for /gazebo/model_states to be READY...")
-        while self.robot_pose is None and not rospy.is_shutdown():
-            try:
-                data = rospy.wait_for_message("/gazebo/model_states", ModelStates, timeout=5.0)
-                index = data.name.index('mrobot')
-                self.robot_pose = data.pose[index]
-                rospy.logdebug("Current  /gazebo/model_states READY=>")
-            except:
-                rospy.logerr("Current  /gazebo/model_states not ready yet, retrying for getting  /gazebo/model_states")
-
-        self.door_pose = None
-        rospy.logdebug("Waiting for /gazebo/link_states to be READY...")
-        while self.door_pose is None and not rospy.is_shutdown():
-            try:
-                data = rospy.wait_for_message("/gazebo/link_states", LinkStates, timeout=5.0)
-                index = data.name.index('hinged_door::door')
-                self.door_pose = data.pose[index]
-                rospy.logdebug("Current  /gazebo/link_states READY=>")
-            except:
-                rospy.logerr("Current  /gazebo/link_states not ready yet, retrying for getting  /gazebo/link_states")
-
-"""
-Robot Driver
-"""
-class RobotDriver():
-    def __init__(self):
-        self.vel_pub = rospy.Publisher('cmd_vel', Twist, queue_size=1)
-
-    # give velocities in x direction and z direction with a speed coefficient
-    def drive(self,vx,vz,c=1):
-        msg = Twist()
-        msg.linear.x = vx*c
-        msg.linear.y = 0
-        msg.linear.z = 0
-        msg.angular.x = 0
-        msg.angular.y = 0
-        msg.angular.z = vz*c
-        self.vel_pub.publish(msg)
-
-    def stop(self):
-        self.drive(0,0)
-
-    def check_connection(self):
-      rate = rospy.Rate(10)  # 10hz
-      while self.vel_pub.get_num_connections() == 0 and not rospy.is_shutdown():
-        rospy.logdebug("No susbribers to vel_pub yet so we wait and try again")
-        try:
-          rate.sleep()
-        except rospy.ROSInterruptException:
-          # This is to avoid error when world is rested, time when backwards.
-          pass
-      rospy.logdebug("vel_pub Publisher Connected")
 
 ###############################################################################
 register(
@@ -241,14 +37,14 @@ class DoorOpenEnv(GymGazeboEnv):
         self.gazebo.unpauseSim()
 
         self.resolution = resolution
-        self.up_camera = CameraSensor(resolution,'/cam_up/image_raw',cam_noise)
-        self.front_camera = CameraSensor(resolution, '/rs435/color/image_raw', cam_noise)
-        self.tf_sensor = ForceSensor('/tf_sensor_hook')
+        self.up_camera = ArduCam('arducam', resolution, cam_noise)
+        self.front_camera = ArduCam('camera',resolution, cam_noise)
+        self.tf_sensor = FTSensor('/tf_sensor_hook')
         self.pose_sensor = PoseSensor()
         self._check_all_sensors_ready()
 
         self.driver = RobotDriver()
-        self._check_publisher_connection()
+        self.check_publisher_connection()
         self.robot_pose_pub = rospy.Publisher('/gazebo/set_model_state', ModelState, queue_size=1)
 
         self.gazebo.pauseSim()

@@ -65,7 +65,7 @@
           <alwaysOn>true</alwaysOn>
           <updateRate>0.0</updateRate>
           <cameraName>${camera_name}</cameraName>
-          <imageTopicName>image_raw</imageTopicName>
+          <imageTopicName>image</imageTopicName>
           <cameraInfoTopicName>camera_info</cameraInfoTopicName>
           <frameName>${camera_name}</frameName>
           <hackBaseline>0.07</hackBaseline>

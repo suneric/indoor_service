@@ -152,7 +152,7 @@ class AutoChagerTask:
         self.fdController = FrameDeviceController()
         self.task_status = "unknown"
         self.detect_sub = rospy.Subscriber("detection", DetectionInfo, self.detect_cb)
-        self.ftsensor = FTSensor('/tf_sensor_hook')
+        self.ftsensor = FTSensor('/tf_sensor_slider')
         self.contact = BumpSensor('/bumper_plug')
         self.info = None
         self.info_count = 0
@@ -309,7 +309,7 @@ class AutoChagerTask:
             forces = self.ftsensor.forces()
             print("Force Sensor 1: detected forces [x, y, z]", forces)
             rate = rospy.Rate(10)
-            while not success and forces[0] > -10 and abs(forces[1]) < 0.5 and abs(forces[2]) < 0.25:
+            while not success and forces[0] > -30 and abs(forces[1]) < 30 and abs (forces[2]) < 30:
                 self.driver.drive(0.2,0)
                 rate.sleep()
                 forces = self.ftsensor.forces()
@@ -342,14 +342,13 @@ class AutoChagerTask:
                 dh = -delta
             dv = 0
             if (forces[2] > 0.2):
-                dv = delta
-            elif (forces[2] < -0.2):
                 dv = -delta
+            elif (forces[2] < -0.2):
+                dv = delta
             hpos = self.fdController.hslider_pos()
             self.fdController.move_hslider(hpos+dh)
             vpos = self.fdController.vslider_height()
             self.fdController.move_vslider(vpos+dv)
-
 
         print("plugin to charge...")
         self.task_status == "plugin"
@@ -358,31 +357,18 @@ class AutoChagerTask:
         hpos = self.fdController.hslider_pos()
         vpos = self.fdController.vslider_height()
         success, numOfTry = False, 0
-        while numOfTry < 30:
+        while numOfTry < 20:
             numOfTry += 1
             success = plug()
             if not success:
-                # leave(vel=-0.5)
                 adjust()
             else:
                 break
+        leave(vel=-0.5)
         self.driver.stop()
         self.fdController.plug.unlock()
         print("plugin finished {} with {} tries".format(success, numOfTry))
         self.task_status = "done"
-
-## transformations
-def quaternion_pose(x,y,yaw):
-    pose = Pose()
-    pose.position.x = x
-    pose.position.y = y
-    pose.position.z = 0.0
-    q = tft.quaternion_from_euler(0,0,yaw)
-    pose.orientation.x = q[0]
-    pose.orientation.y = q[1]
-    pose.orientation.z = q[2]
-    pose.orientation.w = q[3]
-    return pose
 
 
 if __name__ == '__main__':

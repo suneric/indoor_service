@@ -3,8 +3,12 @@ import rospy
 import numpy as np
 from std_msgs.msg import Float64
 from control_msgs.msg import JointControllerState
+from gazebo_msgs.msg import ODEJointProperties
+from gazebo_msgs.srv import SetJointProperties, SetJointPropertiesRequest
 
-# controller: joint controllers
+"""
+HookController for side bar
+"""
 class HookController:
     def __init__(self):
         self.hook_angle = 0
@@ -22,30 +26,38 @@ class HookController:
             return True
         else:
             return False
-    # hook angle [0,1.48]
+
     def release(self):
         self.set_pos(0)
 
     def fold(self):
-        self.set_pos(1.48)
+        self.set_pos(1.57)
 
     def set_pos(self,angle):
         if angle < 0:
             angle = 0
-        elif angle > 1.48:
-            angle = 1.48
+        elif angle > 1.57:
+            angle = 1.57
 
         while abs(self.hook_angle - angle) > 0.0001:
             rate = rospy.Rate(1)
             self.pub.publish(angle)
             rate.sleep()
 
-
+"""
+VSliderController for endeffector vertical movement
+"""
 class VSliderController:
     def __init__(self):
         self.slider_height = 0
         self.pub = rospy.Publisher('/mrobot/joint_vslider_controller/command', Float64, queue_size=1)
         self.sub = rospy.Subscriber('/mrobot/joint_vslider_controller/state', JointControllerState, self._sub_cb)
+
+        service_name = '/gazebo/set_joint_properties'
+        print("Waiting for service " + str(service_name))
+        rospy.wait_for_service(service_name)
+        print("Service Found " + str(service_name))
+        self.set_properties = rospy.ServiceProxy(service_name, SetJointProperties)
 
     def _sub_cb(self,data):
         self.slider_height = data.set_point
@@ -65,11 +77,38 @@ class VSliderController:
             self.pub.publish(height)
             rate.sleep()
 
+    def lock(self):
+        r = SetJointPropertiesRequest()
+        r.joint_name = 'joint_frame_vslider'
+        r.ode_joint_config = ODEJointProperties()
+        r.ode_joint_config.hiStop = [self.slider_height]
+        r.ode_joint_config.loStop = [self.slider_height]
+        result = self.set_properties(r)
+        print("lock plug ", result.success, result.status_message)
+
+    def unlock(self):
+        r = SetJointPropertiesRequest()
+        r.joint_name = 'joint_frame_vslider'
+        r.ode_joint_config = ODEJointProperties()
+        r.ode_joint_config.hiStop = [0.96]
+        r.ode_joint_config.loStop = [0.0]
+        result = self.set_properties(r)
+        print("unlock plug ", result.success, result.status_message)
+
+"""
+HSliderController for endeffector horizontal movement
+"""
 class HSliderController:
     def __init__(self):
         self.slider_pos = 0
         self.pub = rospy.Publisher('/mrobot/joint_hslider_controller/command', Float64, queue_size=1)
         self.sub = rospy.Subscriber('/mrobot/joint_hslider_controller/state', JointControllerState, self._sub_cb)
+
+        service_name = '/gazebo/set_joint_properties'
+        print("Waiting for service " + str(service_name))
+        rospy.wait_for_service(service_name)
+        print("Service Found " + str(service_name))
+        self.set_properties = rospy.ServiceProxy(service_name, SetJointProperties)
 
     def _sub_cb(self,data):
         self.slider_pos = data.set_point
@@ -89,17 +128,62 @@ class HSliderController:
             self.pub.publish(pos)
             rate.sleep()
 
+    def lock(self):
+        r = SetJointPropertiesRequest()
+        r.joint_name = 'joint_vslider_hslider'
+        r.ode_joint_config = ODEJointProperties()
+        r.ode_joint_config.hiStop = [self.slider_pos]
+        r.ode_joint_config.loStop = [self.slider_pos]
+        result = self.set_properties(r)
+        print("lock plug ", result.success, result.status_message)
+
+    def unlock(self):
+        r = SetJointPropertiesRequest()
+        r.joint_name = 'joint_vslider_hslider'
+        r.ode_joint_config = ODEJointProperties()
+        r.ode_joint_config.hiStop = [0.13]
+        r.ode_joint_config.loStop = [-0.13]
+        result = self.set_properties(r)
+        print("unlock plug ", result.success, result.status_message)
+
+"""
+PlugController for driving adapter out for plugging
+"""
 class PlugController:
     def __init__(self):
         self.plug_pos = 0
         self.pub = rospy.Publisher('/mrobot/joint_plug_controller/command', Float64, queue_size=1)
         self.sub = rospy.Subscriber('/mrobot/joint_plug_controller/state', JointControllerState, self._sub_cb)
 
+        service_name = '/gazebo/set_joint_properties'
+        print("Waiting for service " + str(service_name))
+        rospy.wait_for_service(service_name)
+        print("Service Found " + str(service_name))
+        self.set_properties = rospy.ServiceProxy(service_name, SetJointProperties)
+
     def _sub_cb(self,data):
         self.plug_pos = data.set_point
 
     def pos(self):
         return self.plug_pos
+
+    def lock(self):
+        r = SetJointPropertiesRequest()
+        r.joint_name = 'joint_hslider_plug'
+        r.ode_joint_config = ODEJointProperties()
+        r.ode_joint_config.hiStop = [self.plug_pos]
+        r.ode_joint_config.loStop = [self.plug_pos]
+        result = self.set_properties(r)
+        print("lock plug ", result.success, result.status_message)
+
+    def unlock(self):
+        r = SetJointPropertiesRequest()
+        r.joint_name = 'joint_hslider_plug'
+        r.ode_joint_config = ODEJointProperties()
+        r.ode_joint_config.hiStop = [0.1]
+        r.ode_joint_config.loStop = [0.0]
+        result = self.set_properties(r)
+        print("unlock plug ", result.success, result.status_message)
 
     # hook angle [0,0.1]
     def set_pos(self,pos):
@@ -113,6 +197,10 @@ class PlugController:
             self.pub.publish(pos)
             rate.sleep()
 
+
+"""
+FrameDeviceController controls all the joints on the frame
+"""
 class FrameDeviceController:
     def __init__(self):
         self.hook = HookController()
@@ -125,7 +213,6 @@ class FrameDeviceController:
         self.move_vslider(vs)
         self.move_hslider(hs)
         self.move_plug(pg)
-        print("set position (hook,vslider,hslider,plug)",hk,vs,hs,pg)
 
     def vslider_height(self):
         return self.vslider.height()
@@ -141,15 +228,30 @@ class FrameDeviceController:
 
     def move_vslider(self,vs=0.0):
         self.vslider.set_height(vs)
+        print("Device Controller: set vslider height", vs)
 
     def move_hslider(self,hs=0.0):
         self.hslider.set_pos(hs)
+        print("Device Controller: set hslider position", hs)
 
     def move_hook(self,release=True):
         if release:
             self.hook.release()
+            print("Device Controller: release sidebar")
         else:
             self.hook.fold()
+            print("Device Controller: fold sidebar")
 
     def move_plug(self, pg=0.0):
         self.plug.set_pos(pg)
+        print("Device Controller: set plug position", pg)
+
+    def lock(self):
+        self.vslider.lock()
+        self.hslider.lock()
+        self.plug.lock()
+
+    def unlock(self):
+        self.vslider.unlock()
+        self.hslider.unlock()
+        self.plug.lock()
