@@ -39,7 +39,7 @@ class DoorOpenEnv(GymGazeboEnv):
         self.resolution = resolution
         self.up_camera = ArduCam('arducam', resolution, cam_noise)
         self.front_camera = ArduCam('camera',resolution, cam_noise)
-        self.tf_sensor = FTSensor('/tf_sensor_hook')
+        self.tf_sensor = FTSensor('ft_sidebar')
         self.pose_sensor = PoseSensor()
         self._check_all_sensors_ready()
 

@@ -152,7 +152,7 @@ class AutoChagerTask:
         self.fdController = FrameDeviceController()
         self.task_status = "unknown"
         self.detect_sub = rospy.Subscriber("detection", DetectionInfo, self.detect_cb)
-        self.ftsensor = FTSensor('/tf_sensor_slider')
+        self.ftsensor = FTSensor('/ft_endeffector')
         self.contact = BumpSensor('/bumper_plug')
         self.info = None
         self.info_count = 0

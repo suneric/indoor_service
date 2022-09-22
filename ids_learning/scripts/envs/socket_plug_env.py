@@ -19,7 +19,7 @@ class SocketPlugEnv(GymGazeboEnv):
             reset_world_or_sim='NO_RESET_SIM'
         )
         self.camera = RSD435('camera')
-        self.ftSensor = FTSensor('tf_sensor_slider')
+        self.ftSensor = FTSensor('ft_endeffector')
         self.bpSensor = BumpSensor('bumper_plug')
         self.poseSensor = PoseSensor()
         self.driver = RobotDriver()
@@ -44,31 +44,26 @@ class SocketPlugEnv(GymGazeboEnv):
     def _set_init(self):
         # reset system
         rad = np.random.uniform(size=3)
-        rx = 0.005*(rad[0]-0.5) + 1.03
-        ry = 0.005*(rad[1]-0.5) + 2.5
-        rt = 0.01*(rad[2]-0.5) + 1.57
+        rx = 0.*(rad[0]-0.5) + 1.034
+        ry = 0.*(rad[1]-0.5) + 2.5
+        rt = 0.*(rad[2]-0.5) + 1.57
         self.robotPoseReset.reset_robot(rx,ry,rt)
         self.driver.stop()
-        self.fdController.set_position(hk=False,vs=0.09,hs=0.0,pg=0.03)
-        self.ftSensor.reset_filtered()
+        self.fdController.set_position(hk=False,vs=0.0882,hs=0.0,pg=0.03)
+        self.ftSensor.reset()
 
     def _take_action(self, action):
-        # adjust
         hpos = self.fdController.hslider_pos()
         vpos = self.fdController.vslider_height()
         self.fdController.move_hslider(hpos+action[0])
         self.fdController.move_vslider(vpos+action[1])
-        # plug
         self.fdController.lock()
-        rate = rospy.Rate(10)
-        while not self.success:
-            self.driver.drive(0.1,0)
-            rate.sleep()
+        forces = self.ftSensor.forces()
+        print("detected forces [x, y, z]", forces)
+        while not self.success and forces[0] > -100 and abs(forces[1]) < 100 and abs(forces[2]) < 100:
+            self.driver.drive(0.1,0.0)
             forces = self.ftSensor.forces()
             print("detected forces [x, y, z]", forces)
-            if forces[0] < -30 or abs(forces[1]) > 30 or abs(forces[2]) > 30:
-                print("STOP as Force exceed 30 N: detected forces [x, y, z]", forces)
-                break
             self.success = self.bpSensor.connected()
         self.driver.stop()
         self.fdController.unlock()

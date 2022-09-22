@@ -8,6 +8,7 @@ import sensor_msgs.point_cloud2 as pc2
 import skimage
 from geometry_msgs.msg import WrenchStamped
 from gazebo_msgs.msg import ContactsState, ModelStates, LinkStates
+from .filters import KalmanFilter
 
 """
 ArduCam looks up for observing door open status
@@ -156,39 +157,28 @@ class FTSensor():
     def __init__(self, topic):
         self.topic=topic
         self.force_sub = rospy.Subscriber('/'+self.topic, WrenchStamped, self._force_cb)
+        self.kfx = KalmanFilter()
+        self.kfy = KalmanFilter()
+        self.kfz = KalmanFilter()
+        self.filtered = np.zeros(3)
         self.record = []
-        self.number_of_points = 8
-        self.filtered_record = []
-        self.step_record = []
 
     def _force_cb(self,data):
         force = data.wrench.force
-        if len(self.record) <= self.number_of_points:
-            self.record.append([force.x,force.y,force.z])
-        else:
-            self.record.pop(0)
-            self.record.append([force.x,force.y,force.z])
-            self.filtered_record.append(self.forces())
-            self.step_record.append(self.forces())
-
-    def _moving_average(self):
-        force_array = np.array(self.record)
-        return np.mean(force_array,axis=0)
+        x = self.kfx.update(force.x)
+        y = self.kfy.update(force.y)
+        z = self.kfz.update(force.z)
+        self.filtered = [x,y,z]
+        self.record.append(self.filtered)
 
     def forces(self):
-        return self._moving_average()
+        return self.filtered
 
-    def reset_filtered(self):
-        self.filtered_record = []
+    def reset(self):
+        self.record = []
 
-    def reset_step(self):
-        self.step_record = []
-
-    def step(self):
-        return self.step_record
-
-    def filtered(self):
-        return self.filtered_record
+    def forces_record(self):
+        return self.record
 
     def check_sensor_ready(self):
         rospy.logdebug("Waiting for force sensor to be READY...")

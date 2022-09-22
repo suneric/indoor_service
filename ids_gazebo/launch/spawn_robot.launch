@@ -1,6 +1,6 @@
 <launch>
   <arg name="name" default="robot"/>
-  <arg name="model" default="$(find ids_description)/urdf/mrobot_2.urdf.xacro"/>
+  <arg name="model" default="$(find ids_description)/urdf/mrobot.urdf.xacro"/>
   <arg name="tf_prefix" default="$(optenv ROS_NAMESPACE)"/>
 
   <arg name="x" default="1.5"/>

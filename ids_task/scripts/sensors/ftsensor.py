@@ -32,7 +32,7 @@ class FTSensor:
 if __name__ == '__main__':
     rospy.init_node("ft_smoother", anonymous=True, log_level=rospy.INFO)
     rate = rospy.Rate(1)
-    sensor = FTSensor('tf_sensor_hook')
+    sensor = FTSensor('ft_sidebar')
     try:
         while not rospy.is_shutdown():
             print("smoothedw with average moving",sensor.forces())

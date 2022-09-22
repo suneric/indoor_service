@@ -4,10 +4,10 @@
     <xacro:property name="PI" value="3.1415926535897931"/>
     <xacro:property name="frame_m" value="20"/>
     <xacro:property name="vslider_m" value="2"/>
-    <xacro:property name="hslider_m" value="1"/>
-    <xacro:property name="plug_m" value="0.5"/>
-    <xacro:property name="hook_m" value="0.2"/>
-    <xacro:property name="tip_m" value="0.1"/>
+    <xacro:property name="hslider_m" value="0.8"/>
+    <xacro:property name="plug_m" value="0.2"/>
+    <xacro:property name="hook_m" value="0.5"/>
+    <xacro:property name="tip_m" value="0.2"/>
 
     <xacro:macro name="frame_macro" params="parent name *origin">
       <joint name="joint_jazzy_frame" type="fixed">
@@ -40,8 +40,8 @@
         <parent link="link_frame"/>
         <child link="link_vslider"/>
         <axis xyz="0 0 1"/>
-        <limit upper="0.96" lower="0" effort="300.0" velocity="0.1"/>
-        <dynamics damping="0" friction="30.0"/>
+        <limit upper="0.96" lower="0" effort="100.0" velocity="0.1"/>
+        <dynamics damping="0" friction="5.0"/>
       </joint>
       <link name="link_vslider">
         <visual>
@@ -68,8 +68,8 @@
         <parent link="link_vslider"/>
         <child link="link_hslider"/>
         <axis xyz="0 1 0"/>
-        <limit upper="0.13" lower="-0.13" effort="300.0" velocity="0.1"/>
-        <dynamics damping="0" friction="30.0"/>
+        <limit upper="0.13" lower="-0.13" effort="100.0" velocity="0.1"/>
+        <dynamics damping="0" friction="5.0"/>
       </joint>
       <link name="link_hslider">
         <visual>
@@ -96,8 +96,8 @@
         <parent link="link_hslider"/>
         <child link="link_plug"/>
         <axis xyz="1 0 0"/>
-        <limit upper="0.1" lower="0" effort="300.0" velocity="0.1"/>
-        <dynamics damping="0" friction="30.0"/>
+        <limit upper="0.1" lower="0" effort="100.0" velocity="0.1"/>
+        <dynamics damping="0" friction="5.0"/>
       </joint>
       <link name="link_plug">
         <visual>
@@ -111,6 +111,14 @@
           <geometry>
             <mesh filename="package://ids_description/meshes/jazzy/plug.obj" scale="0.01 0.01 0.01"/>
           </geometry>
+          <surface>
+            <friction>
+              <ode>
+                <mu>0.01</mu>
+                <mu2>0.01</mu2>
+              </ode>
+            </friction>
+          </surface>
         </collision>
         <inertial>
           <mass value="${plug_m}"/>
@@ -143,7 +151,7 @@
         <inertial>
           <mass value="0.01"/>
           <origin rpy="0 0 0" xyz="0 0 0"/>
-          <inertia ixx="0.001" ixy="0" ixz="0" iyy="0.001" iyz="0" izz="0.001"/>
+          <inertia ixx="0.000000001" ixy="0" ixz="0" iyy="0.000000002" iyz="0" izz="0.000000001"/>
         </inertial>
       </link>
 
@@ -167,6 +175,14 @@
           <geometry>
             <box size="0.25 0.02 0.01"/>
           </geometry>
+          <surface>
+            <friction>
+              <ode>
+                <mu>0.01</mu>
+                <mu2>0.01</mu2>
+              </ode>
+            </friction>
+          </surface>
         </collision>
         <inertial>
           <mass value="${hook_m}"/>
@@ -276,8 +292,7 @@
         <material>Gazebo/Blue</material>
       </gazebo>
 
-
-      <!--force torque sensor-->
+      <!--sensors-->
       <gazebo reference="joint_frame_hook">
         <provideFeedback>true</provideFeedback>
       </gazebo>
@@ -286,9 +301,9 @@
       </gazebo>
 
       <gazebo>
-        <plugin name="ft_sensor" filename="libgazebo_ros_ft_sensor.so">
+        <plugin name="sidebar_force_sensor" filename="libgazebo_ros_ft_sensor.so">
           <updateRate>100.0</updateRate>
-          <topicName>tf_sensor_hook</topicName>
+          <topicName>ft_sidebar</topicName>
           <jointName>joint_frame_hook</jointName>
           <noise>
             <type>guassian</type>
@@ -297,10 +312,11 @@
           </noise>
         </plugin>
       </gazebo>
+
       <gazebo>
-        <plugin name="ft_sensor" filename="libgazebo_ros_ft_sensor.so">
+        <plugin name="endeffector_force_sensor" filename="libgazebo_ros_ft_sensor.so">
           <updateRate>100.0</updateRate>
-          <topicName>tf_sensor_slider</topicName>
+          <topicName>ft_endeffector</topicName>
           <jointName>joint_vslider_hslider</jointName>
           <noise>
             <type>guassian</type>
@@ -309,7 +325,6 @@
           </noise>
         </plugin>
       </gazebo>
-
       <gazebo reference="link_contact_bp">
         <sensor name="main_bumper" type="contact">
           <contact>

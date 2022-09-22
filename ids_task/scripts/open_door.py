@@ -204,7 +204,7 @@ class DoorHandleDetection:
 # class for door handle apporaching
 class DoorhandleOperation:
     def __init__(self, driver, fdController, dhDetector):
-        self.ftsensor = FTSensor('/tf_sensor_slider')
+        self.ftsensor = FTSensor('ft_endeffector')
         self.driver = driver
         self.dhDetector = dhDetector
         self.fdController = fdController
@@ -299,7 +299,7 @@ class DoorhandleOperation:
 class DoorPulling:
     def __init__(self, driver, fdController):
         self.camera = DigiKey("arducam")
-        self.ftsensor = FTSensor('/tf_sensor_hook')
+        self.ftsensor = FTSensor('ft_sidebar')
         self.driver = driver
         self.fdController = fdController
         self.agent = self.load_agent()

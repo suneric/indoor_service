@@ -2,9 +2,9 @@
 
 <robot name="jazzy" xmlns:xacro="https://www.ros.org/wiki/xacro" >
     <!--mobile base-->
-    <xacro:include filename="$(find ids_description)/urdf/wheeler_2.urdf.xacro" />
-      <xacro:property name="friction_k" value="0.98"/>
-      <xacro:property name="friction_s" value="0.98"/>
+    <xacro:include filename="$(find ids_description)/urdf/base_square.urdf.xacro" />
+      <xacro:property name="mu" value="0.9"/>
+      <xacro:property name="mu2" value="0.7"/>
     <xacro:fourwheeler_base_macro/>
 
     <!--frame 3DOF-->
