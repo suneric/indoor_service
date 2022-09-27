@@ -293,66 +293,17 @@ class PoseSensor():
             except:
                 rospy.logerr("Current  /gazebo/link_states not ready yet, retrying for getting  /gazebo/link_states")
 
-class SocketDetector:
-    def __init__(self, topic):
+class ObjectDetector:
+    def __init__(self, topic, type):
         self.sub = rospy.Subscriber(topic, DetectionInfo, self.detect_cb)
         self.info = None
         self.info_count = 0
+        self.type = type
 
     def detect_cb(self, data):
-        self.info_count += 1
-        self.info = data
+        if data.type == self.type:
+            self.info_count += 1
+            self.info = data
 
-    def detect_info(self, type, size=3):
-        rate = rospy.Rate(10)
-        info_count = self.info_count
-        c,l,r,t,b,x,y,z,nx,ny,nz=[],[],[],[],[],[],[],[],[],[],[]
-        while len(c) < size:
-            if self.info_count <= info_count or self.info.type != type or self.info.c < 0.5:
-                continue
-                
-            if len(c) == 0: # first detected
-                c.append(self.info.c)
-                l.append(self.info.l)
-                r.append(self.info.r)
-                t.append(self.info.t)
-                b.append(self.info.b)
-                x.append(self.info.x)
-                y.append(self.info.y)
-                z.append(self.info.z)
-                nx.append(self.info.nx)
-                ny.append(self.info.ny)
-                nz.append(self.info.nz)
-            else: # check if it is the same target
-                rcu,rcv = (l[0]+r[0])/2, (t[0]+b[0])/2
-                cu,cv = (self.info.l+self.info.r)/2,(self.info.t+self.info.b)/2
-                if abs(cu-rcu) < 3 and abs(cv-rcv) < 3:
-                    c.append(self.info.c)
-                    l.append(self.info.l)
-                    r.append(self.info.r)
-                    t.append(self.info.t)
-                    b.append(self.info.b)
-                    x.append(self.info.x)
-                    y.append(self.info.y)
-                    z.append(self.info.z)
-                    nx.append(self.info.nx)
-                    ny.append(self.info.ny)
-                    nz.append(self.info.nz)
-            info_count = self.info_count
-            rate.sleep()
-        # create a info based on the average value
-        info = DetectionInfo()
-        info.detectable = True
-        info.type = type
-        info.c = np.mean(c)
-        info.l = np.mean(l)
-        info.r = np.mean(r)
-        info.t = np.mean(t)
-        info.b = np.mean(b)
-        info.x = np.mean(x)
-        info.y = np.mean(y)
-        info.z = np.mean(z)
-        info.nx = np.mean(nx)
-        info.ny = np.mean(ny)
-        info.nz = np.mean(nz)
-        return info
+    def detect_idx(self):
+        return self.info_count

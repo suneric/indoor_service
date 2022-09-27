@@ -16,7 +16,7 @@ np.random.seed(123)
 def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--max_ep', type=int, default=10000)
-    parser.add_argument('--max_step', type=int ,default=30)
+    parser.add_argument('--max_step', type=int ,default=20)
     return parser.parse_args()
 
 if __name__=="__main__":
@@ -39,8 +39,8 @@ if __name__=="__main__":
     image_shape = (256,256,1)
     force_dim = 3
     num_actions = 2
-    upper_bound = [0.001,0.001]
-    lower_bound = [-0.001,-0.001]
+    upper_bound = [0.003,0.003]
+    lower_bound = [-0.003,-0.003]
     buffer_capacity = 5000
     batch_size = 64
     agent = DDPGAgent(image_shape,force_dim, num_actions,lower_bound,upper_bound,actor_lr,critic_lr,gamma,tau,buffer_capacity,batch_size)
