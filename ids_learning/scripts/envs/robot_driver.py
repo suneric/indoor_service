@@ -30,13 +30,14 @@ class RobotPoseReset:
         robot.pose.orientation.z = rq[2]
         robot.pose.orientation.w = rq[3]
         self.pub.publish(robot)
-        rospy.sleep(0.5)
-        # verify
-        pose = self.robot_pose()
-        if not self._same_position(pose, robot.pose):
-            print("required reset to ", robot.pose)
-            print("current ", pose)
-            self.pub.publish(robot)
+        print("reset robot position to [{},{}]".format(x,y))
+        # rospy.sleep(0.5)
+        # # verify
+        # pose = self.robot_pose()
+        # if not self._same_position(pose, robot.pose):
+        #     print("required reset to ", robot.pose)
+        #     print("current ", pose)
+        #     self.pub.publish(robot)
 
     def _same_position(self, pose1, pose2):
         x1, y1 = pose1.position.x, pose1.position.y

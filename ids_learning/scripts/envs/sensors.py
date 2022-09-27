@@ -9,6 +9,7 @@ import skimage
 from geometry_msgs.msg import WrenchStamped
 from gazebo_msgs.msg import ContactsState, ModelStates, LinkStates
 from .filters import KalmanFilter
+from ids_detection.msg import DetectionInfo
 
 """
 ArduCam looks up for observing door open status
@@ -102,6 +103,19 @@ class RSD435:
         self.cv_depth = None
         self.width = 640
         self.height = 480
+
+    def image_arr(self, resolution):
+        img = cv.resize(self.cv_color,resolution)
+        img = np.array(img)/255 - 0.5
+        img = img.reshape((resolution[0],resolution[1],3))
+        return img
+
+    def grey_arr(self, resolution):
+        img = cv.cvtColor(self.cv_color,cv.COLOR_BGR2GRAY)
+        img = cv.resize(img,resolution)
+        img = np.array(img)/255 - 0.5
+        img = img.reshape((resolution[0],resolution[1],1))
+        return img
 
     def ready(self):
         return self.cameraInfoUpdate and self.cv_color is not None and self.cv_depth is not None
@@ -234,24 +248,27 @@ pose sensor
 class PoseSensor():
     def __init__(self, noise=0.0):
         self.noise = noise
-        self.door_pose_sub = rospy.Subscriber('/gazebo/link_states', LinkStates, self._door_pose_cb)
-        self.robot_pos_sub = rospy.Subscriber('/gazebo/model_states', ModelStates, self._robot_pose_cb)
+        self.link_pose_sub = rospy.Subscriber('/gazebo/link_states', LinkStates, self._link_pose_cb)
+        self.model_pos_sub = rospy.Subscriber('/gazebo/model_states', ModelStates, self._model_pose_cb)
         self.robot_pose = None
         self.door_pose = None
+        self.bumper_pose = None
 
-    def _door_pose_cb(self,data):
-        index = data.name.index('hinged_door::door')
-        self.door_pose = data.pose[index]
+    def _link_pose_cb(self,data):
+        self.door_pose = data.pose[data.name.index('hinged_door::door')]
+        self.bumper_pose = data.pose[data.name.index('mrobot::link_contact_bp')]
 
-    def _robot_pose_cb(self,data):
-        index = data.name.index('mrobot')
-        self.robot_pose = data.pose[index]
+    def _model_pose_cb(self,data):
+        self.robot_pose = data.pose[data.name.index('mrobot')]
 
     def robot(self):
         return self.robot_pose
 
     def door(self):
         return self.door_pose
+
+    def bumper(self):
+        return self.bumper_pose
 
     def check_sensor_ready(self):
         self.robot_pose = None
@@ -275,3 +292,67 @@ class PoseSensor():
                 rospy.logdebug("Current  /gazebo/link_states READY=>")
             except:
                 rospy.logerr("Current  /gazebo/link_states not ready yet, retrying for getting  /gazebo/link_states")
+
+class SocketDetector:
+    def __init__(self, topic):
+        self.sub = rospy.Subscriber(topic, DetectionInfo, self.detect_cb)
+        self.info = None
+        self.info_count = 0
+
+    def detect_cb(self, data):
+        self.info_count += 1
+        self.info = data
+
+    def detect_info(self, type, size=3):
+        rate = rospy.Rate(10)
+        info_count = self.info_count
+        c,l,r,t,b,x,y,z,nx,ny,nz=[],[],[],[],[],[],[],[],[],[],[]
+        while len(c) < size:
+            if self.info_count <= info_count or self.info.type != type or self.info.c < 0.5:
+                continue
+                
+            if len(c) == 0: # first detected
+                c.append(self.info.c)
+                l.append(self.info.l)
+                r.append(self.info.r)
+                t.append(self.info.t)
+                b.append(self.info.b)
+                x.append(self.info.x)
+                y.append(self.info.y)
+                z.append(self.info.z)
+                nx.append(self.info.nx)
+                ny.append(self.info.ny)
+                nz.append(self.info.nz)
+            else: # check if it is the same target
+                rcu,rcv = (l[0]+r[0])/2, (t[0]+b[0])/2
+                cu,cv = (self.info.l+self.info.r)/2,(self.info.t+self.info.b)/2
+                if abs(cu-rcu) < 3 and abs(cv-rcv) < 3:
+                    c.append(self.info.c)
+                    l.append(self.info.l)
+                    r.append(self.info.r)
+                    t.append(self.info.t)
+                    b.append(self.info.b)
+                    x.append(self.info.x)
+                    y.append(self.info.y)
+                    z.append(self.info.z)
+                    nx.append(self.info.nx)
+                    ny.append(self.info.ny)
+                    nz.append(self.info.nz)
+            info_count = self.info_count
+            rate.sleep()
+        # create a info based on the average value
+        info = DetectionInfo()
+        info.detectable = True
+        info.type = type
+        info.c = np.mean(c)
+        info.l = np.mean(l)
+        info.r = np.mean(r)
+        info.t = np.mean(t)
+        info.b = np.mean(b)
+        info.x = np.mean(x)
+        info.y = np.mean(y)
+        info.z = np.mean(z)
+        info.nx = np.mean(nx)
+        info.ny = np.mean(ny)
+        info.nz = np.mean(nz)
+        return info

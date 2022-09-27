@@ -84,7 +84,7 @@ class VSliderController:
         r.ode_joint_config.hiStop = [self.slider_height]
         r.ode_joint_config.loStop = [self.slider_height]
         result = self.set_properties(r)
-        print("lock plug ", result.success, result.status_message)
+        #print("lock plug ", result.success, result.status_message)
 
     def unlock(self):
         r = SetJointPropertiesRequest()
@@ -93,7 +93,7 @@ class VSliderController:
         r.ode_joint_config.hiStop = [0.96]
         r.ode_joint_config.loStop = [0.0]
         result = self.set_properties(r)
-        print("unlock plug ", result.success, result.status_message)
+        #print("unlock plug ", result.success, result.status_message)
 
 """
 HSliderController for endeffector horizontal movement
@@ -135,7 +135,7 @@ class HSliderController:
         r.ode_joint_config.hiStop = [self.slider_pos]
         r.ode_joint_config.loStop = [self.slider_pos]
         result = self.set_properties(r)
-        print("lock plug ", result.success, result.status_message)
+        #print("lock plug ", result.success, result.status_message)
 
     def unlock(self):
         r = SetJointPropertiesRequest()
@@ -144,7 +144,7 @@ class HSliderController:
         r.ode_joint_config.hiStop = [0.13]
         r.ode_joint_config.loStop = [-0.13]
         result = self.set_properties(r)
-        print("unlock plug ", result.success, result.status_message)
+        #print("unlock plug ", result.success, result.status_message)
 
 """
 PlugController for driving adapter out for plugging
@@ -174,7 +174,7 @@ class PlugController:
         r.ode_joint_config.hiStop = [self.plug_pos]
         r.ode_joint_config.loStop = [self.plug_pos]
         result = self.set_properties(r)
-        print("lock plug ", result.success, result.status_message)
+        #print("lock plug ", result.success, result.status_message)
 
     def unlock(self):
         r = SetJointPropertiesRequest()
@@ -183,7 +183,7 @@ class PlugController:
         r.ode_joint_config.hiStop = [0.1]
         r.ode_joint_config.loStop = [0.0]
         result = self.set_properties(r)
-        print("unlock plug ", result.success, result.status_message)
+        #print("unlock plug ", result.success, result.status_message)
 
     # hook angle [0,0.1]
     def set_pos(self,pos):
@@ -228,23 +228,23 @@ class FrameDeviceController:
 
     def move_vslider(self,vs=0.0):
         self.vslider.set_height(vs)
-        print("Device Controller: set vslider height", vs)
+        #print("Device Controller: set vslider height", vs)
 
     def move_hslider(self,hs=0.0):
         self.hslider.set_pos(hs)
-        print("Device Controller: set hslider position", hs)
+        #print("Device Controller: set hslider position", hs)
 
     def move_hook(self,release=True):
         if release:
             self.hook.release()
-            print("Device Controller: release sidebar")
+            #print("Device Controller: release sidebar")
         else:
             self.hook.fold()
-            print("Device Controller: fold sidebar")
+            #print("Device Controller: fold sidebar")
 
     def move_plug(self, pg=0.0):
         self.plug.set_pos(pg)
-        print("Device Controller: set plug position", pg)
+        #print("Device Controller: set plug position", pg)
 
     def lock(self):
         self.vslider.lock()
