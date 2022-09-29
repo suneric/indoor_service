@@ -117,6 +117,9 @@ class RSD435:
         img = img.reshape((resolution[0],resolution[1],1))
         return img
 
+    def zero_arr(self, resolution):
+        return np.zeros((resolution[0],resolution[1],1))
+
     def ready(self):
         return self.cameraInfoUpdate and self.cv_color is not None and self.cv_depth is not None
 

@@ -123,18 +123,18 @@ class DDPGAgent:
         last_init = tf.random_uniform_initializer(minval=-0.003,maxval=0.003)
 
         image_in = tf.keras.layers.Input(shape=image_shape)
-        image_out = tf.keras.layers.Conv2D(64,(3,3), padding='same', activation='relu')(image_in)
+        image_out = tf.keras.layers.Conv2D(32,(3,3), padding='same', activation='relu')(image_in)
         image_out = tf.keras.layers.MaxPool2D((2,2))(image_out)
-        image_out = tf.keras.layers.Conv2D(32,(3,3), padding='same', activation='relu')(image_out)
+        image_out = tf.keras.layers.Conv2D(16,(3,3), padding='same', activation='relu')(image_out)
         image_out = tf.keras.layers.MaxPool2D((2,2))(image_out)
         image_out = tf.keras.layers.Flatten()(image_out)
 
         force_in = tf.keras.layers.Input(shape=(force_dim))
-        force_out = tf.keras.layers.Dense(128, activation="relu")(force_in)
-        force_out = tf.keras.layers.Dense(64, activation="relu")(force_out)
+        force_out = tf.keras.layers.Dense(32, activation="relu")(force_in)
+        force_out = tf.keras.layers.Dense(16, activation="relu")(force_out)
 
         concat = tf.keras.layers.Concatenate()([image_out,force_out])
-        out = tf.keras.layers.Dense(32, activation="relu")(concat)
+        out = tf.keras.layers.Dense(8, activation="relu")(concat)
         out = tf.keras.layers.Dense(num_actions, activation="tanh", kernel_initializer=last_init)(out)
         out = out * upper_bound
         model = tf.keras.Model([image_in,force_in], out)
@@ -142,21 +142,21 @@ class DDPGAgent:
 
     def get_critic(self, image_shape, force_dim, num_actions):
         image_in = tf.keras.layers.Input(shape=image_shape)
-        image_out = tf.keras.layers.Conv2D(64,(3,3), padding='same', activation='relu')(image_in)
+        image_out = tf.keras.layers.Conv2D(32,(3,3), padding='same', activation='relu')(image_in)
         image_out = tf.keras.layers.MaxPool2D((2,2))(image_out)
-        image_out = tf.keras.layers.Conv2D(32,(3,3), padding='same', activation='relu')(image_out)
+        image_out = tf.keras.layers.Conv2D(16,(3,3), padding='same', activation='relu')(image_out)
         image_out = tf.keras.layers.MaxPool2D((2,2))(image_out)
         image_out = tf.keras.layers.Flatten()(image_out)
 
         force_in = tf.keras.layers.Input(shape=(force_dim))
-        force_out = tf.keras.layers.Dense(128, activation="relu")(force_in)
-        force_out = tf.keras.layers.Dense(64, activation="relu")(force_out)
+        force_out = tf.keras.layers.Dense(32, activation="relu")(force_in)
+        force_out = tf.keras.layers.Dense(16, activation="relu")(force_out)
 
         action_in = tf.keras.layers.Input(shape=(num_actions))
-        action_out = tf.keras.layers.Dense(64, activation="relu")(action_in)
+        action_out = tf.keras.layers.Dense(16, activation="relu")(action_in)
 
         concat = tf.keras.layers.Concatenate()([image_out, force_out, action_out])
-        out = tf.keras.layers.Dense(32, activation="relu")(concat)
+        out = tf.keras.layers.Dense(8, activation="relu")(concat)
         out = tf.keras.layers.Dense(1)(out)
         model = tf.keras.Model([image_in,force_in,action_in], out)
         return model

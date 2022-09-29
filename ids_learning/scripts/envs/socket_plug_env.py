@@ -71,10 +71,10 @@ class SocketPlugEnv(GymGazeboEnv):
         print("=== action", action)
         self.fdController.move_hslider(self.initPose[0]+action[0])
         self.fdController.move_vslider(self.initPose[1]+action[1])
-        self.obs_image = self.camera.grey_arr((256,256))
-        self.obs_force = self.plug(f_max=50)
-        if not self.success and not self.fail:
-            self.unplug()
+        self.obs_image = self.camera.zero_arr((256,256))
+        self.obs_force = self.plug(f_max=30)
+        # if not self.success and not self.fail:
+        #     self.unplug()
 
     def _is_done(self):
         return self.success or self.fail
@@ -103,6 +103,7 @@ class SocketPlugEnv(GymGazeboEnv):
         print("=== plugging")
         self.fdController.lock()
         forces = self.ftSensor.forces()
+        dist = self.distance()
         while forces[0] > -f_max and abs(forces[1]) < f_max and abs(forces[2]) < f_max:
             self.driver.drive(1.0,0.0)
             forces = self.ftSensor.forces()
