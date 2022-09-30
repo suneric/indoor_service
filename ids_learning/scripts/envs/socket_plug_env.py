@@ -7,6 +7,7 @@ from gym.envs.registration import register
 from .sensors import RSD435, FTSensor, PoseSensor, BumpSensor, ObjectDetector
 from .joints_controller import FrameDeviceController
 from .robot_driver import RobotDriver, RobotPoseReset
+from gym.spaces import Tuple, Box
 
 register(
   id='SocketPlugEnv-v0',
@@ -34,6 +35,8 @@ class SocketPlugEnv(GymGazeboEnv):
         self.initPose = None # inistal position of endeffector [hpose, vpose]
         self.obs_image = None # observation image
         self.obs_force = None # observation forces
+        self.action_space = Box(-0.005,0.005,(2,),dtype=np.float32) # 2 actions, each in [-0.005, 0.005]
+        self.observation_space = ((256,256,1),3)
 
     def _check_all_systems_ready(self):
         # self.camera.check_sensor_ready()
