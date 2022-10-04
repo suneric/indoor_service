@@ -30,7 +30,7 @@ class RobotPoseReset:
         robot.pose.orientation.z = rq[2]
         robot.pose.orientation.w = rq[3]
         self.pub.publish(robot)
-        print("reset robot position to [{},{}]".format(x,y))
+        #print("reset robot position to [{},{}]".format(x,y))
         # rospy.sleep(0.5)
         # # verify
         # pose = self.robot_pose()

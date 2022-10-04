@@ -32,6 +32,31 @@ class ActionNoise:
     def __call__(self):
         return np.random.normal(self.mean,self.std_dev,self.size)
 
+class OUActionNoise:
+    def __init__(self,mean,std_dev,theta=0.15,dt=1e-2,x_init=None):
+        self.theta = theta
+        self.mean = mean
+        self.std_dev = std_dev
+        self.x_init = x_init
+        self.dt = dt
+        self.reset()
+
+    def __call__(self):
+        # Formula taken from https://www.wikipedia.org/wiki/Ornstein-Uhlenbeck_process.
+        x = (
+            self.x_prev
+            + self.theta * (self.mean - self.x_prev) * self.dt
+            + self.std_dev * np.sqrt(self.dt) * np.random.normal(size=self.mean.shape)
+        )
+        self.x_prev = x
+        return x
+
+    def reset(self):
+        if self.x_init is not None:
+            self.x_prev = self.x_init
+        else:
+            self.x_prev = np.zeros_like(self.mean)
+
 def save_model(agent, model_dir, name):
     logits_net_path = os.path.join(model_dir, 'logits_net', name)
     val_net_path = os.path.join(model_dir, 'val_net', name)
@@ -54,7 +79,7 @@ if __name__=="__main__":
     lower_bound = env.action_space.low[0]
     print("create socket pluging environment.", image_shape, force_dim, num_actions, lower_bound, upper_bound)
 
-    noise = ActionNoise(mean=0,std_dev=0.1*upper_bound,dim=num_actions)
+    noise = OUActionNoise(mean=np.zeros(num_actions),std_dev=0.1*upper_bound)
     memory = ExperienceBuffer(
         buffer_capacity=10000,
         batch_size = 64,
@@ -70,7 +95,7 @@ if __name__=="__main__":
         upper_bound = upper_bound,
         actor_lr = 1e-4,
         critic_lr = 2e-4,
-        gamma = 0.99,
+        gamma = 0.999,
         tau = 0.995
         )
 
@@ -101,9 +126,9 @@ if __name__=="__main__":
             save_model(agent, model_dir, 'best')
         ep_return_list.append(ep_ret)
         avg_reward = np.mean(ep_return_list[-40:])
-        rospy.loginfo(
-            "Episode * {} * average reward is ===> {}, length {}, success count so far {}".format(
+        print("Episode *{}*: reward {}, average reward {}, length {}, success count {} ".format(
                 ep+1,
+                ep_ret,
                 avg_reward,
                 ep_len,
                 success_counter

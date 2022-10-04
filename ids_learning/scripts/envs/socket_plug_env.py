@@ -27,7 +27,6 @@ class SocketPlugEnv(GymGazeboEnv):
         self.fdController = FrameDeviceController()
         self.robotPoseReset = RobotPoseReset(self.poseSensor)
         self.socketDetector = ObjectDetector(topic='detection',type=4)
-        self._check_all_systems_ready()
         self.success = False
         self.fail = False
         self.goal = [1.0329,2.954,0.3608] # [x,y,z]
@@ -36,13 +35,13 @@ class SocketPlugEnv(GymGazeboEnv):
         self.obs_image = None # observation image
         self.obs_force = None # observation forces
         self.action_space = Box(-0.005,0.005,(2,),dtype=np.float32) # 2 actions, each in [-0.005, 0.005]
-        self.observation_space = ((256,256,1),3)
+        self.observation_space = ((64,64,1),3) # image and force
 
     def _check_all_systems_ready(self):
-        # self.camera.check_sensor_ready()
-        # self.ftSensor.check_sensor_ready()
-        # self.bpSensor.check_sensor_ready()
-        # self.driver.check_publisher_connection()
+        self.camera.check_sensor_ready()
+        self.ftSensor.check_sensor_ready()
+        self.bpSensor.check_sensor_ready()
+        self.driver.check_publisher_connection()
         rospy.logdebug("System READY")
 
     def _get_observation(self):
@@ -60,21 +59,21 @@ class SocketPlugEnv(GymGazeboEnv):
         # reset robot position adding noise
         rad = np.random.uniform(size=4)
         rx = 0.005*(rad[0]-0.5) + self.goal[0]# [-2.5mm, 2.5mm]
-        ry = 0.1*(rad[1]-0.5) + (self.goal[1]-0.5) # [-5cm, 5cm]
+        ry = 0.1*(rad[1]-0.5) + (self.goal[1]-0.45) # [-5cm, 5cm]
         rt = 0.00*(rad[2]-0.5) + (0.5*np.pi)
         self.robotPoseReset.reset_robot(rx,ry,rt)
         rh = 0.005*(rad[3]-0.5) + self.goal_h[0] # [-2.5mm, 2.5mm]
         self.fdController.set_position(hk=False,vs=rh,hs=0,pg=0.03)
         self.initPose = [0.0,rh]
         # get observation
-        self.obs_image = self.camera.grey_arr((256,256))
+        self.obs_image = self.camera.grey_arr((64,64))
         self.obs_force = [0,0,0]
 
     def _take_action(self, action):
-        print("=== action", action)
+        #print("=== action", action)
         self.fdController.move_hslider(self.initPose[0]+action[0])
         self.fdController.move_vslider(self.initPose[1]+action[1])
-        self.obs_image = self.camera.zero_arr((256,256))
+        self.obs_image = self.camera.zero_arr((64,64))
         self.obs_force = self.plug(f_max=30)
         # if not self.success and not self.fail:
         #     self.unplug()
@@ -90,11 +89,11 @@ class SocketPlugEnv(GymGazeboEnv):
             reward = -50
         else:
             reward = -1
-        print("=== reward: ", reward)
+        #print("=== reward: ", reward)
         return reward
 
     def unplug(self):
-        print("=== unplugging")
+        #print("=== unplugging")
         idx = self.socketDetector.detect_idx()
         rate = rospy.Rate(2)
         while self.socketDetector.detect_idx() <= idx:
@@ -103,7 +102,7 @@ class SocketPlugEnv(GymGazeboEnv):
         self.driver.stop()
 
     def plug(self, f_max=30):
-        print("=== plugging")
+        #print("=== plugging")
         self.fdController.lock()
         forces = self.ftSensor.forces()
         dist = self.distance()
@@ -114,22 +113,22 @@ class SocketPlugEnv(GymGazeboEnv):
             self.success = dist > 0 #self.bpSensor.connected()
             self.fail = self.failed()
             if self.success or self.fail:
-                print("success or fail: ", self.success, self.fail)
+                #print("success or fail: ", self.success, self.fail)
                 break
         self.driver.stop()
         self.fdController.unlock()
-        print("=== detected forces",forces)
-        print("=== distance to goal",dist)
+        #print("=== detected forces",forces)
+        #print("=== distance to goal",dist)
         return forces
 
     def failed(self, tolerance=0.02):
         halfTol = 0.5*tolerance
         bpPos = self.poseSensor.bumper()
         if bpPos.position.x > self.goal[0]+halfTol or bpPos.position.x < self.goal[0]-halfTol:
-            print("=== bumper position out of limit, x", bpPos.position.x)
+            #print("=== bumper position out of limit, x", bpPos.position.x)
             return True
         if bpPos.position.z > self.goal[2]+halfTol or bpPos.position.z < self.goal[2]-halfTol:
-            print("=== bumper position out of limit, y", bpPos.position.z)
+            #print("=== bumper position out of limit, y", bpPos.position.z)
             return True
         return False
 

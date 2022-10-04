@@ -12,6 +12,25 @@ from .filters import KalmanFilter
 from ids_detection.msg import DetectionInfo
 
 """
+resize image without distortion
+"""
+def resize_image(image, shape=None, inter = cv.INTER_AREA):
+    (h,w) = image.shape[:2]
+    if shape == None:
+        return image
+    # crop image before resize
+    dim = None
+    rh = h/shape[0]
+    rw = h/shape[1]
+    if rh <= rw:
+        dim = (h, int(rh*shape[1]))
+    else:
+        dim = (int(rw*shape[0]),w)
+    # print(h,w, rh, rw, dim)
+    croped = image[int((h-dim[0])/2):int((h+dim[0])/2),int((w-dim[1])/2):int((w+dim[1])/2)]
+    return cv.resize(croped,shape,interpolation=inter)
+
+"""
 ArduCam looks up for observing door open status
 """
 class ArduCam:
@@ -41,13 +60,13 @@ class ArduCam:
         return img_arr
 
     def color_image(self):
-        img = cv.resize(self.cv_color,self.resolution)
+        img = resize_image(self.cv_color,(self.resolution[0], self.resolution[1]))
         img_arr = np.array(img)/255.0 - 0.5 # normalize the image
         img_arr = img_arr.reshape((self.resolution[0],self.resolution[1],3))
         return img_arr
 
     def gray_image(self):
-        img = cv.resize(self.cv_gray,self.resolution)
+        img = resize_image(self.cv_gray,(self.resolution[0],self.resolution[1]))
         img_arr = np.array(img)/255.0 - 0.5 # normalize the image
         img_arr = img_arr.reshape((self.resolution[0],self.resolution[1],1))
         return img_arr
@@ -76,12 +95,11 @@ class ArduCam:
             return image
 
     def check_sensor_ready(self):
-        self.cv_color = None
-        while self.cv_color is None and not rospy.is_shutdown():
+        rospy.logdebug("Waiting for ardu camera to be READY...")
+        data = None
+        while data is None and not rospy.is_shutdown():
             try:
                 data = rospy.wait_for_message('/'+self.name+'/image', Image, timeout=5.0)
-                image = self.bridge.imgmsg_to_cv2(data, "bgr8")
-                self.cv_color = self._guass_noisy(image, self.noise)
                 rospy.logdebug("Current image READY=>")
             except:
                 rospy.logerr("Current image not ready yet, retrying for getting image")
@@ -105,14 +123,14 @@ class RSD435:
         self.height = 480
 
     def image_arr(self, resolution):
-        img = cv.resize(self.cv_color,resolution)
+        img = resize_image(self.cv_color,resolution)
         img = np.array(img)/255 - 0.5
         img = img.reshape((resolution[0],resolution[1],3))
         return img
 
     def grey_arr(self, resolution):
-        img = cv.cvtColor(self.cv_color,cv.COLOR_BGR2GRAY)
-        img = cv.resize(img,resolution)
+        img = resize_image(self.cv_color,resolution)
+        img = cv.cvtColor(img,cv.COLOR_BGR2GRAY)
         img = np.array(img)/255 - 0.5
         img = img.reshape((resolution[0],resolution[1],1))
         return img
@@ -154,15 +172,11 @@ class RSD435:
                 print(e)
 
     def check_sensor_ready(self):
-        self.camera_info = None
-        while self.camera_info is None and not rospy.is_shutdown():
+        rospy.logdebug("Waiting for depth sensor to be READY...")
+        data = None
+        while data is None and not rospy.is_shutdown():
             try:
                 data = rospy.wait_for_message('/'+self.name+'/color/camera_info', CameraInfo, timeout=5.0)
-                if self.cameraInfoUpdate == False:
-                    self.intrinsic = data.K
-                    self.width = data.width
-                    self.height = data.height
-                    self.cameraInfoUpdate = True
                 rospy.logdebug("Current camera READY=>")
             except:
                 rospy.logerr("Current camera not ready yet, retrying for getting image /"+self.name+'/color/camera_info')
@@ -199,18 +213,10 @@ class FTSensor():
 
     def check_sensor_ready(self):
         rospy.logdebug("Waiting for force sensor to be READY...")
-        force = None
-        while force is None and not rospy.is_shutdown():
+        data = None
+        while data is None and not rospy.is_shutdown():
             try:
                 data = rospy.wait_for_message(self.topic, WrenchStamped, timeout=5.0)
-                force = data.wrench.force
-                if len(self.record) <= self.number_of_points:
-                    self.record.append([force.x,force.y,force.z])
-                else:
-                    self.record.pop(0)
-                    self.record.append([force.x,force.y,force.z])
-                    self.filtered_record.append(self.data())
-                    self.step_record.append(self.data())
                 rospy.logdebug("Current force sensor READY=>")
             except:
                 rospy.logerr("Current force sensor not ready yet, retrying for getting force /"+self.topic)
@@ -235,12 +241,11 @@ class BumpSensor:
             self.touched = False
 
     def check_sensor_ready(self):
-        self.touched = False
         rospy.logdebug("Waiting for bumper sensor to be READY...")
-        while self.touched is False and not rospy.is_shutdown():
+        data = None
+        while data is None and not rospy.is_shutdown():
             try:
                 data = rospy.wait_for_message("/bumper_plug", ContactsState, timeout=5.0)
-                self.touched = len(data.states) > 0
                 rospy.logdebug("Current bumper sensor  READY=>")
             except:
                 rospy.logerr("Current bumper sensor  not ready yet, retrying for getting /"+self.topic)
@@ -274,24 +279,20 @@ class PoseSensor():
         return self.bumper_pose
 
     def check_sensor_ready(self):
-        self.robot_pose = None
         rospy.logdebug("Waiting for /gazebo/model_states to be READY...")
-        while self.robot_pose is None and not rospy.is_shutdown():
+        data = None
+        while data is None and not rospy.is_shutdown():
             try:
                 data = rospy.wait_for_message("/gazebo/model_states", ModelStates, timeout=5.0)
-                index = data.name.index('mrobot')
-                self.robot_pose = data.pose[index]
                 rospy.logdebug("Current  /gazebo/model_states READY=>")
             except:
                 rospy.logerr("Current  /gazebo/model_states not ready yet, retrying for getting  /gazebo/model_states")
 
-        self.door_pose = None
+        data = None
         rospy.logdebug("Waiting for /gazebo/link_states to be READY...")
-        while self.door_pose is None and not rospy.is_shutdown():
+        while data is None and not rospy.is_shutdown():
             try:
                 data = rospy.wait_for_message("/gazebo/link_states", LinkStates, timeout=5.0)
-                index = data.name.index('hinged_door::door')
-                self.door_pose = data.pose[index]
                 rospy.logdebug("Current  /gazebo/link_states READY=>")
             except:
                 rospy.logerr("Current  /gazebo/link_states not ready yet, retrying for getting  /gazebo/link_states")
