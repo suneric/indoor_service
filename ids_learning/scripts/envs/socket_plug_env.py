@@ -61,8 +61,8 @@ class SocketPlugEnv(GymGazeboEnv):
         # reset robot position adding noise
         rad = np.random.uniform(size=4)
         rx = 0.005*(rad[0]-0.5) + self.goal[0]# [-2.5mm, 2.5mm]
-        ry = 0.1*(rad[1]-0.5) + (self.goal[1]-0.45) # [-5cm, 5cm]
-        rt = 0.00*(rad[2]-0.5) + (0.5*np.pi)
+        ry = 0.1*(rad[1]-0.5) + (self.goal[1]-0.42) # [-5cm, 5cm]
+        rt = 0.001*(rad[2]-0.5) + (0.5*np.pi)
         self.robotPoseReset.reset_robot(rx,ry,rt)
         rh = 0.005*(rad[3]-0.5) + self.goal_h[0] # [-2.5mm, 2.5mm]
         self.fdController.set_position(hk=False,vs=rh,hs=0,pg=0.03)
@@ -103,8 +103,8 @@ class SocketPlugEnv(GymGazeboEnv):
             self.driver.drive(1.0,0.0)
             forces = self.ftSensor.forces()
             dist1, dist2 = self.dist2goal()
-            self.success = dist1 > 0 and dist2 < 1e-3
-            self.fail = dist2 > 1e2 # limit exploration area
+            self.success = dist1 > 0 and dist2 < 1e-3 # < 1 mm 
+            self.fail = dist2 > 1e-2 # limit exploration area r < 1 cm
             if self.success or self.fail:
                 break
         self.driver.stop()
