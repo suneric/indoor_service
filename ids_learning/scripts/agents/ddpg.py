@@ -171,7 +171,7 @@ class DDPGAgent:
             target_actions = self.ac_target.pi([next_images,next_forces])
             target_q = tf.squeeze(self.ac_target.q([next_images,next_forces,target_actions]),1)
             q = tf.squeeze(self.ac.q([images,forces,actions]),1)
-            y = rew + self.gamma * (1-dones) * target_q
+            y = rewards + self.gamma * (1-dones) * target_q
             q_loss = tf.keras.losses.MSE(y, q)
         q_grad = tape.gradient(q_loss, self.ac.q.trainable_variables)
         self.q_optimizer.apply_gradients(zip(q_grad, self.ac.q.trainable_variables))
@@ -181,8 +181,6 @@ class DDPGAgent:
             pi_loss = -tf.math.reduce_mean(q) # use "-" to maixmize q
         pi_grad = tape.gradient(pi_loss, self.ac.pi.trainable_variables)
         self.pi_optimizer.apply_gradients(zip(pi_grad, self.ac.pi.trainable_variables))
-        print("q_loss", q_loss)
-        print("pi_loss", pi_loss)
 
     @tf.function
     def update_target(self, target_weights, weights):

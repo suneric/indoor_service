@@ -56,7 +56,7 @@ if __name__=="__main__":
     model_dir = os.path.join(sys.path[0],'..','saved_models','socket_plug',datetime.now().strftime("%Y-%m-%d-%H-%M"))
     summaryWriter = tf.summary.create_file_writer(model_dir)
 
-    t, start_steps, update_after = 0, 500, 300
+    t, start_steps, update_after = 0, 5000, 1000
     ep_ret_list, avg_ret_list = [], []
     success_counter, best_ep_return = 0, -np.inf
     for ep in range(args.max_ep):
@@ -84,7 +84,7 @@ if __name__=="__main__":
         with summaryWriter.as_default():
             tf.summary.scalar('episode reward', ep_ret, step=ep)
 
-        if ep_ret > best_ep_return:
+        if ep > args.max_ep/2 and ep_ret > best_ep_return:
             best_ep_return = ep_ret
             save_model(agent, model_dir, 'best')
 
