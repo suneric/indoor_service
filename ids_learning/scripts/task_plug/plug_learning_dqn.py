@@ -9,7 +9,7 @@ import argparse
 from datetime import datetime
 import os
 from envs.socket_plug_env import SocketPlugEnv
-from agents.ddpg import DDPGAgent, ReplayBuffer, GSNoise, OUNoise
+from agents.dqn import DQNAgent, ReplayBuffer
 import matplotlib.pyplot as plt
 
 """
@@ -36,39 +36,33 @@ def save_model(agent, model_dir, name):
 
 if __name__=="__main__":
     args = get_args()
-    rospy.init_node('ddpg_train', anonymous=True)
+    rospy.init_node('dqn_train', anonymous=True)
 
-    env = SocketPlugEnv()
+    env = SocketPlugEnv(continuous=False)
     image_shape = env.observation_space[0]
     force_dim = env.observation_space[1]
-    action_dim = env.action_space.shape[0]
-    action_limit = env.action_space.high[0]
-    print("create socket pluging environment.", image_shape, force_dim, action_dim, action_limit)
+    action_dim = env.action_space.n
+    print("create socket pluging environment.", image_shape, force_dim, action_dim)
 
     buffer = ReplayBuffer(image_shape,force_dim,action_dim,capacity=50000,batch_size=64)
-    noise = GSNoise(mean=0,std_dev=0.2*action_limit,size=action_dim)
     gamma = 0.99
-    polyak = 0.995
-    pi_lr = 1e-4
-    q_lr = 2e-4
-    agent = DDPGAgent(image_shape,force_dim,action_dim,action_limit,pi_lr,q_lr,gamma,polyak)
+    lr = 2e-4
+    agent = DQNAgent(image_shape,force_dim,action_dim,gamma,lr,update_stable_freq=100)
 
     model_dir = os.path.join(sys.path[0],'..','saved_models','socket_plug',datetime.now().strftime("%Y-%m-%d-%H-%M"))
     summaryWriter = tf.summary.create_file_writer(model_dir)
 
-    t, start_steps, update_after = 0, 2000, 1000
+    t, start_steps = 0, 1000
+    epsilon, epsilon_stop, decay = 0.99, 0.1, 0.995
     ep_ret_list, avg_ret_list = [], []
     success_counter, best_ep_return = 0, -np.inf
     for ep in range(args.max_ep):
+        epsilon = max(epsilon_stop, epsilon*decay)
         ep_ret, ep_step = 0, 0
-        pi_loss, q_loss = 0, 0
         done = False
         o, info = env.reset()
         while not done and ep_step < args.max_step:
-            if t > start_steps:
-                a = agent.policy(o, noise())
-            else:
-                a = env.action_space.sample()
+            a = agent.policy(o,epsilon)
             o2, r, done, _ = env.step(a)
             buffer.store((o,a,r,o2,done))
             t += 1
@@ -76,12 +70,8 @@ if __name__=="__main__":
             ep_ret += r
             o = o2
 
-            if t > update_after:
+            if t > start_steps:
                 pi_loss, q_loss = agent.learn(buffer)
-
-            tf.summary.scalar('pi_loss', pi_loss, step=t)
-            tf.summary.scalar('q_loss', q_loss, step=t)
-            print("Step *{}*, pi_loss {}, q_loss {}".format(t, pi_loss, q_loss))
 
         if env.success:
             success_counter += 1

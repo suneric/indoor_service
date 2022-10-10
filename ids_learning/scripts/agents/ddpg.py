@@ -96,15 +96,17 @@ class ActorCritic:
 
     def actor_model(self, image_shape, force_dim, action_dim, action_limit):
         image_in = layers.Input(shape=image_shape)
-        image_out = layers.Conv2D(64,(3,3), padding='same', activation='relu')(image_in)
+        image_out = layers.Conv2D(32,(3,3), padding='same', activation='relu')(image_in)
         image_out = layers.MaxPool2D((2,2))(image_out)
-        image_out = layers.Conv2D(64,(3,3), padding='same', activation='relu')(image_out)
+        image_out = layers.Conv2D(32,(3,3), padding='same', activation='relu')(image_out)
         image_out = layers.MaxPool2D((2,2))(image_out)
+        image_out = layers.Conv2D(32,(3,3), padding='same', activation='relu')(image_out)
         image_out = layers.Flatten()(image_out)
+        image_out = layers.Dense(128,activation='relu')(image_out)
 
         force_in = layers.Input(shape=(force_dim))
-        force_out = layers.Dense(64, activation="relu")(force_in)
-        force_out = layers.Dense(64, activation="relu")(force_out)
+        force_out = layers.Dense(16, activation="relu")(force_in)
+        force_out = layers.Dense(8, activation="relu")(force_out)
 
         concat = layers.Concatenate()([image_out,force_out])
         out = layers.Dense(64, activation="relu")(concat)
@@ -119,18 +121,20 @@ class ActorCritic:
         image_out = layers.MaxPool2D((2,2))(image_out)
         image_out = layers.Conv2D(64,(3,3), padding='same', activation='relu')(image_out)
         image_out = layers.MaxPool2D((2,2))(image_out)
+        image_out = layers.Conv2D(32,(3,3), padding='same', activation='relu')(image_out)
         image_out = layers.Flatten()(image_out)
+        image_out = layers.Dense(128,activation='relu')(image_out)
 
         force_in = layers.Input(shape=(force_dim))
-        force_out = layers.Dense(64, activation="relu")(force_in)
-        force_out = layers.Dense(64, activation="relu")(force_out)
+        force_out = layers.Dense(16, activation="relu")(force_in)
+        force_out = layers.Dense(8, activation="relu")(force_out)
 
         action_in = layers.Input(shape=(action_dim))
-        action_out = layers.Dense(32, activation="relu")(action_in)
+        action_out = layers.Dense(16, activation="relu")(action_in)
+        action_out = layers.Dense(8, activation='relu')(action_out)
 
         concat = layers.Concatenate()([image_out, force_out, action_out])
-        out = layers.Dense(64, activation="relu")(concat)
-        out = layers.Dense(1, activation="relu")(out)
+        out = layers.Dense(1, activation="relu")(concat)
         return tf.keras.Model([image_in,force_in,action_in], out)
 
     def act(self, image, force):
@@ -161,9 +165,10 @@ class DDPGAgent:
         next_images = experiences['next_image']
         next_forces = experiences['next_force']
         dones = experiences['done']
-        self.update_policy(images,forces,actions,rewards,next_images,next_forces,dones)
+        pi_loss, q_loss = self.update_policy(images,forces,actions,rewards,next_images,next_forces,dones)
         self.update_target(self.ac_target.pi.variables, self.ac.pi.variables)
         self.update_target(self.ac_target.q.variables, self.ac.q.variables)
+        return pi_loss, q_loss
 
     @tf.function
     def update_policy(self,images,forces,actions,rewards,next_images,next_forces,dones):
@@ -181,6 +186,7 @@ class DDPGAgent:
             pi_loss = -tf.math.reduce_mean(q) # use "-" to maixmize q
         pi_grad = tape.gradient(pi_loss, self.ac.pi.trainable_variables)
         self.pi_optimizer.apply_gradients(zip(pi_grad, self.ac.pi.trainable_variables))
+        return pi_loss, q_loss
 
     @tf.function
     def update_target(self, target_weights, weights):
