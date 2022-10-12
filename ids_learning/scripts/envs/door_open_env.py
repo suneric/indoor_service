@@ -1,6 +1,4 @@
 #!/usr/bin/env python
-from __future__ import absolute_import, division, print_function
-
 import numpy as np
 import rospy
 import os
@@ -8,10 +6,10 @@ from .gym_gazebo_env import GymGazeboEnv
 from gym.envs.registration import register
 import tf.transformations as tft
 import math
-from sensors import ArduCam, RSD435, FTSensor, PoseSensor
-from robot_driver import RobotDriver
-from joints_controller import FrameDeviceController
-
+from .sensors import ArduCam, RSD435, FTSensor, PoseSensor
+from .robot_driver import RobotDriver, RobotPoseReset
+from .joints_controller import FrameDeviceController
+from gym.spaces import Box, Discrete
 
 ###############################################################################
 register(
@@ -19,77 +17,41 @@ register(
   entry_point='envs.door_open_env:DoorOpenEnv')
 
 class DoorOpenEnv(GymGazeboEnv):
-
-    def __init__(self,resolution=(64,64), cam_noise=0.0, door_width=0.9):
-        """
-        Initializes a new DoorOpenEnv environment, with define the image size
-        and camera noise level (gaussian noise variance, the mean is 0.0)
-        """
+    def __init__(self, continuous = False, cam_noise=0.0, door_width=0.9):
         super(DoorOpenEnv, self).__init__(
             start_init_physics_parameters=False,
-            reset_world_or_sim="WORLD"
+            reset_world_or_sim="NO_RESET_SIM"
         )
+        self.continuous = continuous
 
         self.door_dim = [door_width, 0.045] # door dimension [length,width]
-        self.action_space = self._action_space()
-
-        rospy.logdebug("Start DoorOpenTaskEnv INIT...")
-        self.gazebo.unpauseSim()
 
         self.resolution = resolution
-        self.up_camera = ArduCam('arducam', resolution, cam_noise)
-        self.front_camera = ArduCam('camera',resolution, cam_noise)
-        self.tf_sensor = FTSensor('ft_sidebar')
-        self.pose_sensor = PoseSensor()
-        self._check_all_sensors_ready()
-
+        self.camera = ArduCam('arducam')
+        self.ftSensor = FTSensor('ft_sidebar')
+        self.poseSensor = PoseSensor()
         self.driver = RobotDriver()
-        self.check_publisher_connection()
-        self.robot_pose_pub = rospy.Publisher('/gazebo/set_model_state', ModelState, queue_size=1)
+        self.fdController = FrameDeviceController()
+        self.robotPoseReset = RobotPoseReset(self.poseSensor)
+        if self.continuous:
+            self.action_space = Box(-1.0,1.0,(2,),dtype=np.float32)
+        else:
+            self.action_space = Discrete(9)
+        self.observation_space = ((64,64,1),3) # image and force
+        self.success = False
+        self.fail = False
 
-        self.gazebo.pauseSim()
-        rospy.logdebug("Finished DoorOpenTaskEnv INIT...")
-
-    def _action_space(self):
-        """
-        [Safety Issues in Human-Robot Interactions]
-        ISO 10218 states that safe slow speed for a robot needs to be limited to 0.25 m.s-1.
-        """
-        vx, vz = 1.0, 3.14
-        base = np.array([[vx,vz],[vx,0.0],[0.0,vz],[-vx,vz],[-vx,0.0],[vx,-vz],[0.0,-vz],[-vx,-vz]])
-        low, high = base,3*base
-        action_space = np.concatenate((low,high),axis=0)
-        print(action_space)
-        return action_space
-
-    def action_dimension(self):
-        dim = self.action_space.shape[0]
-        print("action dimension", dim)
-        return dim
-
-    def visual_dimension(self):
-        res = self.resolution
-        res = (res[0],res[1],2)
-        print("visual dimension", res)
-        return res
+    def get_action(self, action):
+        vx, vz = 1.0, 3.14 # scale of linear and angular velocity
+        if self.continuous:
+            return (action[0]*vx, action[1]*vz)
+        else:
+            act_list = [(vx,-vz),(vx,0.0),(vx,vz),(0,-vz),(0,0),(0,vz),(-vx,-vz),(-vx,0),(-vx,vz)]
+            return act_list[action]
 
     def _check_all_systems_ready(self):
-        """
-        Checks that all the sensors, publishers and other simulation systems are
-        operational.
-        """
         self._check_all_sensors_ready()
         self._check_publisher_connection()
-
-    def _check_all_sensors_ready(self):
-        self.up_camera.check_camera_ready()
-        self.tf_sensor.check_sensor_ready()
-        self.pose_sensor.check_sensor_ready()
-        rospy.logdebug("All Sensors READY")
-
-    def _check_publisher_connection(self):
-        self.driver.check_connection()
-        rospy.logdebug("All Publishers READY")
 
     def _get_observation(self):
         img_front = self.front_camera.grey_arr()
