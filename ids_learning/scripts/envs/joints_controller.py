@@ -197,7 +197,6 @@ class PlugController:
             self.pub.publish(pos)
             rate.sleep()
 
-
 """
 FrameDeviceController controls all the joints on the frame
 """

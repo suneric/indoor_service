@@ -9,7 +9,7 @@ import argparse
 from datetime import datetime
 import os
 from envs.socket_plug_env import SocketPlugEnv
-from agents.ddpg import DDPGAgent, ReplayBuffer, GSNoise, OUNoise
+from agents.td3 import TD3, ReplayBuffer, GSNoise, OUNoise
 import matplotlib.pyplot as plt
 
 """
@@ -21,11 +21,12 @@ for device in gpu_devices:
     tf.config.experimental.set_memory_growth(device, True)
 
 np.random.seed(123)
+tf.random.set_seed(123)
 
 def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--max_ep', type=int, default=2000)
-    parser.add_argument('--max_step', type=int ,default=25)
+    parser.add_argument('--max_step', type=int ,default=50)
     return parser.parse_args()
 
 def save_model(agent, model_dir, name):
@@ -36,9 +37,9 @@ def save_model(agent, model_dir, name):
 
 if __name__=="__main__":
     args = get_args()
-    rospy.init_node('ddpg_train', anonymous=True)
+    rospy.init_node('td3_train', anonymous=True)
 
-    env = SocketPlugEnv()
+    env = SocketPlugEnv(continuous=True)
     image_shape = env.observation_space[0]
     force_dim = env.observation_space[1]
     action_dim = env.action_space.shape[0]
@@ -46,49 +47,41 @@ if __name__=="__main__":
     print("create socket pluging environment.", image_shape, force_dim, action_dim, action_limit)
 
     buffer = ReplayBuffer(image_shape,force_dim,action_dim,capacity=50000,batch_size=64)
-    noise = GSNoise(mean=0,std_dev=0.2*action_limit,size=action_dim)
+    noise = GSNoise(mu=np.zeros(action_dim),sigma=float(0.2*action_limit)*np.ones(action_dim))
     gamma = 0.99
     polyak = 0.995
     pi_lr = 1e-4
     q_lr = 2e-4
-    agent = DDPGAgent(image_shape,force_dim,action_dim,action_limit,pi_lr,q_lr,gamma,polyak)
+    agent = TD3(image_shape,force_dim,action_dim,action_limit,pi_lr,q_lr,gamma,polyak,noise)
 
-    model_dir = os.path.join(sys.path[0],'..','saved_models','socket_plug',datetime.now().strftime("%Y-%m-%d-%H-%M"))
+    model_dir = os.path.join(sys.path[0],'../saved_models/socket_plug/td3',datetime.now().strftime("%Y-%m-%d-%H-%M"))
     summaryWriter = tf.summary.create_file_writer(model_dir)
 
-    t, start_steps, update_after = 0, 2000, 1000
+    t, start_steps = 0, 1000
     ep_ret_list, avg_ret_list = [], []
     success_counter, best_ep_return = 0, -np.inf
     for ep in range(args.max_ep):
-        ep_ret, ep_step = 0, 0
-        pi_loss, q_loss = 0, 0
-        done = False
+        done, ep_ret, ep_step = False, 0, 0
         o, info = env.reset()
         while not done and ep_step < args.max_step:
             if t > start_steps:
-                a = agent.policy(o, noise())
+                a = agent.policy(o)
             else:
                 a = env.action_space.sample()
-            o2, r, done, _ = env.step(a)
+            o2, r, done, info = env.step(a)
             buffer.store((o,a,r,o2,done))
             t += 1
             ep_step += 1
             ep_ret += r
             o = o2
 
-            if t > update_after:
-                pi_loss, q_loss = agent.learn(buffer)
-
-            tf.summary.scalar('pi_loss', pi_loss, step=t)
-            tf.summary.scalar('q_loss', q_loss, step=t)
-            print("Step *{}*, pi_loss {}, q_loss {}".format(t, pi_loss, q_loss))
+            agent.learn(buffer)
 
         if env.success:
             success_counter += 1
 
         with summaryWriter.as_default():
             tf.summary.scalar('episode reward', ep_ret, step=ep)
-
 
         if ep > args.max_ep/2 and ep_ret > best_ep_return:
             best_ep_return = ep_ret
@@ -106,6 +99,8 @@ if __name__=="__main__":
                 ))
 
     save_model(agent, model_dir, 'last')
+
+    env.close()
 
     plt.plot(avg_ret_list)
     plt.xlabel('Episode')

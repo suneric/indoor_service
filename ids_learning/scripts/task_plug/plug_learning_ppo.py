@@ -9,7 +9,7 @@ import argparse
 from datetime import datetime
 import os
 from envs.socket_plug_env import SocketPlugEnv
-from agents.dqn import DQN, ReplayBuffer
+from agents.ppo import PPO, ReplayBuffer
 import matplotlib.pyplot as plt
 
 """
@@ -30,13 +30,14 @@ def get_args():
     return parser.parse_args()
 
 def save_model(agent, model_dir, name):
-    path = os.path.join(model_dir, 'q_net', name)
-    agent.save(path)
-    print("save {} weights so far to {}".format(name, model_dir))
+    logits_net_path = os.path.join(model_dir, 'logits_net', name)
+    val_net_path = os.path.join(model_dir, 'val_net', name)
+    agent.save(logits_net_path, val_net_path)
+    print("save {} weights so far to {}".format(name,model_dir))
 
 if __name__=="__main__":
     args = get_args()
-    rospy.init_node('dqn_train', anonymous=True)
+    rospy.init_node('ppo_train', anonymous=True)
 
     env = SocketPlugEnv(continuous=False)
     image_shape = env.observation_space[0]
@@ -44,32 +45,40 @@ if __name__=="__main__":
     action_dim = env.action_space.n
     print("create socket pluging environment.", image_shape, force_dim, action_dim)
 
-    buffer = ReplayBuffer(image_shape,force_dim,action_dim,capacity=50000,batch_size=64)
+    capacity = 1000
     gamma = 0.99
-    lr = 2e-4
-    update_stable_freq = 100
-    agent = DQN(image_shape,force_dim,action_dim,gamma,lr,update_stable_freq)
+    lamda = 0.97
+    buffer = ReplayBuffer(image_shape,force_dim,action_dim,capacity,gamma,lamda)
+    actor_lr = 1e-4
+    critic_lr = 2e-4
+    beta = 1e-3
+    clip_ratio = 0.2
+    batch_size = 64
+    agent = PPO(image_shape,force_dim,action_dim,actor_lr,critic_lr,beta,clip_ratio)
 
-    model_dir = os.path.join(sys.path[0],'../saved_models/socket_plug/dqn',datetime.now().strftime("%Y-%m-%d-%H-%M"))
+    model_dir = os.path.join(sys.path[0],'../saved_models/socket_plug/ppo',datetime.now().strftime("%Y-%m-%d-%H-%M"))
     summaryWriter = tf.summary.create_file_writer(model_dir)
 
-    epsilon, epsilon_stop, decay = 0.99, 0.1, 0.995
+    t, update_steps = 0, 500
     ep_ret_list, avg_ret_list = [], []
-    t, success_counter, best_ep_return = 0, 0, -np.inf
+    success_counter, best_ep_return = 0, -np.inf
     for ep in range(args.max_ep):
-        epsilon = max(epsilon_stop, epsilon*decay)
         done, ep_ret, ep_step = False, 0, 0
         o, info = env.reset()
         while not done and ep_step < args.max_step:
-            a = agent.policy(o,epsilon)
+            a, logp, value = agent.policy(o)
             o2, r, done, info = env.step(a)
-            buffer.store((o,a,r,o2,done))
+            buffer.store((o,a,r,value,logp))
             t += 1
             ep_step += 1
             ep_ret += r
             o = o2
 
-            agent.learn(buffer)
+        last_value = 0 if done else agent.value(o)
+        buffer.finish_trajectry(last_value)
+
+        if buffer.ptr > update_steps:
+            agent.learn(buffer, batch_size)
 
         if env.success:
             success_counter += 1

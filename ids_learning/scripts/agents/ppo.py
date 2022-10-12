@@ -1,288 +1,138 @@
 import numpy as np
 import tensorflow as tf
-from tensorflow import keras
-from tensorflow.keras import layers
-import tensorflow.keras.backend as K
-import scipy.signal
+from .core import *
 import os
 
-"""
-CNN-based nerual network for handling images input and output action prediction
-'softmax', or normalized exponetial function, is a generalization of the logistic function
-to multiple dimensions. It is used in multinomial logistic regression and is often used as
-the last activation function of a neural network to normalized the output of a network to a
-probability distribution over predicted output classes.
-"""
-def mixed_net(image_dim, force_dim, outputs_dim, outputs_activation='softmax'):
-    # visual inputs
-    i_inputs = keras.Input(shape=image_dim, name='images')
-    xi = layers.Conv2D(32,(3,3), padding='same', activation='relu')(i_inputs)
-    xi = layers.MaxPool2D((2,2))(xi)
-    xi = layers.Conv2D(32, (3,3), padding='same', activation='relu')(xi)
-    xi = layers.MaxPool2D((2,2))(xi)
-    xi = layers.Conv2D(32, (3,3), padding='same', activation='relu')(xi)
-    xi = layers.Flatten()(xi)
-    i_outputs = layers.Dense(128,activation='relu')(xi)
-    i_model = keras.Model(inputs=i_inputs,outputs=i_outputs)
-
-    # force inputs
-    f_inputs = keras.Input(shape=force_dim, name="forces")
-    xf = layers.Dense(16,activation='relu')(f_inputs)
-    f_outputs = layers.Dense(8,activation='relu')(xf)
-    f_model = keras.Model(inputs=f_inputs,outputs=f_outputs)
-
-    # combile image input and force input
-    mixed = layers.concatenate([i_model.output, f_model.output])
-
-    # output of direction for driving the robot
-    outputs = layers.Dense(outputs_dim, activation=outputs_activation)(mixed)
-    return keras.Model(inputs=[i_model.input,f_model.input],outputs=outputs)
-
-"""
-Replay Buffer, strore experiences and calculate total rewards, advanteges
-the buffer will be used for update the policy
-"""
 class ReplayBuffer:
-    def __init__(self, image_shape, force_shape, action_size, size=1000):
-        self.img_buf = np.zeros([size]+list(image_shape), dtype=np.float32) # images
-        self.force_buf = np.zeros((size, force_shape), dtype=np.float32) # forces
-        self.act_buf = np.zeros((size, action_size), dtype=np.float32) # action, based on stochasitc policy with teh probability
-        self.rew_buf = np.zeros(size, dtype=np.float32) # step reward
-        self.pred_buf = np.zeros((size, action_size), dtype=np.float32) # prediction: action probability, output of actor net
-        self.val_buf = np.zeros(size, dtype=np.float32) # value of (s,a), output of critic net
-        self.adv_buf = np.zeros(size, dtype=np.float32) # advantege Q(s,a)-V(s)
-        self.ret_buf = np.zeros(size, dtype=np.float32) # ep_return, total reward of episode
-        self.ptr, self.idx = 0, 0 # buffer ptr, and current trajectory start index
+    def __init__(self, image_shape, force_dim, action_dim, capacity, gamma=0.99,lamda=0.95):
+        self.img_buf = np.zeros([capacity]+list(image_shape), dtype=np.float32)
+        self.frc_buf = np.zeros((capacity, force_dim), dtype=np.float32)
+        self.act_buf = np.zeros((capacity, action_dim), dtype=np.float32) # based on stochasitc policy with probability
+        self.rew_buf = np.zeros(capacity, dtype=np.float32)
+        self.val_buf = np.zeros(capacity, dtype=np.float32) # value of (s,a), output of critic net
+        self.adv_buf = np.zeros(capacity, dtype=np.float32) # advantege Q(s,a)-V(s)
+        self.ret_buf = np.zeros(capacity, dtype=np.float32) # total reward of episode
+        self.prob_buf = np.zeros((capacity, action_dim), dtype=np.float32) # action probability, output of actor net
+        self.gamma, self.lamda = gamma, lamda
+        self.ptr, self.traj_idx = 0, 0 # buffer ptr, and current trajectory start index
 
-    def store(self, state, action, reward, prediction, value):
-        #print("storing", state[0].shape, action.shape, reward, prediction.shape, value.shape)
-        self.img_buf[self.ptr]=state[0]
-        self.force_buf[self.ptr]=state[1]
-        self.act_buf[self.ptr]=action
-        self.rew_buf[self.ptr]=reward
-        self.pred_buf[self.ptr]=prediction
-        self.val_buf[self.ptr]=value
+    def store(self, obs_tuple):
+        self.img_buf[self.ptr]=obs_tuple[0]["image"]
+        self.frc_buf[self.ptr]=obs_tuple[0]["force"]
+        self.act_buf[self.ptr]=obs_tuple[1]
+        self.rew_buf[self.ptr]=obs_tuple[2]
+        self.val_buf[self.ptr]=obs_tuple[3]
+        self.prob_buf[self.ptr]=obs_tuple[4]
         self.ptr += 1
 
-    def size(self):
-        return self.ptr
-
-    """
-    For each epidode, calculating the total reward and advanteges with specific
-    gamma and lamada
-    """
-    def ep_update(self, gamma=0.99, lamda=0.95):
+    def finish_trajectry(self, last_value = 0):
         """
-        magic from rllab for computing discounted cumulative sums of vectors
-        input: vector x: [x0, x1, x2]
-        output: [x0+discount*x1+discount^2*x2, x1+discount*x2, x2]
+        For each epidode, calculating the total reward and advanteges
         """
-        def discount_cumsum(x,discount):
-            return scipy.signal.lfilter([1], [1, float(-discount)], x[::-1], axis=0)[::-1]
-
-        ep_slice = slice(self.idx,self.ptr)
-        rews = np.append(self.rew_buf[ep_slice],0)
-        vals = np.append(self.val_buf[ep_slice],0)
-        # rewards-to-go, which is targets for the value function
-        self.ret_buf[ep_slice] = discount_cumsum(rews,gamma)[:-1]
-        # General Advantege Estimation
-        deltas = rews[:-1]+gamma*vals[1:]-vals[:-1]
-        self.adv_buf[ep_slice] = discount_cumsum(deltas,gamma*lamda)
-        self.idx = self.ptr
+        path_slice = slice(self.traj_idx, self.ptr)
+        rews = np.append(self.rew_buf[path_slice],last_value)
+        vals = np.append(self.val_buf[path_slice],last_value)
+        deltas = rews[:-1] + self.gamma*vals[1:] - vals[:-1]
+        self.adv_buf[path_slice] = discount_cumsum(deltas, self.gamma*self.lamda) # GAE
+        self.ret_buf[path_slice] = discount_cumsum(rews, self.gamma)[:-1] # rewards-to-go,
+        self.traj_idx = self.ptr
 
     def get(self):
-        s = slice(0,self.ptr)
-        # normalize advantage batch-wise
-        advs = self.adv_buf[s]
-        normalized_advs = (advs-np.mean(advs))/(np.std(advs)+1e-10)
-        data = dict(images=self.img_buf[s], forces=self.force_buf[s],
-                    actions=self.act_buf[s], returns=self.ret_buf[s],
-                    predictions=self.pred_buf[s], advantages=normalized_advs)
+        """
+        Get all data of the buffer and normalize the advantages
+        """
         self.ptr, self.idx = 0, 0
-        return data
+        adv_mean, adv_std = np.mean(self.adv_buf), np.std(self.adv_buf)+1e-10
+        self.adv_buf = (self.adv_buf-adv_mean) / adv_std
+        return dict(
+            images=self.img_buf,
+            forces=self.frc_buf,
+            actions=self.act_buf,
+            advantages = self.adv_buf,
+            returns=self.ret_buf,
+            probs=self.prob_buf,
+            )
 
-
-"""
-loss print call back
-"""
-class PrintLoss(keras.callbacks.Callback):
-    def on_epoch_end(self,epoch,logs={}):
-        print("epoch index", epoch+1, "loss", logs.get('loss'))
-
-"""
-The goal of RL is to find an optimal behavior strategy for the agent to obtain optimal rewards. The policy gradient
-methods target at modeling and optimizing the policy directly. The policy loss is defined as
-    L = E [log pi (a|s)] * AF
-where, 'L' is the policy loss, 'E' is the expected, 'log pi(a|s)' log probability of taking the action at that state
-'AF' is the advantage.
-
-PPO is an on-policy algorithm which can be used for environments with either discrete or continous actions spaces.
-There are two primary variants of PPO: PPO-penalty which approximately solves a KL-constrained update like TRPO,
-but penalizes the KL-divergence in the objective function instead of make it a hard constraint; PPO-clip which does
-not have a KL-divergence term in the objective and does not have a constraint at all, instead relies on specialized
-clipping in the objective function to remove incentives for the new policy to get far from the old policy
-This implementation uses PPO-clip.
-
-references:
-[1] https://arxiv.org/pdf/1707.06347.pdf
-[2] https://spinningup.openai.com/en/latest/algorithms/ppo.html
-"""
-
-"""
-Actor net
-"""
-class Actor_Model:
-    def __init__(self, image_shape, force_shape, action_size, clip_ratio, lr, beta):
-        self.learning_rate = lr
+class PPO:
+    def __init__(self,image_shape,force_dim,action_dim,pi_lr=1e-4,q_lr=2e-4,beta=1e-3,clip_ratio=0.2):
+        self.beta = beta
+        self.action_dim = action_dim
         self.clip_ratio = clip_ratio
-        self.beta = beta # hyperparameter that controls the influence of entropy loss
-        self.action_size = action_size
-        self.actor = self.build_model(image_shape, force_shape, action_size, lr)
-        self.loss_printer = PrintLoss()
+        self.pi = vision_force_actor_network(image_shape,force_dim,action_dim,'relu','softmax')
+        self.q = vision_force_critic_network(image_shape,force_dim,'relu')
+        self.compile_models(pi_lr,q_lr)
 
-    def build_model(self, image_shape, force_shape, action_size, lr):
-        model = mixed_net(image_dim=image_shape, force_dim=force_shape, outputs_dim=action_size, outputs_activation='softmax')
-        model.compile(loss=self.ppo_loss, optimizer=keras.optimizers.Adam(learning_rate=lr))
-        print(model.summary())
-        return model
+    def compile_models(self, pi_lr, q_lr):
+        self.pi.compile(loss=self.actor_loss, optimizer=tf.keras.optimizers.Adam(pi_lr))
+        self.q.compile(loss=self.critic_loss, optimizer=tf.keras.optimizers.Adam(q_lr))
+        print(self.pi.summary())
+        print(self.q.summary())
 
-    """
-    The key part of the PPO-clip
-    policy ratio is define as r = pi(a|s) / pi_old(a|s)
-    loss = min(r*AF, clip(r, 1-e, 1+e)*AF), where 'e' is the clip ratio,
-    and AF is the advantage function AF(s,a)=Q(s,a)-V(s)
-    """
-    def ppo_loss(self, y_true, y_pred):
-        # y_true: np.hstack([advantages, predictions, actions])
-        advs,o_pred,acts = y_true[:,:1],y_true[:,1:1+self.action_size],y_true[:,1+self.action_size:]
-        # print(y_pred, advs, picks, acts)
-        prob = y_pred*acts
-        old_prob = o_pred*acts
-        ratio = prob/(old_prob + 1e-10)
+    def actor_loss(self, y, y_pred):
+        # y: np.hstack([advantages, probs, actions]), y_pred: predict actions
+        advs, prob, acts = y[:,:1], y[:,1:1+self.action_dim],y[:,1+self.action_dim:]
+        old_prob = prob*acts
+        new_prob = y_pred*acts
+        ratio = new_prob/(old_prob + 1e-10)
         p1 = ratio*advs
-        p2 = K.clip(ratio, 1-self.clip_ratio, 1+self.clip_ratio)*advs
+        p2 = tf.clip_by_value(ratio, 1-self.clip_ratio, 1+self.clip_ratio)*advs
         # total loss = policy loss + entropy loss (entropy loss for promote action diversity)
-        loss = -K.mean(K.minimum(p1,p2)+self.beta*(-y_pred*K.log(y_pred+1e-10)))
+        loss = -tf.reduce_mean(tf.minimum(p1,p2)+self.beta*(-y_pred*tf.math.log(y_pred+1e-10)))
         return loss
 
-    def predict(self,images,forces):
-        digits = self.actor.predict([images, forces])
-        #print("actor prediction", digits)
-        return digits
+    def critic_loss(self, y, y_pred):
+        # y: returns, y_pred: predict q
+        loss = tf.keras.losses.MSE(y, y_pred)
+        return loss
 
-    def fit(self,images,forces,y_true,epochs,batch_size):
-        self.actor.fit([images,forces], y_true, epochs=epochs, verbose=0, shuffle=True, batch_size=batch_size, callbacks=[self.loss_printer])
+    def policy(self, state):
+        images = tf.expand_dims(tf.convert_to_tensor(state['image']), 0)
+        forces = tf.expand_dims(tf.convert_to_tensor(state['force']), 0)
+        pred = np.squeeze(self.pi([images,forces]), axis=0)
+        act = np.random.choice(self.action_dim, p=pred)
+        val = np.squeeze(self.q([images,forces]), axis=0)
+        return act, pred, val
 
-    def save(self, path):
-        self.actor.save_weights(path)
+    def value(self, state):
+        images = tf.expand_dims(tf.convert_to_tensor(state['image']), 0)
+        forces = tf.expand_dims(tf.convert_to_tensor(state['force']), 0)
+        return np.squeeze(self.q([images, forces]), axis=0)
 
-    def load(self, path):
-        self.actor.load_weights(path)
-
-    def freeze(self):
-        # freeze all layers except output layer
-        layer_num = len(self.actor.layers)
-        print("freeze actor", layer_num-1, "/", layer_num, "layers")
-        for i in range(layer_num-1):
-            self.actor.layers[i].trainable = False
-        self.actor.layers[0].trainable = True
-        self.actor.compile(loss=self.ppo_loss, optimizer=keras.optimizers.Adam(learning_rate=self.learning_rate))
-
-"""
-Critic net
-"""
-class Critic_Model:
-    def __init__(self, image_shape, force_shape, lr):
-        self.learning_rate = lr
-        self.critic = self.build_model(image_shape, force_shape, lr)
-        self.loss_printer = PrintLoss()
-
-    def build_model(self, image_shape, force_shape, lr):
-        model = mixed_net(image_dim=image_shape, force_dim=force_shape, outputs_dim=1, outputs_activation='linear')
-        model.compile(loss="mse",optimizer=keras.optimizers.Adam(learning_rate=lr))
-        print(model.summary())
-        return model
-
-    def predict(self,images,forces):
-        digits = self.critic.predict([images,forces])
-        #print("critic prediction", digits)
-        return digits
-
-    def fit(self,images,forces,y_true,epochs,batch_size):
-        self.critic.fit([images,forces], y_true, epochs=epochs, verbose=0, shuffle=True, batch_size=batch_size, callbacks=[self.loss_printer])
-
-    def save(self, path):
-        self.critic.save_weights(path)
-
-    def load(self, path):
-        self.critic.load_weights(path)
-
-    def freeze(self):
-        # freeze all layers except output layer
-        layer_num = len(self.critic.layers)
-        print("freeze critic", layer_num-1, "/", layer_num, "layers")
-        for i in range(layer_num-1):
-            self.critic.layers[i].trainable = False
-        self.critic.layers[0].trainable = True
-        self.critic.compile(loss="mse", optimizer=keras.optimizers.Adam(learning_rate=self.learning_rate))
-
-"""
-A PPO agent class using images and forces as input
-"""
-class PPOMixedAgent:
-    def __init__(
-        self,
-        image_dim,
-        force_dim,
-        action_size,
-        clip_ratio=0.2,
-        lr_a=1e-4,
-        lr_c=3e-4,
-        beta=1e-3
-    ):
-        self.name = 'ppo_mixed'
-        self.action_size = action_size
-        self.Actor = Actor_Model(image_dim,force_dim,action_size,clip_ratio,lr_a,beta)
-        self.Critic = Critic_Model(image_dim,force_dim,lr_c)
-
-    def action(self, state):
-        images = np.expand_dims(state[0], axis=0) # visual state
-        forces = np.expand_dims(state[1], axis=0) # forces state
-        pred = np.squeeze(self.Actor.predict(images,forces), axis=0)
-        act = np.random.choice(self.action_size,p=pred) # index of actions
-        val = np.squeeze(self.Critic.predict(images,forces), axis=0)
-        # print("prediction, action, value:", pred, act, val)
-        return pred, act, val
-
-    def train(self, data, batch_size, iter_a=80, iter_c=80):
-        images = data['images']
-        forces = data['forces']
-        actions = np.vstack(data['actions'])
-        predictions = np.vstack(data['predictions'])
-        advantages = np.vstack(data['advantages'])
-        returns = np.vstack(data['returns'])
-        # stack everything to numpy array
-        y_true = np.hstack([advantages, predictions, actions])
-        # training Actor and Crtic networks
-        print("training Actor network...")
-        self.Actor.fit(images, forces, y_true, iter_a, batch_size)
-        print("training Critic network...")
-        self.Critic.fit(images, forces, returns, iter_c, batch_size)
+    def learn(self, buffer, batch_size, iter_a=80, iter_c=80):
+        experiences = buffer.get()
+        images = experiences['images']
+        forces = experiences['forces']
+        actions = np.vstack(experiences['actions'])
+        returns = np.vstack(experiences['returns'])
+        advantages = np.vstack(experiences['advantages'])
+        probs = np.vstack(experiences['probs'])
+        self.pi.fit(
+            x = [images, forces],
+            y = np.hstack([advantages, probs, actions]),
+            batch_size = batch_size,
+            epochs = iter_a,
+            shuffle = True,
+            verbose = 0,
+            callbacks=None
+        ) # traning pi network
+        self.q.fit(
+            x = [images, forces],
+            y = returns,
+            batch_size = batch_size,
+            epochs = iter_c,
+            shuffle = True,
+            verbose = 0,
+            callbacks=None
+        ) # training q network
 
     def save(self, actor_path, critic_path):
-        # save logits_net
         if not os.path.exists(os.path.dirname(actor_path)):
             os.makedirs(os.path.dirname(actor_path))
-        self.Actor.save(actor_path)
-        # save val_net
+        self.pi.save_weights(actor_path)
         if not os.path.exists(os.path.dirname(critic_path)):
             os.makedirs(os.path.dirname(critic_path))
-        self.Critic.save(critic_path)
+        self.q.save_weights(critic_path)
 
     def load(self, actor_path, critic_path):
-        self.Actor.load(actor_path)
-        self.Critic.load(critic_path)
-
-    def freeze(self):
-        self.Actor.freeze()
-        self.Critic.freeze()
+        self.pi.load_weights(actor_path)
+        self.q.load_weights(critic_path)
