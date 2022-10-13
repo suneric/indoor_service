@@ -10,11 +10,13 @@ from geometry_msgs.msg import WrenchStamped
 from gazebo_msgs.msg import ContactsState, ModelStates, LinkStates
 from .filters import KalmanFilter
 from ids_detection.msg import DetectionInfo
+import tf.transformations as tft
+import math
 
-"""
-resize image without distortion
-"""
 def resize_image(image, shape=None, inter = cv.INTER_AREA):
+    """
+    resize image without distortion
+    """
     (h,w) = image.shape[:2]
     if shape == None:
         return image
@@ -30,23 +32,53 @@ def resize_image(image, shape=None, inter = cv.INTER_AREA):
     croped = image[int((h-dim[0])/2):int((h+dim[0])/2),int((w-dim[1])/2):int((w+dim[1])/2)]
     return cv.resize(croped,shape,interpolation=inter)
 
+def noise_image(image, var):
+    """
+    add gaussian noise to image
+    """
+    if var > 0:
+        img = skimage.util.img_as_float(image)
+        noisy = skimage.util.random_noise(img,'gaussian',mean=0.0,var=var)
+        return skimage.util.img_as_ubyte(noisy)
+    else:
+        return image
+
 """
 ArduCam looks up for observing door open status
 """
 class ArduCam:
-    def __init__(self, name, resolution=(64,64), noise=0.):
-        self.name = name
+    def __init__(self, name):
         print("create arducam instance...")
-        self.resolution = resolution
-        self.noise = noise
+        self.name = name
         self.bridge=CvBridge()
         self.caminfo_sub = rospy.Subscriber('/'+name+'/camera_info', CameraInfo, self._caminfo_callback)
         self.color_sub = rospy.Subscriber('/'+name+'/image', Image, self._color_callback)
         self.cameraInfoUpdate = False
         self.cv_color = None
-        self.cv_grey = None
         self.width = 256
         self.height = 256
+
+    def image_arr(self, resolution, noise_var = None):
+        img = self.cv_color
+        if noise_var is not None:
+            img = noise_image(img, noise_var)
+        img = resize_image(img,resolution)
+        img = np.array(img)/255 - 0.5
+        img = img.reshape((resolution[0],resolution[1],3))
+        return img
+
+    def grey_arr(self, resolution, noise_var = None):
+        img = self.cv_color
+        if noise_var is not None:
+            img = noise_image(img, noise_var)
+        img = resize_image(img,resolution)
+        img = cv.cvtColor(img,cv.COLOR_BGR2GRAY)
+        img = np.array(img)/255 - 0.5
+        img = img.reshape((resolution[0],resolution[1],1))
+        return img
+
+    def zero_arr(self, resolution):
+        return np.zeros((resolution[0],resolution[1],1))
 
     def ready(self):
         return self.cameraInfoUpdate and self.cv_color is not None
@@ -54,22 +86,8 @@ class ArduCam:
     def image_size(self):
         return self.height, self.width
 
-    def zero_image(self): # blind camera
-        img_arr = np.zeros(self.resolution)
-        img_arr = img_arr.reshape((self.resolution[0],self.resolution[1],1))
-        return img_arr
-
     def color_image(self):
-        img = resize_image(self.cv_color,(self.resolution[0], self.resolution[1]))
-        img_arr = np.array(img)/255.0 - 0.5 # normalize the image
-        img_arr = img_arr.reshape((self.resolution[0],self.resolution[1],3))
-        return img_arr
-
-    def gray_image(self):
-        img = resize_image(self.cv_gray,(self.resolution[0],self.resolution[1]))
-        img_arr = np.array(img)/255.0 - 0.5 # normalize the image
-        img_arr = img_arr.reshape((self.resolution[0],self.resolution[1],1))
-        return img_arr
+        return self.cv_color
 
     def _caminfo_callback(self, data):
         if self.cameraInfoUpdate == False:
@@ -80,19 +98,9 @@ class ArduCam:
     def _color_callback(self, data):
         if self.cameraInfoUpdate:
             try:
-                image = self.bridge.imgmsg_to_cv2(data, "bgr8")
-                self.cv_color = self._guass_noisy(image, self.noise)
-                self.cv_grey = cv2.cvtColor(self.cv_color, cv2.COLOR_BGR2GRAY)
+                self.cv_color = self.bridge.imgmsg_to_cv2(data, "bgr8")
             except CvBridgeError as e:
                 print(e)
-
-    def _guass_noisy(self,image,var):
-        if var > 0:
-            img = skimage.util.img_as_float(image)
-            noisy = skimage.util.random_noise(img,'gaussian',mean=0.0,var=var)
-            return skimage.util.img_as_ubyte(noisy)
-        else:
-            return image
 
     def check_sensor_ready(self):
         rospy.logdebug("Waiting for ardu camera to be READY...")
@@ -122,14 +130,20 @@ class RSD435:
         self.width = 640
         self.height = 480
 
-    def image_arr(self, resolution):
-        img = resize_image(self.cv_color,resolution)
+    def image_arr(self, resolution, noise_var = None):
+        img = self.cv_color
+        if noise_var is not None:
+            img = noise_image(img, noise_var)
+        img = resize_image(img,resolution)
         img = np.array(img)/255 - 0.5
         img = img.reshape((resolution[0],resolution[1],3))
         return img
 
-    def grey_arr(self, resolution):
-        img = resize_image(self.cv_color,resolution)
+    def grey_arr(self, resolution, noise_var = None):
+        img = self.cv_color
+        if noise_var is not None:
+            img = noise_image(img, noise_var)
+        img = resize_image(img,resolution)
         img = cv.cvtColor(img,cv.COLOR_BGR2GRAY)
         img = np.array(img)/255 - 0.5
         img = img.reshape((resolution[0],resolution[1],1))
@@ -193,6 +207,7 @@ class FTSensor():
         self.kfz = KalmanFilter()
         self.filtered = np.zeros(3)
         self.record = []
+        self.record_temp = []
 
     def _force_cb(self,data):
         force = data.wrench.force
@@ -201,12 +216,19 @@ class FTSensor():
         z = self.kfz.update(force.z)
         self.filtered = [x,y,z]
         self.record.append(self.filtered)
+        self.record_temp.append(self.filtered)
 
     def forces(self):
         return self.filtered
 
     def reset(self):
         self.record = []
+
+    def reset_temp(self):
+        self.record_temp = []
+
+    def temp_record(self):
+        return self.record_temp
 
     def forces_record(self):
         return self.record
@@ -269,14 +291,44 @@ class PoseSensor():
     def _model_pose_cb(self,data):
         self.robot_pose = data.pose[data.name.index('mrobot')]
 
-    def robot(self):
-        return self.robot_pose
+    def robot_footprint(self):
+        robot_mat = self.pose_matrix(self.robot_pose)
+        lf_trans = [[1,0,0,0.25],[0,1,0,0.25],[0,0,1,0],[0,0,0,1]]
+        lr_trans = [[1,0,0,-0.25],[0,1,0,0.25],[0,0,1,0],[0,0,0,1]]
+        rf_trans = [[1,0,0,0.25],[0,1,0,-0.25],[0,0,1,0],[0,0,0,1]]
+        rr_trans = [[1,0,0,-0.25],[0,1,0,-0.25],[0,0,1,0],[0,0,0,1]]
+        cam_trans = [[1,0,0,0.49],[0,1,0,-0.19],[0,0,1,0],[0,0,0,1]]
+        lf_mat = np.dot(robot_mat,np.array(lf_trans))
+        lr_mat = np.dot(robot_mat,np.array(lr_trans))
+        rf_mat = np.dot(robot_mat,np.array(rf_trans))
+        rr_mat = np.dot(robot_mat,np.array(rr_trans))
+        cam_mat = np.dot(robot_mat,np.array(cam_trans))
+        return dict(
+            left_front=(lf_mat[0,3],lf_mat[1,3]),
+            left_rear=(lr_mat[0,3],lr_mat[1,3]),
+            right_front=(rf_mat[0,3],rf_mat[1,3]),
+            right_rear=(rr_mat[0,3],rr_mat[1,3]),
+            camera=(cam_mat[0,3],cam_mat[1,3]),
+        )
 
-    def door(self):
-        return self.door_pose
+    def door_angle(self,length=0.9):
+        door_mat = self.pose_matrix(self.door_pose)
+        door_edge = [[1,0,0,length],[0,1,0,0],[0,0,1,0],[0,0,0,1]]
+        door_edge_mat = np.dot(door_mat, np.array(door_edge))
+        return math.atan2(door_edge_mat[0,3],door_edge_mat[1,3])
 
     def bumper(self):
-        return self.bumper_pose
+        bpPos = self.bumper_pose
+        x = bpPos.position.x
+        y = bpPos.position.y
+        z = bpPos.position.z
+        return (x,y,z)
+
+    def pose_matrix(self,cp):
+        p, q = cp.position, cp.orientation
+        T = tft.translation_matrix([p.x,p.y,p.z])
+        R = tft.quaternion_matrix([q.x,q.y,q.z,q.w])
+        return np.dot(T,R)
 
     def check_sensor_ready(self):
         rospy.logdebug("Waiting for /gazebo/model_states to be READY...")

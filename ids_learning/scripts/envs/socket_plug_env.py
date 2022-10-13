@@ -17,7 +17,7 @@ class SocketPlugEnv(GymGazeboEnv):
     def __init__(self, continuous = True):
         super(SocketPlugEnv, self).__init__(
             start_init_physics_parameters = False,
-            reset_world_or_sim='NO_RESET_SIM'
+            reset_world_or_sim='WORLD'
         )
         self.continuous = continuous
         self.camera = RSD435('camera')
@@ -36,7 +36,7 @@ class SocketPlugEnv(GymGazeboEnv):
         self.obs_image = None # observation image
         self.obs_force = None # observation forces
         if self.continuous:
-            self.action_space = Box(-0.005,0.005,(2,),dtype=np.float32)
+            self.action_space = Box(-1.0,1.0,(2,),dtype=np.float32)
         else:
             self.action_space = Discrete(9) #
         self.observation_space = ((64,64,1),3) # image and force
@@ -55,31 +55,26 @@ class SocketPlugEnv(GymGazeboEnv):
         return obs
 
     def _post_information(self):
-        return None
+        return dict(
+            plug=self.poseSensor.bumper(),
+            socket=self.goal,
+        )
 
     def _set_init(self):
         # reset system
-        self.ftSensor.reset()
         self.success = False
         self.fail = False
-        # reset robot position adding noise
-        rad = np.random.uniform(size=4)
-        rx = 0.01*(rad[0]-0.5) + self.goal[0]# [-5mm, 5mm]
-        ry = 0.1*(rad[1]-0.5) + (self.goal[1]-0.45) # [-10cm, 10cm]
-        rt = 0.001*(rad[2]-0.5) + (0.5*np.pi)
-        self.robotPoseReset.reset_robot(rx,ry,rt)
-        rh = 0.01*(rad[3]-0.5) + self.goal_h[0] # [-5mm, 5mm]
-        self.fdController.set_position(hk=False,vs=rh,hs=0,pg=0.03)
-        self.initPose = [0.0,rh]
-        rospy.sleep(2) # wait for end-effector to reset
+        self.ftSensor.reset()
+        self.reset_robot()
+        _, self.prev_dist = self.dist2goal()
+        self.curr_dist = self.prev_dist
         # get observation
         self.obs_image = self.camera.grey_arr((64,64))
         self.obs_force = self.ftSensor.forces()
-        _, self.prev_dist = self.dist2goal()
-        self.curr_dist = self.prev_dist
 
     def _take_action(self, action):
         act = self.get_action(action)
+        # print(act)
         hpos = self.fdController.hslider_pos()
         self.fdController.move_hslider(hpos+act[0])
         vpos = self.fdController.vslider_height()
@@ -96,8 +91,9 @@ class SocketPlugEnv(GymGazeboEnv):
         elif self.fail:
             reward = -50
         else:
-            dist_change = self.curr_dist - self.prev_dist
-            reward = -dist_change*1000
+            penalty = 0.1
+            dist_decrese = self.prev_dist - self.curr_dist
+            reward = 1e3*dist_decrese - 0.1
             self.prev_dist = self.curr_dist
         return reward
 
@@ -114,9 +110,23 @@ class SocketPlugEnv(GymGazeboEnv):
             if self.success or self.fail:
                 break
         self.driver.stop()
-        self.fdController.unlock()
         self.curr_dist = dist2
+        self.fdController.unlock()
         return forces
+
+    def reset_robot(self):
+        self.driver.stop()
+        # reset robot position
+        rad = np.random.uniform(size=4)
+        rx = 0.01*(rad[0]-0.5) + self.goal[0]# [-5mm, 5mm]
+        ry = 0.1*(rad[1]-0.5) + (self.goal[1]-0.45) # [-10cm, 10cm]
+        rt = 0.001*(rad[2]-0.5) + (0.5*np.pi)
+        self.robotPoseReset.reset_robot(rx,ry,rt)
+        # reset frame device
+        rh = 0.01*(rad[3]-0.5) + self.goal_h[0] # [-5mm, 5mm]
+        self.initPose = [0.0,rh]
+        self.fdController.set_position(hk=False,vs=rh,hs=0,pg=0.03)
+        rospy.sleep(2) # wait for end-effector to reset
 
     def dist2goal(self):
         """
@@ -125,14 +135,14 @@ class SocketPlugEnv(GymGazeboEnv):
         return dist2: bumper to goal position in x-z
         """
         bpPos = self.poseSensor.bumper()
-        dist1 = bpPos.position.y - self.goal[1]
-        dist2 = np.sqrt((bpPos.position.x-self.goal[0])**2 + (bpPos.position.z-self.goal[2])**2)
+        dist1 = bpPos[1] - self.goal[1]
+        dist2 = np.sqrt((bpPos[0]-self.goal[0])**2 + (bpPos[2]-self.goal[2])**2)
         return dist1, dist2
 
     def get_action(self, action):
+        sh,sv = 0.005, 0.005 # 5 mm, scale for horizontal and vertical move
         if self.continuous:
-            return action
+            return (action[0]*sh, action[1]*sv)
         else:
-            v = 0.001
-            act_list = [(v,-v),(v,0),(v,v),(0,-v),(0,0),(0,v),(-v,-v),(-v,0),(-v,v)]
+            act_list = [(sh,-sv),(sh,0),(sh,sv),(0,-sv),(0,0),(0,sv),(-sh,-sv),(-sh,0),(-sh,sv)]
             return act_list[action]
