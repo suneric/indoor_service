@@ -144,5 +144,5 @@ class SocketPlugEnv(GymGazeboEnv):
         if self.continuous:
             return (action[0]*sh, action[1]*sv)
         else:
-            act_list = [(sh,-sv),(sh,0),(sh,sv),(0,-sv),(0,0),(0,sv),(-sh,-sv),(-sh,0),(-sh,sv)]
+            act_list = [(sh,-sv),(sh,0),(sh,sv),(0,-sv),(0,sv),(-sh,-sv),(-sh,0),(-sh,sv)]
             return act_list[action]
