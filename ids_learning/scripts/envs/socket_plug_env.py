@@ -30,7 +30,7 @@ class SocketPlugEnv(GymGazeboEnv):
         self.socketDetector = ObjectDetector(topic='detection',type=4)
         self.success = False
         self.fail = False
-        self.goal = [1.0350,2.9575,0.3606] # [x,y,z]
+        self.goal = [1.0350,2.957,0.3606] # [x,y,z]
         self.goal_h = [0.0882,0.0488]
         self.initPose = None # inistal position of endeffector [hpose, vpose]
         self.obs_image = None # observation image
@@ -105,7 +105,7 @@ class SocketPlugEnv(GymGazeboEnv):
             self.driver.drive(1.0,0.0)
             forces = self.ftSensor.forces()
             dist1, dist2 = self.dist2goal()
-            self.success = dist1 > 0 and dist2 < 2e-3 # < 2 mm
+            self.success = dist1 > 0 and dist2 < 5e-3 # < 5 mm
             self.fail = dist2 > 2e-2 # limit exploration area r < 2 cm
             if self.success or self.fail:
                 break
@@ -140,9 +140,9 @@ class SocketPlugEnv(GymGazeboEnv):
         return dist1, dist2
 
     def get_action(self, action):
-        sh,sv = 0.005, 0.005 # 5 mm, scale for horizontal and vertical move
+        sh,sv = 0.001, 0.001 # 1 mm, scale for horizontal and vertical move
         if self.continuous:
-            return (action[0]*sh, action[1]*sv)
+            return 5*(action[0]*sh, action[1]*sv)
         else:
             act_list = [(sh,-sv),(sh,0),(sh,sv),(0,-sv),(0,sv),(-sh,-sv),(-sh,0),(-sh,sv)]
             return act_list[action]

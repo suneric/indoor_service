@@ -76,7 +76,7 @@ class DoorOpenEnv(GymGazeboEnv):
         # print(act)
         self.ftSensor.reset_temp()
         self.driver.drive(act[0],act[1])
-        rospy.sleep(0.5)
+        rospy.sleep(1) # let robot move 1 second
         self.curr_angle = self.poseSensor.door_angle()
         self.obs_image = self.camera.grey_arr((64,64))
         self.obs_force = self.ftSensor.forces()
@@ -155,7 +155,7 @@ class DoorOpenEnv(GymGazeboEnv):
     def get_action(self, action):
         vx, vz = 1.0, 3.14 # scale of linear and angular velocity
         if self.continuous:
-            return 3*(action[0]*vx, action[1]*vz)
+            return 2*(action[0]*vx, action[1]*vz)
         else:
-            act_list = 3*[(vx,-vz),(vx,0.0),(vx,vz),(0,-vz),(0,vz),(-vx,-vz),(-vx,0),(-vx,vz)]
+            act_list = 2*[(vx,-vz),(vx,0.0),(vx,vz),(0,-vz),(0,vz),(-vx,-vz),(-vx,0),(-vx,vz)]
             return act_list[action]
