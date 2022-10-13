@@ -38,7 +38,7 @@ class SocketPlugEnv(GymGazeboEnv):
         if self.continuous:
             self.action_space = Box(-1.0,1.0,(2,),dtype=np.float32)
         else:
-            self.action_space = Discrete(9) #
+            self.action_space = Discrete(8) #
         self.observation_space = ((64,64,1),3) # image and force
         self.prev_dist = 0.0
         self.curr_dist = 0.0

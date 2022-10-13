@@ -34,7 +34,7 @@ class DoorOpenEnv(GymGazeboEnv):
         if self.continuous:
             self.action_space = Box(-1.0,1.0,(2,),dtype=np.float32)
         else:
-            self.action_space = Discrete(9)
+            self.action_space = Discrete(8)
         self.observation_space = ((64,64,1),3) # image and force
         self.obs_image = None
         self.obs_force = None
@@ -122,6 +122,13 @@ class DoorOpenEnv(GymGazeboEnv):
         rospy.sleep(2) # wait for end-effector to reset
 
     def is_safe(self, record, max=70):
+        """
+        Americans with Disabilities Act Accessibility Guidelines (ADAAG),
+        ICC/ANSI A117.1 Standard on Accessible and Usable Building and Facilities,
+        and the Massachusetts Architectural Access Board requirements (521 CMR)
+        - Interior Doors: 5 pounds of force (22.14111 N)
+        - Exterior Doors: 15 pounds of force (66.72333 N)
+        """
         forces = np.array(record)
         max_f = np.max(np.absolute(forces),axis=0)
         if any(f > max for f in max_f):
@@ -131,9 +138,12 @@ class DoorOpenEnv(GymGazeboEnv):
             return True
 
     def is_failed(self):
+        """
+        Fail when the robot is not out of the room and the side bar is far away from the door
+        """
         fp = self.poseSensor.robot_footprint()
-        robot_is_out = any(fp[key][0] > 0.0 for key in fp.keys())
-        if not robot_is_out:
+        robot_not_out = any(fp[key][0] > 0.0 for key in fp.keys())
+        if robot_not_out:
             cam_r = math.sqrt(fp['camera'][0]**2+fp['camera'][1]**2)
             cam_a = math.atan2(fp['camera'][0],fp['camera'][1])
             door_r = self.door_length
