@@ -25,7 +25,7 @@ tf.random.set_seed(123)
 
 def get_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--max_ep', type=int, default=2000)
+    parser.add_argument('--max_ep', type=int, default=5000)
     parser.add_argument('--max_step', type=int ,default=50)
     return parser.parse_args()
 
