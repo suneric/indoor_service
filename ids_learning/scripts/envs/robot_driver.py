@@ -6,6 +6,23 @@ from geometry_msgs.msg import Twist
 from gazebo_msgs.msg import ODEJointProperties, ModelState
 from gazebo_msgs.srv import SetJointProperties, SetJointPropertiesRequest
 from .sensors import PoseSensor
+import math
+
+"""
+RobotConfig
+"""
+class RobotConfig:
+    def __init__(self):
+        self.camera_offset = (0.49,-0.19)
+        self.robot_length = 0.5
+
+    def robot_pose(self, cam_x, cam_y, cam_t):
+        cam_pose = [[math.cos(cam_t),math.sin(cam_t),0,cam_x],[-math.sin(cam_t),math.cos(cam_t),0,cam_y],[0,0,1,0.75],[0,0,0,1]]
+        robot_to_cam_mat = [[1,0,0,self.camera_offset[0]],[0,1,0,self.camera_offset[1]],[0,0,1,0],[0,0,0,1]]
+        R = np.dot(np.array(cam_pose),np.linalg.inv(np.array(robot_to_cam_mat)))
+        E = tft.euler_from_matrix(R[0:3,0:3],'rxyz')
+        rx, ry, rt = R[0,3], R[1,3], E[2]
+        return rx, ry, rt
 
 """
 RobotPoseReset

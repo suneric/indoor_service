@@ -30,7 +30,7 @@ class SocketPlugEnv(GymGazeboEnv):
         self.socketDetector = ObjectDetector(topic='detection',type=4)
         self.success = False
         self.fail = False
-        self.goal = [1.0350,2.957,0.3606] # [x,y,z]
+        self.goal = [1.0350,2.9565,0.3606] # [x,y,z]
         self.goal_h = [0.0882,0.0488]
         self.initPose = None # inistal position of endeffector [hpose, vpose]
         self.obs_image = None # observation image
@@ -79,7 +79,11 @@ class SocketPlugEnv(GymGazeboEnv):
         self.fdController.move_hslider(hpos+act[0])
         vpos = self.fdController.vslider_height()
         self.fdController.move_vslider(vpos+act[1])
-        self.obs_force = self.plug(f_max=30)
+        dist1, dist2 = self.dist2goal()
+        self.success = dist1 > 0.0
+        self.fail = dist2 > 0.02 # limit exploration area r < 2 cm
+        if not self.success and not self.fail:
+            self.obs_force = self.plug(f_max=30)
 
     def _is_done(self):
         return self.success or self.fail
@@ -93,22 +97,22 @@ class SocketPlugEnv(GymGazeboEnv):
         else:
             penalty = 0.1
             dist_decrese = self.prev_dist - self.curr_dist
-            reward = 1e3*dist_decrese - 0.1
+            reward = 1e3*dist_decrese - penalty
             self.prev_dist = self.curr_dist
         return reward
 
     def plug(self, f_max=30):
         self.fdController.lock()
-        forces = self.ftSensor.forces()
-        dist1, dist2 = self.dist2goal()
+        forces, dist1, dist2 = self.ftSensor.forces(), 0, 0
         while forces[0] > -f_max and abs(forces[1]) < f_max and abs(forces[2]) < f_max:
-            self.driver.drive(1.0,0.0)
+            self.driver.drive(0.25,0.0)
             forces = self.ftSensor.forces()
             dist1, dist2 = self.dist2goal()
-            self.success = dist1 > 0 and dist2 < 5e-3 # < 5 mm
-            self.fail = dist2 > 2e-2 # limit exploration area r < 2 cm
+            self.success = dist1 > 0.0
+            self.fail = dist2 > 0.02 # limit exploration area r < 2 cm
             if self.success or self.fail:
                 break
+            rospy.sleep(0.01)
         self.driver.stop()
         self.curr_dist = dist2
         self.fdController.unlock()

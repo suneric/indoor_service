@@ -7,7 +7,7 @@ from gym.envs.registration import register
 import tf.transformations as tft
 import math
 from .sensors import ArduCam, RSD435, FTSensor, PoseSensor
-from .robot_driver import RobotDriver, RobotPoseReset
+from .robot_driver import RobotDriver, RobotPoseReset, RobotConfig
 from .joints_controller import FrameDeviceController
 from gym.spaces import Box, Discrete
 
@@ -26,6 +26,7 @@ class DoorOpenEnv(GymGazeboEnv):
         self.ftSensor = FTSensor('ft_sidebar')
         self.poseSensor = PoseSensor()
         self.driver = RobotDriver()
+        self.robotConfig = RobotConfig()
         self.fdController = FrameDeviceController()
         self.robotPoseReset = RobotPoseReset(self.poseSensor)
         self.success = False
@@ -76,7 +77,7 @@ class DoorOpenEnv(GymGazeboEnv):
         # print(act)
         self.ftSensor.reset_temp()
         self.driver.drive(act[0],act[1])
-        rospy.sleep(1) # let robot move 1 second
+        rospy.sleep(0.5) # command in 2 Hz
         self.curr_angle = self.poseSensor.door_angle()
         self.obs_image = self.camera.grey_arr((64,64))
         self.obs_force = self.ftSensor.forces()
@@ -106,16 +107,12 @@ class DoorOpenEnv(GymGazeboEnv):
         # wait door close
         while self.poseSensor.door_angle() > 0.11:
             rospy.sleep(0.5)
-        # reset robot position
+        # reset robot position with a random camera position
         rad = np.random.uniform(size=3)
         cx = 0.01*(rad[0]-0.5) + 0.025
         cy = 0.01*(rad[1]-0.5) + self.door_length + 0.045
         theta = 0.1*math.pi*(rad[2]-0.5) + math.pi
-        cam_pose = [[math.cos(theta),math.sin(theta),0,cx],[-math.sin(theta),math.cos(theta),0,cy],[0,0,1,0.75],[0,0,0,1]]
-        robot_to_cam_mat = [[1,0,0,0.49],[0,1,0,-0.19],[0,0,1,0],[0,0,0,1]]
-        R = np.dot(np.array(cam_pose),np.linalg.inv(np.array(robot_to_cam_mat)))
-        E = tft.euler_from_matrix(R[0:3,0:3],'rxyz')
-        rx, ry, rt = R[0,3], R[1,3], E[2]
+        rx, ry, rt = self.robotConfig.robot_pose(cx,cy,theta)
         self.robotPoseReset.reset_robot(rx,ry,rt)
         # reset frame device
         self.fdController.set_position(hk=True,vs=0.75,hs=0.13,pg=0.0)
