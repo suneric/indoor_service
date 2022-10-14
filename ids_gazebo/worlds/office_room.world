@@ -364,11 +364,21 @@
         </collision>
       </link>
       <link name="socket_2">
+        <!--pose for socket: 1.0 2.996 0.4 1.57 0 0 -->
+        <!--uri: file://media/materials/obj/socket.obj -- >
+        <!--scale 1 1 1 -->
+        <!--material: file://media/materials/scripts/Gazebo.material-->
+        <!--pose for socket_1: 1.035 3.0 0.344 1.57 3.14 0 -->
+        <!--uri: file://media/materials/obj/socket_1.obj -- >
+        <!--scale 0.01 0.01 0.01 -->
+        <!--material: file://media/materials/obj/11611_NEMA_5_20_Female_Wall_Socket_v1_l3.mtl -->
+        
         <visual name="visual_socket_2">
-          <pose>1.0 2.98 0.4 1.57 0 0</pose>
+          <pose>1.0 2.996 0.4 1.57 0 0</pose>
           <geometry>
             <mesh>
               <uri>file://media/materials/obj/socket.obj</uri>
+              <scale>1 1 1</scale>
             </mesh>
           </geometry>
           <material>
@@ -379,10 +389,11 @@
           </material>
         </visual>
         <collision name="collision_socket_2">
-          <pose>1.0 2.98 0.4 1.57 0 0</pose>
+          <pose>1.0 2.996 0.4 1.57 0 0</pose>
           <geometry>
             <mesh>
               <uri>file://media/materials/obj/socket.obj</uri>
+              <scale>1 1 1</scale>
             </mesh>
           </geometry>
           <surface>

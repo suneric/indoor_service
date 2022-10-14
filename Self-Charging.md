@@ -28,3 +28,4 @@
 - [Applying Force/Torque](https://classic.gazebosim.org/tutorials?tut=apply_force_torque)
 - [ROS Steer_driver_controller](http://wiki.ros.org/steer_drive_controller) and [ROS diff_drive_controller](http://wiki.ros.org/diff_drive_controller)
 - [Kalman Filtering](https://scipy-cookbook.readthedocs.io/items/KalmanFiltering.html) and [Kalman Filtering in Pictures](http://www.bzarg.com/p/how-a-kalman-filter-works-in-pictures/)
+- [Socket 3D Model](https://free3d.com/3d-model/nema-5-20-female-wall-socket-v1--918694.html)

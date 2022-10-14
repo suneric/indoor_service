@@ -30,7 +30,7 @@ class SocketPlugEnv(GymGazeboEnv):
         self.socketDetector = ObjectDetector(topic='detection',type=4)
         self.success = False
         self.fail = False
-        self.goal = [1.0350,2.9565,0.3606] # [x,y,z]
+        self.goal = [1.0350,2.9725,0.3606] # [x,y,z]
         self.goal_h = [0.0882,0.0488]
         self.initPose = None # inistal position of endeffector [hpose, vpose]
         self.obs_image = None # observation image
@@ -141,6 +141,7 @@ class SocketPlugEnv(GymGazeboEnv):
         bpPos = self.poseSensor.bumper()
         dist1 = bpPos[1] - self.goal[1]
         dist2 = np.sqrt((bpPos[0]-self.goal[0])**2 + (bpPos[2]-self.goal[2])**2)
+        # print(dist1, dist2)
         return dist1, dist2
 
     def get_action(self, action):
