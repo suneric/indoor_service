@@ -26,7 +26,7 @@ tf.random.set_seed(123)
 def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--max_ep', type=int, default=5000)
-    parser.add_argument('--max_step', type=int ,default=50)
+    parser.add_argument('--max_step', type=int ,default=60)
     return parser.parse_args()
 
 def save_model(agent, model_dir, name):
@@ -57,7 +57,7 @@ if __name__=="__main__":
     model_dir = os.path.join(sys.path[0],'../saved_models/door_open/td3',datetime.now().strftime("%Y-%m-%d-%H-%M"))
     summaryWriter = tf.summary.create_file_writer(model_dir)
 
-    t, start_steps = 0, 1000
+    t, start_steps = 0, 2500
     ep_ret_list, avg_ret_list = [], []
     success_counter, best_ep_return = 0, -np.inf
     for ep in range(args.max_ep):

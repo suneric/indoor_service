@@ -53,22 +53,21 @@ if __name__=="__main__":
     critic_lr = 2e-4
     beta = 1e-3
     clip_ratio = 0.2
-    batch_size = 64
     agent = PPO(image_shape,force_dim,action_dim,actor_lr,critic_lr,beta,clip_ratio)
 
     model_dir = os.path.join(sys.path[0],'../saved_models/socket_plug/ppo',datetime.now().strftime("%Y-%m-%d-%H-%M"))
     summaryWriter = tf.summary.create_file_writer(model_dir)
 
-    t, update_steps = 0, 500
+    t, update_steps = 0, 800
     ep_ret_list, avg_ret_list = [], []
     success_counter, best_ep_return = 0, -np.inf
     for ep in range(args.max_ep):
         done, ep_ret, ep_step = False, 0, 0
         o, info = env.reset()
         while not done and ep_step < args.max_step:
-            a, logp, value = agent.policy(o)
+            a, prob, value = agent.policy(o)
             o2, r, done, info = env.step(a)
-            buffer.store((o,a,r,value,logp))
+            buffer.store((o,tf.one_hot(a,action_dim).numpy(),r,value,prob))
             t += 1
             ep_step += 1
             ep_ret += r
@@ -77,8 +76,8 @@ if __name__=="__main__":
         last_value = 0 if done else agent.value(o)
         buffer.finish_trajectry(last_value)
 
-        if buffer.ptr > update_steps:
-            agent.learn(buffer, batch_size)
+        if buffer.ptr > update_steps or (ep+1) == self.max_ep:
+            agent.learn(buffer)
 
         if env.success:
             success_counter += 1

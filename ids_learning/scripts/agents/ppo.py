@@ -8,11 +8,11 @@ class ReplayBuffer:
         self.img_buf = np.zeros([capacity]+list(image_shape), dtype=np.float32)
         self.frc_buf = np.zeros((capacity, force_dim), dtype=np.float32)
         self.act_buf = np.zeros((capacity, action_dim), dtype=np.float32) # based on stochasitc policy with probability
+        self.prob_buf = np.zeros((capacity, action_dim), dtype=np.float32) # action probability, output of actor net
         self.rew_buf = np.zeros(capacity, dtype=np.float32)
         self.val_buf = np.zeros(capacity, dtype=np.float32) # value of (s,a), output of critic net
         self.adv_buf = np.zeros(capacity, dtype=np.float32) # advantege Q(s,a)-V(s)
         self.ret_buf = np.zeros(capacity, dtype=np.float32) # total reward of episode
-        self.prob_buf = np.zeros((capacity, action_dim), dtype=np.float32) # action probability, output of actor net
         self.gamma, self.lamda = gamma, lamda
         self.ptr, self.traj_idx = 0, 0 # buffer ptr, and current trajectory start index
 
@@ -41,17 +41,19 @@ class ReplayBuffer:
         """
         Get all data of the buffer and normalize the advantages
         """
-        self.ptr, self.idx = 0, 0
-        adv_mean, adv_std = np.mean(self.adv_buf), np.std(self.adv_buf)+1e-10
-        self.adv_buf = (self.adv_buf-adv_mean) / adv_std
-        return dict(
-            images=self.img_buf,
-            forces=self.frc_buf,
-            actions=self.act_buf,
-            advantages = self.adv_buf,
-            returns=self.ret_buf,
-            probs=self.prob_buf,
+        s = slice(0,self.ptr)
+        advs = self.adv_buf[s]
+        normalized_advs = (advs-np.mean(advs)) / (np.std(advs)+1e-10)
+        data = dict(
+            images=self.img_buf[s],
+            forces=self.frc_buf[s],
+            actions=self.act_buf[s],
+            returns=self.ret_buf[s],
+            probs=self.prob_buf[s],
+            advantages = normalized_advs,
             )
+        self.ptr, self.idx = 0, 0
+        return data
 
 class PPO:
     def __init__(self,image_shape,force_dim,action_dim,pi_lr=1e-4,q_lr=2e-4,beta=1e-3,clip_ratio=0.2):
@@ -68,12 +70,24 @@ class PPO:
         print(self.pi.summary())
         print(self.q.summary())
 
+    def policy(self, state):
+        images = tf.expand_dims(tf.convert_to_tensor(state['image']), 0)
+        forces = tf.expand_dims(tf.convert_to_tensor(state['force']), 0)
+        pred = tf.squeeze(self.pi([images,forces]), axis=0).numpy()
+        act = np.random.choice(self.action_dim, p=pred)
+        val = tf.squeeze(self.q([images,forces]), axis=0).numpy()[0]
+        return act, pred, val
+
+    def value(self, obs):
+        images = tf.expand_dims(tf.convert_to_tensor(state['image']), 0)
+        forces = tf.expand_dims(tf.convert_to_tensor(state['force']), 0)
+        val = np.squeeze(self.q([images,forces]), axis=0).numpy()[0]
+        return val
+
     def actor_loss(self, y, y_pred):
         # y: np.hstack([advantages, probs, actions]), y_pred: predict actions
         advs, prob, acts = y[:,:1], y[:,1:1+self.action_dim],y[:,1+self.action_dim:]
-        old_prob = prob*acts
-        new_prob = y_pred*acts
-        ratio = new_prob/(old_prob + 1e-10)
+        ratio = (y_pred*acts)/(prob*acts + 1e-10)
         p1 = ratio*advs
         p2 = tf.clip_by_value(ratio, 1-self.clip_ratio, 1+self.clip_ratio)*advs
         # total loss = policy loss + entropy loss (entropy loss for promote action diversity)
@@ -85,20 +99,7 @@ class PPO:
         loss = tf.keras.losses.MSE(y, y_pred)
         return loss
 
-    def policy(self, state):
-        images = tf.expand_dims(tf.convert_to_tensor(state['image']), 0)
-        forces = tf.expand_dims(tf.convert_to_tensor(state['force']), 0)
-        pred = np.squeeze(self.pi([images,forces]), axis=0)
-        act = np.random.choice(self.action_dim, p=pred)
-        val = np.squeeze(self.q([images,forces]), axis=0)
-        return act, pred, val
-
-    def value(self, state):
-        images = tf.expand_dims(tf.convert_to_tensor(state['image']), 0)
-        forces = tf.expand_dims(tf.convert_to_tensor(state['force']), 0)
-        return np.squeeze(self.q([images, forces]), axis=0)
-
-    def learn(self, buffer, batch_size, iter_a=80, iter_c=80):
+    def learn(self, buffer, batch_size=64, iter_a=80, iter_c=80):
         experiences = buffer.get()
         images = experiences['images']
         forces = experiences['forces']

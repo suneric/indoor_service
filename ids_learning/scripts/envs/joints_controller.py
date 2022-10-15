@@ -269,13 +269,13 @@ class FrameDeviceController:
         #print("Device Controller: set plug position", pg)
 
     def lock(self):
-        self.hook.lock()
+        # self.hook.lock()
         self.vslider.lock()
         self.hslider.lock()
         self.plug.lock()
 
     def unlock(self):
-        self.hook.unlock()
+        # self.hook.unlock()
         self.vslider.unlock()
         self.hslider.unlock()
         self.plug.lock()
