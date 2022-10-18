@@ -53,25 +53,27 @@ if __name__=="__main__":
     critic_lr = 2e-4
     beta = 1e-3
     clip_ratio = 0.2
-    agent = PPO(image_shape,force_dim,action_dim,actor_lr,critic_lr,beta,clip_ratio)
+    target_kld = 0.01
+    agent = PPO(image_shape,force_dim,action_dim,actor_lr,critic_lr,beta,clip_ratio,target_kld)
 
     model_dir = os.path.join(sys.path[0],'../saved_models/socket_plug/ppo',datetime.now().strftime("%Y-%m-%d-%H-%M"))
     summaryWriter = tf.summary.create_file_writer(model_dir)
 
-    t, update_steps = 0, 800
     ep_ret_list, avg_ret_list = [], []
+    t, update_steps = 0, 500
     success_counter, best_ep_return = 0, -np.inf
     for ep in range(args.max_ep):
-        done, ep_ret, ep_step = False, 0, 0
+        done, ep_ret, step = False, 0, 0
         o, info = env.reset()
-        while not done and ep_step < args.max_step:
-            a, prob, value = agent.policy(o)
+        while not done and step < args.max_step:
+            a, logp = agent.policy(o)
+            val = agent.value(o)
             o2, r, done, info = env.step(a)
-            buffer.store((o,tf.one_hot(a,action_dim).numpy(),r,value,prob))
-            t += 1
-            ep_step += 1
+            buffer.store((o,a,r,val,logp))
             ep_ret += r
             o = o2
+            step += 1
+            t += 1
 
         last_value = 0 if done else agent.value(o)
         buffer.finish_trajectry(last_value)
