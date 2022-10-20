@@ -25,8 +25,8 @@ tf.random.set_seed(123)
 
 def get_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--max_ep', type=int, default=5000)
-    parser.add_argument('--max_step', type=int ,default=60)
+    parser.add_argument('--max_ep', type=int, default=10000)
+    parser.add_argument('--max_step', type=int ,default=100)
     return parser.parse_args()
 
 def save_model(agent, model_dir, name):
@@ -39,6 +39,9 @@ if __name__=="__main__":
     args = get_args()
     rospy.init_node('td3_train', anonymous=True)
 
+    model_dir = os.path.join(sys.path[0],'../saved_models/door_open/td3',datetime.now().strftime("%Y-%m-%d-%H-%M"))
+    summaryWriter = tf.summary.create_file_writer(model_dir)
+
     env = DoorOpenEnv(continuous=True)
     image_shape = env.observation_space[0]
     force_dim = env.observation_space[1]
@@ -46,36 +49,27 @@ if __name__=="__main__":
     action_limit = env.action_space.high[0]
     print("create door open environment.", image_shape, force_dim, action_dim, action_limit)
 
-    buffer = ReplayBuffer(image_shape,force_dim,action_dim,capacity=50000,batch_size=64)
+    buffer = ReplayBuffer(image_shape,force_dim,action_dim,capacity=100000,batch_size=64)
     noise = GSNoise(mu=np.zeros(action_dim),sigma=float(0.2*action_limit)*np.ones(action_dim))
-    gamma = 0.99
-    polyak = 0.995
-    pi_lr = 1e-4
-    q_lr = 2e-4
-    agent = TD3(image_shape,force_dim,action_dim,action_limit,pi_lr,q_lr,gamma,polyak,noise)
+    agent = TD3(image_shape,force_dim,action_dim,action_limit,pi_lr=1e-4,q_lr=2e-4,gamma=0.99,polyak=0.995,noise_obj=noise)
 
-    model_dir = os.path.join(sys.path[0],'../saved_models/door_open/td3',datetime.now().strftime("%Y-%m-%d-%H-%M"))
-    summaryWriter = tf.summary.create_file_writer(model_dir)
-
-    t, start_steps = 0, 2500
     ep_ret_list, avg_ret_list = [], []
+    t, warmup_steps, update_after = 0, 1e4, 1e3
     success_counter, best_ep_return = 0, -np.inf
     for ep in range(args.max_ep):
-        done, ep_ret, ep_step = False, 0, 0
-        o, info = env.reset()
-        while not done and ep_step < args.max_step:
-            if t > start_steps:
-                a = agent.policy(o)
-            else:
-                a = env.action_space.sample()
-            o2, r, done, info = env.step(a)
-            buffer.store((o,a,r,o2,done))
+        done, ep_ret, step = False, 0, 0
+        obs, info = env.reset()
+        while not done and step < args.max_step:
+            act = agent.policy(obs, noise()) if t > warmup_steps else env.action_space.sample()
+            nobs, rew, done, info = env.step(act)
+            buffer.store((obs,act,rew,nobs,done))
+            obs = nobs
+            ep_ret += rew
+            step += 1
             t += 1
-            ep_step += 1
-            ep_ret += r
-            o = o2
 
-            agent.learn(buffer)
+            if t > update_after:
+                agent.learn(buffer)
 
         if env.success:
             success_counter += 1
@@ -88,15 +82,10 @@ if __name__=="__main__":
             save_model(agent, model_dir, 'best')
 
         ep_ret_list.append(ep_ret)
-        avg_ret = np.mean(ep_ret_list[-40:])
+        avg_ret = np.mean(ep_ret_list[-30:])
         avg_ret_list.append(avg_ret)
-        print("Episode *{}*: reward {}, average reward {}, total step {}, success count {} ".format(
-                ep,
-                ep_ret,
-                avg_ret,
-                t,
-                success_counter
-                ))
+        print("Episode *{}*: average reward {}, episode step {}, total step {}, success count {} ".format(
+                ep, avg_ret, step, t, success_counter))
 
     save_model(agent, model_dir, 'last')
 

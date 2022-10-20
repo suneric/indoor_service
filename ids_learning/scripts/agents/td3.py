@@ -49,8 +49,8 @@ class ReplayBuffer:
         self.n_img_buf = np.zeros([capacity]+list(image_shape), dtype=np.float32)
         self.n_frc_buf = np.zeros((capacity, force_dim),dtype=np.float32)
         self.act_buf = np.zeros((capacity, action_dim), dtype=np.float32)
-        self.rew_buf = np.zeros(capacity, dtype=np.float32)
-        self.done_buf = np.zeros(capacity, dtype=np.float32)
+        self.rew_buf = np.zeros((capacity,1), dtype=np.float32)
+        self.done_buf = np.zeros((capacity,1), dtype=np.float32)
         self.ptr, self.size, self.max_size = 0, 0, capacity
         self.batch_size = batch_size
 
@@ -89,18 +89,19 @@ class TD3:
         self.gamma = gamma
         self.polyak = polyak
         self.noise_obj = noise_obj
-        self.learn_iter = 0
         self.pi_update_interval = 2
+        self.learn_iter = 0
 
-    def policy(self, obs):
+    def policy(self, obs, noise=None):
         """
         return an action sampled from actor model adding noise for exploration
         """
         image = tf.expand_dims(tf.convert_to_tensor(obs['image']), 0)
         force = tf.expand_dims(tf.convert_to_tensor(obs['force']), 0)
-        sampled_action = tf.squeeze(self.pi([image,force]))
-        noised_action = sampled_action.numpy() + self.noise_obj()
-        legal_action = np.clip(noised_action, -self.action_limit, -self.action_limit)
+        sampled_action = tf.squeeze(self.pi([image,force])).numpy()
+        if noise is not None:
+            sampled_action += tf.squeeze(noise)
+        legal_action = np.clip(sampled_action, -self.action_limit, -self.action_limit)
         return legal_action
 
     def learn(self, buffer):
@@ -119,20 +120,21 @@ class TD3:
         # learn two Q-function and use the smaller one of two Q values
         with tf.GradientTape() as tape:
             # add noise to the target action, making it harder for the polict to exploit Q-fuctiion errors
-            target_actions = self.pi_target([next_images,next_forces], training=True) + self.noise_obj()
-            target_actions = tf.clip_by_value(target_actions, -self.action_limit, self.action_limit)
-            target_q1, target_q2 = self.q_target([next_images,next_forces,target_actions], training=True)
-            actual_q = rewards + (1-dones) * self.gamma * tf.minimum(target_q1, target_q2)
-            pred_q1, pred_q2 = self.q([images, forces, actions], training=True)
-            q_loss = tf.keras.losses.MSE(actual_q, pred_q1) + tf.keras.losses.MSE(actual_q, pred_q2)
+            tape.watch(self.q.trainable_variables)
+            next_actions = self.pi_target([next_images,next_forces]) + self.noise_obj()
+            next_actions = tf.clip_by_value(next_actions, -self.action_limit, self.action_limit)
+            next_q1, next_q2 = self.q_target([next_images,next_forces,next_actions])
+            true_q = rewards + (1-dones) * self.gamma * tf.math.minimum(next_q1, next_q2)
+            pred_q1, pred_q2 = self.q([images, forces, actions])
+            q_loss = tf.keras.losses.MSE(true_q, pred_q1) + tf.keras.losses.MSE(true_q, pred_q2)
         q_grad = tape.gradient(q_loss, self.q.trainable_variables)
         self.q_optimizer.apply_gradients(zip(q_grad, self.q.trainable_variables))
         # update policy and target network less frequently than Q-function
         if self.learn_iter % self.pi_update_interval == 0:
             with tf.GradientTape() as tape:
-                pred_acts = self.pi([images,forces],training=True)
-                pred_q1, pred_q2 = self.q([images,forces,pred_acts], training=True)
-                pi_loss = -tf.math.reduce_mean(tf.minimum(pred_q1,pred_q2))
+                tape.watch(self.pi.trainable_variables)
+                pred_q1, pred_q2 = self.q([images,forces,self.pi([images,forces])])
+                pi_loss = -tf.math.reduce_mean(tf.math.minimum(pred_q1,pred_q2))
             pi_grad = tape.gradient(pi_loss, self.pi.trainable_variables)
             self.pi_optimizer.apply_gradients(zip(pi_grad, self.pi.trainable_variables))
             # update target network

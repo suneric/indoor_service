@@ -25,8 +25,8 @@ tf.random.set_seed(123)
 
 def get_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--max_ep', type=int, default=5000)
-    parser.add_argument('--max_step', type=int ,default=50)
+    parser.add_argument('--max_ep', type=int, default=10000)
+    parser.add_argument('--max_step', type=int ,default=100)
     return parser.parse_args()
 
 def save_model(agent, model_dir, name):
@@ -38,38 +38,37 @@ if __name__=="__main__":
     args = get_args()
     rospy.init_node('dqn_train', anonymous=True)
 
+    model_dir = os.path.join(sys.path[0],'../saved_models/socket_plug/dqn',datetime.now().strftime("%Y-%m-%d-%H-%M"))
+    summaryWriter = tf.summary.create_file_writer(model_dir)
+
     env = SocketPlugEnv(continuous=False)
     image_shape = env.observation_space[0]
     force_dim = env.observation_space[1]
     action_dim = env.action_space.n
     print("create socket pluging environment.", image_shape, force_dim, action_dim)
 
-    buffer = ReplayBuffer(image_shape,force_dim,action_dim,capacity=50000,batch_size=64)
-    gamma = 0.99
-    lr = 2e-4
-    update_stable_freq = 100
-    agent = DQN(image_shape,force_dim,action_dim,gamma,lr,update_stable_freq)
+    buffer = ReplayBuffer(image_shape,force_dim,action_dim,capacity=100000,batch_size=64)
+    agent = DQN(image_shape,force_dim,action_dim,gamma=0.99,lr=2e-4,update_freq=500)
 
-    model_dir = os.path.join(sys.path[0],'../saved_models/socket_plug/dqn',datetime.now().strftime("%Y-%m-%d-%H-%M"))
-    summaryWriter = tf.summary.create_file_writer(model_dir)
-
-    epsilon, epsilon_stop, decay = 0.99, 0.1, 0.995
     ep_ret_list, avg_ret_list = [], []
-    t, success_counter, best_ep_return = 0, 0, -np.inf
+    epsilon, epsilon_stop, decay = 0.99, 0.1, 0.999
+    t, update_after = 0, 1e3
+    success_counter, best_ep_return = 0, -np.inf
     for ep in range(args.max_ep):
         epsilon = max(epsilon_stop, epsilon*decay)
-        done, ep_ret, ep_step = False, 0, 0
-        o, info = env.reset()
-        while not done and ep_step < args.max_step:
-            a = agent.policy(o,epsilon)
-            o2, r, done, info = env.step(a)
-            buffer.store((o,a,r,o2,done))
+        done, ep_ret, step = False, 0, 0
+        obs, info = env.reset()
+        while not done and step < args.max_step:
+            act = agent.policy(obs, epsilon)
+            nobs, rew, done, info = env.step(act)
+            buffer.store((obs,act,rew,nobs,done))
+            obs = nobs
+            ep_ret += rew
+            step += 1
             t += 1
-            ep_step += 1
-            ep_ret += r
-            o = o2
 
-            agent.learn(buffer)
+            if t > update_after:
+                agent.learn(buffer)
 
         if env.success:
             success_counter += 1
@@ -82,15 +81,10 @@ if __name__=="__main__":
             save_model(agent, model_dir, 'best')
 
         ep_ret_list.append(ep_ret)
-        avg_ret = np.mean(ep_ret_list[-40:])
+        avg_ret = np.mean(ep_ret_list[-30:])
         avg_ret_list.append(avg_ret)
-        print("Episode *{}*: reward {}, average reward {}, total step {}, success count {} ".format(
-                ep,
-                ep_ret,
-                avg_ret,
-                t,
-                success_counter
-                ))
+        print("Episode *{}*: average reward {}, episode step {}, total step {}, success count {} ".format(
+                ep, avg_ret, step, t, success_counter))
 
     save_model(agent, model_dir, 'last')
 

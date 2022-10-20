@@ -40,14 +40,14 @@ class ReplayBuffer:
         )
 
 class DQN:
-    def __init__(self,image_shape,force_dim,act_dim,gamma,lr,update_stable_freq):
-        self.q = vision_force_actor_network(image_shape,force_dim,act_dim,'relu','linear')
+    def __init__(self,image_shape,force_dim,action_dim,gamma,lr,update_freq):
+        self.q = vision_force_actor_network(image_shape,force_dim,action_dim,'relu','linear')
         self.q_stable = deepcopy(self.q)
         self.optimizer = tf.keras.optimizers.Adam(lr)
         self.gamma = gamma
-        self.act_dim = act_dim
+        self.act_dim = action_dim
         self.learn_iter = 0
-        self.update_stable_freq = update_stable_freq
+        self.update_freq = update_freq
 
     def policy(self, obs, epsilon):
         """
@@ -71,30 +71,28 @@ class DQN:
         dones = experiences['dones']
         self.update(images,forces,actions,rewards,next_images,next_forces,dones)
 
-    def update(self,images,forces,actions,rewards,next_images,next_forces,dones):
+    def update(self, img, frc, act, rew, nimg, nfrc, done):
         self.learn_iter += 1
         """
-        OPtimal Q-function follows Bellman Equation:
+        Optimal Q-function follows Bellman Equation:
         Q*(s,a) = E [r + gamma*max(Q*(s',a'))]
         """
         with tf.GradientTape() as tape:
+            tape.watch(self.q.trainable_variables)
             # compute current Q
-            val = self.q([images,forces],training=True) # state value
-            oh_act = tf.one_hot(actions, depth=self.act_dim)
-            pred_q = tf.math.reduce_sum(tf.multiply(val,oh_act), axis=-1)
+            oh_act = tf.one_hot(act,depth=self.act_dim)
+            pred_q = tf.math.reduce_sum(self.q([img,frc])*oh_act,axis=-1)
             # compute target Q
-            nval = self.q_stable([next_images,next_forces],training=True)
-            nact = tf.math.argmax(self.q([next_images,next_forces],training=True),axis=-1)
-            oh_nact = tf.one_hot(nact, depth=self.act_dim)
-            next_q = tf.math.reduce_sum(tf.math.multiply(nval,oh_nact), axis=-1)
-            actual_q = rewards + (1-dones) * self.gamma * next_q
-            loss = tf.keras.losses.MSE(actual_q, pred_q)
+            oh_nact = tf.one_hot(tf.math.argmax(self.q([nimg,nfrc]),axis=-1),depth=self.act_dim)
+            next_q = tf.math.reduce_sum(self.q_stable([nimg,nfrc])*oh_nact,axis=-1)
+            true_q = rew + (1-done) * self.gamma * next_q
+            loss = tf.keras.losses.MSE(true_q, pred_q)
         grad = tape.gradient(loss, self.q.trainable_variables)
         self.optimizer.apply_gradients(zip(grad, self.q.trainable_variables))
         """
         copy train network weights to stable network
         """
-        if self.learn_iter % self.update_stable_freq == 0:
+        if self.learn_iter % self.update_freq == 0:
             copy_network_variables(self.q_stable.trainable_variables, self.q.trainable_variables)
 
     def save(self, path):

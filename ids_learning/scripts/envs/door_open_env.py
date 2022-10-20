@@ -77,7 +77,7 @@ class DoorOpenEnv(GymGazeboEnv):
         # print(act)
         self.ftSensor.reset_temp()
         self.driver.drive(act[0],act[1])
-        rospy.sleep(0.5) # command in 2 Hz
+        rospy.sleep(1) # command in 1 Hz
         self.curr_angle = self.poseSensor.door_angle()
         self.obs_image = self.camera.grey_arr((64,64))
         self.obs_force = self.ftSensor.forces()

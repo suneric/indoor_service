@@ -57,12 +57,11 @@ class ReplayBuffer:
         return data
 
 class PPO:
-    def __init__(self,image_shape,force_dim,action_dim,pi_lr=1e-4,q_lr=2e-4,beta=1e-3,clip_ratio=0.2, target_kld=0.01):
+    def __init__(self,image_shape,force_dim,action_dim,pi_lr=1e-4,q_lr=2e-4,clip_ratio=0.2,beta=1e-3,target_kld=0.01):
         self.pi = vision_force_actor_network(image_shape,force_dim,action_dim,'relu','linear')
         self.q = vision_force_critic_network(image_shape,force_dim,'relu')
         self.pi_optimizer = tf.keras.optimizers.Adam(pi_lr)
         self.q_optimizer = tf.keras.optimizers.Adam(q_lr)
-        self.action_dim = action_dim
         self.clip_ratio = clip_ratio
         self.target_kld = target_kld
         self.beta = beta
@@ -72,15 +71,15 @@ class PPO:
         forces = tf.expand_dims(tf.convert_to_tensor(obs['force']), 0)
         logits = self.pi([images,forces])
         dist = tfp.distributions.Categorical(logits=logits)
-        action = dist.sample().numpy()[0]
-        logprob = dist.log_prob(action).numpy()[0]
+        action = tf.squeeze(dist.sample()).numpy()
+        logprob = tf.squeeze(dist.log_prob(action)).numpy()
         return action, logprob
 
     def value(self, obs):
         images = tf.expand_dims(tf.convert_to_tensor(obs['image']), 0)
         forces = tf.expand_dims(tf.convert_to_tensor(obs['force']), 0)
         val = self.q([images,forces])
-        return tf.squeeze(val, axis=0).numpy()[0]
+        return tf.squeeze(val).numpy()
 
     def learn(self, buffer, pi_iter=80, q_iter=80):
         experiences = buffer.get()
@@ -94,7 +93,8 @@ class PPO:
 
     def update(self,images,forces,actions,returns,advantages,old_logps,pi_iter,q_iter):
         with tf.GradientTape() as tape:
-            logits=self.pi([images,forces],training=True)
+            tape.watch(self.pi.trainable_variables)
+            logits=self.pi([images,forces])
             logps = tfp.distributions.Categorical(logits=logits).log_prob(actions)
             ratio = tf.exp(logps - old_logps) # pi/old_pi
             clip_advs = tf.clip_by_value(ratio, 1-self.clip_ratio, 1+self.clip_ratio)*advantages
@@ -109,8 +109,9 @@ class PPO:
                 break
 
         with tf.GradientTape() as tape:
-            val = self.q([images,forces], training=True)
-            q_loss = tf.keras.losses.MSE(returns, val)
+            tape.watch(self.q.trainable_variables)
+            pred_q = self.q([images,forces])
+            q_loss = tf.keras.losses.MSE(returns, pred_q)
         q_grad = tape.gradient(q_loss, self.q.trainable_variables)
         for _ in range(q_iter):
             self.q_optimizer.apply_gradients(zip(q_grad, self.q.trainable_variables))
