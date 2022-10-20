@@ -26,7 +26,7 @@ tf.random.set_seed(123)
 def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--max_ep', type=int, default=10000)
-    parser.add_argument('--max_step', type=int ,default=100)
+    parser.add_argument('--max_step', type=int ,default=60)
     return parser.parse_args()
 
 def save_model(agent, model_dir, name):
