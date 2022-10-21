@@ -98,20 +98,20 @@ class PPO:
             logps = tfp.distributions.Categorical(logits=logits).log_prob(actions)
             ratio = tf.exp(logps - old_logps) # pi/old_pi
             clip_advs = tf.clip_by_value(ratio, 1-self.clip_ratio, 1+self.clip_ratio)*advantages
-            approx_klds = old_logps-logps
             pmf = tf.nn.softmax(logits=logits) # probability
             ent = tf.math.reduce_sum(-pmf*tf.math.log(pmf),axis=-1) # entropy
             pi_loss = -tf.math.reduce_mean(tf.math.minimum(ratio*advantages,clip_advs)) + self.beta*ent
         pi_grad = tape.gradient(pi_loss, self.pi.trainable_variables)
         for _ in range(pi_iter):
             self.pi_optimizer.apply_gradients(zip(pi_grad, self.pi.trainable_variables))
-            if tf.math.reduce_mean(approx_klds) > self.target_kld:
+            logps = tfp.distributions.Categorical(logits=self.pi([images,forces])).log_prob(actions)
+            approx_klds = tf.reduce_mean(old_logps-logps)
+            if approx_klds > 1.5*self.target_kld:
                 break
 
         with tf.GradientTape() as tape:
             tape.watch(self.q.trainable_variables)
-            pred_q = self.q([images,forces])
-            q_loss = tf.keras.losses.MSE(returns, pred_q)
+            q_loss = tf.keras.losses.MSE(returns, self.q([images,forces]))
         q_grad = tape.gradient(q_loss, self.q.trainable_variables)
         for _ in range(q_iter):
             self.q_optimizer.apply_gradients(zip(q_grad, self.q.trainable_variables))
