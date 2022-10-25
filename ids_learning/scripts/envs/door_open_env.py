@@ -47,7 +47,8 @@ class DoorOpenEnv(GymGazeboEnv):
         self.camera.check_sensor_ready()
         self.ftSensor.check_sensor_ready()
         self.driver.check_publisher_connection()
-        rospy.logdebug("System READY")
+        self.fdController.check_publisher_connection()
+        print("System READY")
 
     def _get_observation(self):
         obs = dict(image = self.obs_image, force = self.obs_force)
@@ -116,7 +117,6 @@ class DoorOpenEnv(GymGazeboEnv):
         self.robotPoseReset.reset_robot(rx,ry,rt)
         # reset frame device
         self.fdController.set_position(hk=True,vs=0.75,hs=0.13,pg=0.0)
-        rospy.sleep(2) # wait for end-effector to reset
 
     def is_safe(self, record, max=70):
         """

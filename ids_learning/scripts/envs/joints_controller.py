@@ -15,12 +15,6 @@ class HookController:
         self.pub = rospy.Publisher('/mrobot/joint_hook_controller/command', Float64, queue_size=1)
         self.sub = rospy.Subscriber('/mrobot/joint_hook_controller/state', JointControllerState, self._sub_cb)
 
-        service_name = '/gazebo/set_joint_properties'
-        print("Waiting for service " + str(service_name))
-        rospy.wait_for_service(service_name)
-        print("Service Found " + str(service_name))
-        self.set_properties = rospy.ServiceProxy(service_name, SetJointProperties)
-
     def _sub_cb(self,data):
         self.hook_angle = data.set_point
 
@@ -44,28 +38,17 @@ class HookController:
             angle = 0
         elif angle > 1.57:
             angle = 1.57
+        self.pub.publish(angle)
 
-        while abs(self.hook_angle - angle) > 0.0001:
-            rate = rospy.Rate(1)
-            self.pub.publish(angle)
-            rate.sleep()
-
-    def lock(self):
-        r = SetJointPropertiesRequest()
-        r.joint_name = 'joint_frame_hook'
-        r.ode_joint_config = ODEJointProperties()
-        r.ode_joint_config.hiStop = [self.hook_angle]
-        r.ode_joint_config.loStop = [self.hook_angle]
-        result = self.set_properties(r)
-        #print("lock plug ", result.success, result.status_message)
-
-    def unlock(self):
-        r = SetJointPropertiesRequest()
-        r.joint_name = 'joint_frame_hook'
-        r.ode_joint_config = ODEJointProperties()
-        r.ode_joint_config.hiStop = [1.57]
-        r.ode_joint_config.loStop = [0.0]
-        result = self.set_properties(r)
+    def check_publisher_connection(self):
+        rate =rospy.Rate(10)
+        while self.pub.get_num_connections() == 0 and not rospy.is_shutdown():
+            rospy.logdebug("no subscriber to /mrobot/joint_hook_controller/command yet so wait and try again")
+            try:
+                rate.sleep()
+            except rospy.ROSInterruptException:
+                pass
+        rospy.logdebug("Publisher connected")
 
 """
 VSliderController for endeffector vertical movement
@@ -77,28 +60,24 @@ class VSliderController:
         self.sub = rospy.Subscriber('/mrobot/joint_vslider_controller/state', JointControllerState, self._sub_cb)
 
         service_name = '/gazebo/set_joint_properties'
-        print("Waiting for service " + str(service_name))
+        # print("Waiting for service " + str(service_name))
         rospy.wait_for_service(service_name)
-        print("Service Found " + str(service_name))
+        # print("Service Found " + str(service_name))
         self.set_properties = rospy.ServiceProxy(service_name, SetJointProperties)
 
     def _sub_cb(self,data):
         self.slider_height = data.set_point
 
-    def height(self):
+    def pos(self):
         return self.slider_height
 
     # hook angle [0,0.96]
-    def set_height(self,height):
+    def set_pos(self,height):
         if height < 0:
             height = 0
         elif height > 0.96:
             height = 0.96
-
-        while abs(self.slider_height - height) > 0.0001:
-            rate = rospy.Rate(1)
-            self.pub.publish(height)
-            rate.sleep()
+        self.pub.publish(height)
 
     def lock(self):
         r = SetJointPropertiesRequest()
@@ -118,6 +97,16 @@ class VSliderController:
         result = self.set_properties(r)
         #print("unlock plug ", result.success, result.status_message)
 
+    def check_publisher_connection(self):
+        rate =rospy.Rate(10)
+        while self.pub.get_num_connections() == 0 and not rospy.is_shutdown():
+            rospy.logdebug("no subscriber to '/mrobot/joint_vslider_controller/command yet so wait and try again")
+            try:
+                rate.sleep()
+            except rospy.ROSInterruptException:
+                pass
+        rospy.logdebug("Publisher connected")
+
 """
 HSliderController for endeffector horizontal movement
 """
@@ -128,9 +117,9 @@ class HSliderController:
         self.sub = rospy.Subscriber('/mrobot/joint_hslider_controller/state', JointControllerState, self._sub_cb)
 
         service_name = '/gazebo/set_joint_properties'
-        print("Waiting for service " + str(service_name))
+        # print("Waiting for service " + str(service_name))
         rospy.wait_for_service(service_name)
-        print("Service Found " + str(service_name))
+        # print("Service Found " + str(service_name))
         self.set_properties = rospy.ServiceProxy(service_name, SetJointProperties)
 
     def _sub_cb(self,data):
@@ -145,11 +134,7 @@ class HSliderController:
             pos = 0.13
         elif pos > 0.13:
             pos = 0.13
-
-        while abs(self.slider_pos - pos) > 0.0001:
-            rate = rospy.Rate(1)
-            self.pub.publish(pos)
-            rate.sleep()
+        self.pub.publish(pos)
 
     def lock(self):
         r = SetJointPropertiesRequest()
@@ -169,6 +154,16 @@ class HSliderController:
         result = self.set_properties(r)
         #print("unlock plug ", result.success, result.status_message)
 
+    def check_publisher_connection(self):
+        rate =rospy.Rate(10)
+        while self.pub.get_num_connections() == 0 and not rospy.is_shutdown():
+            rospy.logdebug("no subscriber to '/mrobot/joint_hslider_controller/command yet so wait and try again")
+            try:
+                rate.sleep()
+            except rospy.ROSInterruptException:
+                pass
+        rospy.logdebug("Publisher connected")
+
 """
 PlugController for driving adapter out for plugging
 """
@@ -179,9 +174,9 @@ class PlugController:
         self.sub = rospy.Subscriber('/mrobot/joint_plug_controller/state', JointControllerState, self._sub_cb)
 
         service_name = '/gazebo/set_joint_properties'
-        print("Waiting for service " + str(service_name))
+        # print("Waiting for service " + str(service_name))
         rospy.wait_for_service(service_name)
-        print("Service Found " + str(service_name))
+        # print("Service Found " + str(service_name))
         self.set_properties = rospy.ServiceProxy(service_name, SetJointProperties)
 
     def _sub_cb(self,data):
@@ -214,11 +209,17 @@ class PlugController:
             pos = 0
         elif pos > 0.1:
             pos = 0.1
+        self.pub.publish(pos)
 
-        while abs(self.plug_pos - pos) > 0.0001:
-            rate = rospy.Rate(1)
-            self.pub.publish(pos)
-            rate.sleep()
+    def check_publisher_connection(self):
+        rate =rospy.Rate(10)
+        while self.pub.get_num_connections() == 0 and not rospy.is_shutdown():
+            rospy.logdebug("no subscriber to '/mrobot/joint_plug_controller/command yet so wait and try again")
+            try:
+                rate.sleep()
+            except rospy.ROSInterruptException:
+                pass
+        rospy.logdebug("Publisher connected")
 
 """
 FrameDeviceController controls all the joints on the frame
@@ -236,8 +237,8 @@ class FrameDeviceController:
         self.move_hslider(hs)
         self.move_plug(pg)
 
-    def vslider_height(self):
-        return self.vslider.height()
+    def vslider_pos(self):
+        return self.vslider.pos()
 
     def hslider_pos(self):
         return self.hslider.pos()
@@ -249,33 +250,38 @@ class FrameDeviceController:
         return self.hook.is_released()
 
     def move_vslider(self,vs=0.0):
-        self.vslider.set_height(vs)
-        #print("Device Controller: set vslider height", vs)
+        while abs(self.vslider.pos()-vs) > 0.0001:
+            self.vslider.set_pos(vs)
+            rospy.sleep(0.5)
 
     def move_hslider(self,hs=0.0):
-        self.hslider.set_pos(hs)
-        #print("Device Controller: set hslider position", hs)
+        while abs(self.hslider.pos()-hs) > 0.0001:
+            self.hslider.set_pos(hs)
+            rospy.sleep(0.5)
 
     def move_hook(self,release=True):
-        if release:
-            self.hook.release()
-            #print("Device Controller: release sidebar")
-        else:
-            self.hook.fold()
-            #print("Device Controller: fold sidebar")
+        hp = 0 if release else 1.57
+        while abs(self.hook.pos()-hp) > 0.0001:
+            self.hook.set_pos(hp)
+            rospy.sleep(0.5)
 
     def move_plug(self, pg=0.0):
-        self.plug.set_pos(pg)
-        #print("Device Controller: set plug position", pg)
+        while abs(self.plug.pos()-pg) > 0.0001:
+            self.plug.set_pos(pg)
+            rospy.sleep(0.5)
 
     def lock(self):
-        # self.hook.lock()
         self.vslider.lock()
         self.hslider.lock()
         self.plug.lock()
 
     def unlock(self):
-        # self.hook.unlock()
         self.vslider.unlock()
         self.hslider.unlock()
         self.plug.lock()
+
+    def check_publisher_connection(self):
+        self.hook.check_publisher_connection()
+        self.vslider.check_publisher_connection()
+        self.hslider.check_publisher_connection()
+        self.plug.check_publisher_connection()

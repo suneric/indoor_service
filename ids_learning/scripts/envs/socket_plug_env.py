@@ -16,7 +16,7 @@ register(
 class SocketPlugEnv(GymGazeboEnv):
     def __init__(self, continuous = True):
         super(SocketPlugEnv, self).__init__(
-            start_init_physics_parameters = False,
+            start_init_physics_parameters=False,
             reset_world_or_sim='WORLD'
         )
         self.continuous = continuous
@@ -48,7 +48,8 @@ class SocketPlugEnv(GymGazeboEnv):
         self.ftSensor.check_sensor_ready()
         self.bpSensor.check_sensor_ready()
         self.driver.check_publisher_connection()
-        rospy.logdebug("System READY")
+        self.fdController.check_publisher_connection()
+        print("System READY")
 
     def _get_observation(self):
         obs = dict(image = self.obs_image, force=self.obs_force)
@@ -77,11 +78,11 @@ class SocketPlugEnv(GymGazeboEnv):
         # print(act)
         hpos = self.fdController.hslider_pos()
         self.fdController.move_hslider(hpos+act[0])
-        vpos = self.fdController.vslider_height()
+        vpos = self.fdController.vslider_pos()
         self.fdController.move_vslider(vpos+act[1])
         dist1, dist2 = self.dist2goal()
         self.success = dist1 > 0.0
-        self.fail = dist2 > 0.02 # limit exploration area r < 2 cm
+        self.fail = dist2 > 0.03 # limit exploration area r < 2 cm
         if not self.success and not self.fail:
             self.obs_force = self.plug(f_max=30)
 
@@ -109,7 +110,7 @@ class SocketPlugEnv(GymGazeboEnv):
             forces = self.ftSensor.forces()
             dist1, dist2 = self.dist2goal()
             self.success = dist1 > 0.0
-            self.fail = dist2 > 0.02 # limit exploration area r < 2 cm
+            self.fail = dist2 > 0.03 # limit exploration area r < 2 cm
             if self.success or self.fail:
                 break
             rospy.sleep(0.01)
@@ -130,7 +131,6 @@ class SocketPlugEnv(GymGazeboEnv):
         rh = 0.01*(rad[3]-0.5) + self.goal_h[0] # [-5mm, 5mm]
         self.initPose = [0.0,rh]
         self.fdController.set_position(hk=False,vs=rh,hs=0,pg=0.03)
-        rospy.sleep(2) # wait for end-effector to reset
 
     def dist2goal(self):
         """
