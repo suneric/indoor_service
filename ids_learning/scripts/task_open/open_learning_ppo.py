@@ -48,11 +48,11 @@ if __name__=="__main__":
     action_dim = env.action_space.n
     print("create door open environment.", image_shape, force_dim, action_dim)
 
-    buffer = ReplayBuffer(image_shape,force_dim,action_dim,capacity=1000,gamma=0.99,lamda=0.97)
-    agent = PPO(image_shape,force_dim,action_dim,pi_lr=1e-4,q_lr=2e-4,clip_ratio=0.2,beta=1e-3,target_kld=0.01)
+    buffer = ReplayBuffer(image_shape,force_dim,capacity=1000,gamma=0.99,lamda=0.97)
+    agent = PPO(image_shape,force_dim,action_dim,pi_lr=3e-4,q_lr=1e-3,clip_ratio=0.2,beta=1e-3,target_kld=0.1)
 
     ep_ret_list, avg_ret_list = [], []
-    t, update_after = 0, 500
+    t, update_after = 0, 600
     success_counter, best_ep_return = 0, -np.inf
     for ep in range(args.max_ep):
         done, ep_ret, step = False, 0, 0

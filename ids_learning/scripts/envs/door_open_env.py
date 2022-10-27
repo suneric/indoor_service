@@ -33,7 +33,7 @@ class DoorOpenEnv(GymGazeboEnv):
         self.fail = False
         self.safe = True
         if self.continuous:
-            self.action_space = Box(-1.0,1.0,(2,),dtype=np.float32)
+            self.action_space = Box(-2.0,2.0,(2,),dtype=np.float32)
         else:
             self.action_space = Discrete(8)
         self.observation_space = ((64,64,1),3) # image and force
@@ -152,7 +152,7 @@ class DoorOpenEnv(GymGazeboEnv):
     def get_action(self, action):
         vx, vz = 1.0, 3.14 # scale of linear and angular velocity
         if self.continuous:
-            return 2*(action[0]*vx, action[1]*vz)
+            return (action[0]*vx, action[1]*vz)
         else:
-            act_list = 2*[(vx,-vz),(vx,0.0),(vx,vz),(0,-vz),(0,vz),(-vx,-vz),(-vx,0),(-vx,vz)]
+            act_list = [(vx,-vz),(vx,0.0),(vx,vz),(0,-vz),(0,vz),(-vx,-vz),(-vx,0),(-vx,vz)]
             return act_list[action]

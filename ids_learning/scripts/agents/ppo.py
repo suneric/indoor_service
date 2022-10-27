@@ -5,7 +5,7 @@ from .core import *
 import os
 
 class ReplayBuffer:
-    def __init__(self, image_shape, force_dim, action_dim, capacity, gamma=0.99,lamda=0.95):
+    def __init__(self, image_shape, force_dim, capacity, gamma=0.99,lamda=0.95):
         self.img_buf = np.zeros([capacity]+list(image_shape), dtype=np.float32)
         self.frc_buf = np.zeros((capacity, force_dim), dtype=np.float32)
         self.act_buf = np.zeros(capacity, dtype=np.int32)
@@ -43,15 +43,15 @@ class ReplayBuffer:
         Get all data of the buffer and normalize the advantages
         """
         s = slice(0,self.ptr)
-        advs = self.adv_buf[s]
-        normalized_advs = (advs-np.mean(advs)) / (np.std(advs)+1e-10)
+        adv_mean, adv_std = np.mean(self.adv_buf[s]), np.std(self.adv_buf[s])
+        self.adv_buf[s] = (self.adv_buf[s]-adv_mean) / adv_std
         data = dict(
             images=self.img_buf[s],
             forces=self.frc_buf[s],
             actions=self.act_buf[s],
             returns=self.ret_buf[s],
             logprobs=self.logp_buf[s],
-            advantages = normalized_advs,
+            advantages = self.adv_buf[s],
             )
         self.ptr, self.idx = 0, 0
         return data
@@ -98,9 +98,10 @@ class PPO:
             logps = tfp.distributions.Categorical(logits=logits).log_prob(actions)
             ratio = tf.exp(logps - old_logps) # pi/old_pi
             clip_advs = tf.clip_by_value(ratio, 1-self.clip_ratio, 1+self.clip_ratio)*advantages
-            pmf = tf.nn.softmax(logits=logits) # probability
-            ent = tf.math.reduce_sum(-pmf*tf.math.log(pmf),axis=-1) # entropy
-            pi_loss = -tf.math.reduce_mean(tf.math.minimum(ratio*advantages,clip_advs)) + self.beta*ent
+            # pmf = tf.nn.softmax(logits=logits) # probability
+            # ent = tf.math.reduce_sum(-pmf*tf.math.log(pmf),axis=-1) # entropy
+            # pi_loss = -tf.math.reduce_mean(tf.math.minimum(ratio*advantages,clip_advs)) + self.beta*ent
+            pi_loss = -tf.math.reduce_mean(tf.math.minimum(ratio*advantages,clip_advs))
         pi_grad = tape.gradient(pi_loss, self.pi.trainable_variables)
         for _ in range(pi_iter):
             self.pi_optimizer.apply_gradients(zip(pi_grad, self.pi.trainable_variables))

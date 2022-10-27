@@ -49,12 +49,12 @@ if __name__=="__main__":
     action_limit = env.action_space.high[0]
     print("create socket pluging environment.", image_shape, force_dim, action_dim, action_limit)
 
-    buffer = ReplayBuffer(image_shape,force_dim,action_dim,capacity=100000,batch_size=64)
+    buffer = ReplayBuffer(image_shape,force_dim,action_dim,capacity=50000,batch_size=64)
     noise = GSNoise(mu=np.zeros(action_dim),sigma=float(0.2*action_limit)*np.ones(action_dim))
-    agent = TD3(image_shape,force_dim,action_dim,action_limit,pi_lr=1e-4,q_lr=2e-4,gamma=0.99,polyak=0.995,noise_obj=noise)
+    agent = TD3(image_shape,force_dim,action_dim,action_limit,pi_lr=3e-4,q_lr=1e-3,gamma=0.99,polyak=0.995,noise_obj=noise)
 
     ep_ret_list, avg_ret_list = [], []
-    t, warmup_steps, update_after = 0, 1e4, 1e3
+    t, warmup_steps, update_after = 0, 1e4, 1e4
     success_counter, best_ep_return = 0, -np.inf
     for ep in range(args.max_ep):
         done, ep_ret, step = False, 0, 0

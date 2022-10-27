@@ -36,7 +36,7 @@ class SocketPlugEnv(GymGazeboEnv):
         self.obs_image = None # observation image
         self.obs_force = None # observation forces
         if self.continuous:
-            self.action_space = Box(-1.0,1.0,(2,),dtype=np.float32)
+            self.action_space = Box(-5.0,5.0,(2,),dtype=np.float32)
         else:
             self.action_space = Discrete(8) #
         self.observation_space = ((64,64,1),3) # image and force
@@ -147,7 +147,7 @@ class SocketPlugEnv(GymGazeboEnv):
     def get_action(self, action):
         sh,sv = 0.001, 0.001 # 1 mm, scale for horizontal and vertical move
         if self.continuous:
-            return 5*(action[0]*sh, action[1]*sv)
+            return (action[0]*sh, action[1]*sv)
         else:
             act_list = [(sh,-sv),(sh,0),(sh,sv),(0,-sv),(0,sv),(-sh,-sv),(-sh,0),(-sh,sv)]
             return act_list[action]
