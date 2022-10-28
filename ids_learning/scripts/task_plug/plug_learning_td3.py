@@ -77,7 +77,7 @@ if __name__=="__main__":
         with summaryWriter.as_default():
             tf.summary.scalar('episode reward', ep_ret, step=ep)
 
-        if ep > args.max_ep/2 and ep_ret > best_ep_return:
+        if ep > 1000 and ep_ret > best_ep_return:
             best_ep_return = ep_ret
             save_model(agent, model_dir, 'best')
 
