@@ -54,7 +54,7 @@ if __name__=="__main__":
     agent = TD3(image_shape,force_dim,action_dim,action_limit,pi_lr=3e-4,q_lr=1e-3,gamma=0.99,polyak=0.995,noise_obj=noise)
 
     ep_ret_list, avg_ret_list = [], []
-    t, warmup_steps, update_after = 0, 1e4, 1e4
+    t, warmup_steps, update_after = 0, 0, 0
     success_counter, best_ep_return = 0, -np.inf
     for ep in range(args.max_ep):
         done, ep_ret, step = False, 0, 0

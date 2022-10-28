@@ -49,7 +49,7 @@ if __name__=="__main__":
     print("create socket pluging environment.", image_shape, force_dim, action_dim)
 
     buffer = ReplayBuffer(image_shape,force_dim,capacity=1000,gamma=0.99,lamda=0.97)
-    agent = PPO(image_shape,force_dim,action_dim,pi_lr=3e-4,q_lr=1e-3,clip_ratio=0.2,beta=1e-3,target_kld=0.1)
+    agent = PPO(image_shape,force_dim,action_dim,pi_lr=3e-4,q_lr=1e-3,clip_ratio=0.2,beta=1e-3,target_kld=0.01)
 
     ep_ret_list, avg_ret_list = [], []
     t, update_after = 0, 600

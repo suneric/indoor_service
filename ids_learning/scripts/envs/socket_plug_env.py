@@ -84,7 +84,7 @@ class SocketPlugEnv(GymGazeboEnv):
         self.success = dist1 > 0.0
         self.fail = dist2 > 0.03 # limit exploration area r < 2 cm
         if not self.success and not self.fail:
-            self.obs_force = self.plug(f_max=30)
+            self.obs_force = self.plug(f_max=25)
 
     def _is_done(self):
         return self.success or self.fail
@@ -94,12 +94,11 @@ class SocketPlugEnv(GymGazeboEnv):
         if self.success:
             reward = 100
         elif self.fail:
-            reward = -50
+            reward = -100
         else:
-            penalty = 0.1
-            dist_decrese = self.prev_dist - self.curr_dist
-            reward = 1e3*dist_decrese - penalty
+            dist_decrease = self.prev_dist - self.curr_dist
             self.prev_dist = self.curr_dist
+            reward = 0 if dist_decrease > 0 else -1
         return reward
 
     def plug(self, f_max=30):
@@ -110,7 +109,7 @@ class SocketPlugEnv(GymGazeboEnv):
             forces = self.ftSensor.forces()
             dist1, dist2 = self.dist2goal()
             self.success = dist1 > 0.0
-            self.fail = dist2 > 0.03 # limit exploration area r < 2 cm
+            self.fail = dist2 > 0.03 # limit exploration area r < 3 cm
             if self.success or self.fail:
                 break
             rospy.sleep(0.01)
@@ -123,12 +122,12 @@ class SocketPlugEnv(GymGazeboEnv):
         self.driver.stop()
         # reset robot position
         rad = np.random.uniform(size=4)
-        rx = 0.01*(rad[0]-0.5) + self.goal[0]# [-5mm, 5mm]
+        rx = 0.02*(rad[0]-0.5) + self.goal[0]# [-1cm, 1cm]
         ry = 0.1*(rad[1]-0.5) + (self.goal[1]-0.45) # [-10cm, 10cm]
-        rt = 0.001*(rad[2]-0.5) + (0.5*np.pi)
+        rt = 0.002*(rad[2]-0.5) + (0.5*np.pi)
         self.robotPoseReset.reset_robot(rx,ry,rt)
         # reset frame device
-        rh = 0.01*(rad[3]-0.5) + self.goal_h[0] # [-5mm, 5mm]
+        rh = 0.02*(rad[3]-0.5) + self.goal_h[0] # [-1cm, 1cm]
         self.initPose = [0.0,rh]
         self.fdController.set_position(hk=False,vs=rh,hs=0,pg=0.03)
 

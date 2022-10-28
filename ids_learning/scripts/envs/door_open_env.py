@@ -95,12 +95,11 @@ class DoorOpenEnv(GymGazeboEnv):
         if self.success:
             reward = 100
         elif self.fail:
-            reward = -50
+            reward = -100
         else:
-            penalty = 0.1 if self.safe else 1
             angle_increse = self.curr_angle - self.prev_angle
-            reward = 10*angle_increse - penalty
             self.prev_angle = self.curr_angle
+            reward = 0 if angle_increse else -1
         return reward
 
     def reset_robot(self):
