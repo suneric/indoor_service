@@ -85,7 +85,7 @@ if __name__=="__main__":
         ep_ret_list.append(ep_ret)
         avg_ret = np.mean(ep_ret_list[-30:])
         avg_ret_list.append(avg_ret)
-        print("Episode *{}*: average reward {}, episode step {}, total step {}, success count {} ".format(
+        print("Episode *{}*: average reward {:.4f}, episode step {}, total step {}, success count {} ".format(
                 ep, avg_ret, step, t, success_counter))
 
     save_model(agent, model_dir, 'last')
