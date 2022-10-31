@@ -98,8 +98,8 @@ class DoorOpenEnv(GymGazeboEnv):
             reward = -100
         else:
             angle_change = self.curr_angle - self.prev_angle
+            reward = 100*angle_change - 1
             self.prev_angle = self.curr_angle
-            reward = 1 if angle_change > 0 else -1
         return reward
 
     def reset_robot(self):

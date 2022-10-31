@@ -52,7 +52,7 @@ if __name__=="__main__":
     agent = PPO(image_shape,force_dim,action_dim,pi_lr=3e-4,q_lr=1e-3,clip_ratio=0.2,beta=1e-3,target_kld=0.01)
 
     ep_ret_list, avg_ret_list = [], []
-    t, update_after = 0, 600
+    t, update_after = 0, 500
     success_counter, best_ep_return = 0, -np.inf
     for ep in range(args.max_ep):
         done, ep_ret, step = False, 0, 0

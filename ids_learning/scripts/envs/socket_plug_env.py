@@ -97,8 +97,8 @@ class SocketPlugEnv(GymGazeboEnv):
             reward = -100
         else:
             dist2goal_change = self.curr_dist - self.prev_dist
+            reward = -1000*dist2goal_change - 1
             self.prev_dist = self.curr_dist
-            reward = 1 if dist2goal_change < 0 else -1
         return reward
 
     def plug(self, f_max=30):
