@@ -9,7 +9,7 @@ import argparse
 from datetime import datetime
 import os
 from envs.door_open_env import DoorOpenEnv
-from agents.dqn import DQN, ReplayBuffer
+from agents.sac import SAC, ReplayBuffer
 import matplotlib.pyplot as plt
 
 """
@@ -36,30 +36,29 @@ def save_model(agent, model_dir, name):
 
 if __name__=="__main__":
     args = get_args()
-    rospy.init_node('dqn_train', anonymous=True)
+    rospy.init_node('sac_train', anonymous=True)
 
-    model_dir = os.path.join(sys.path[0],'../saved_models/door_open/dqn',datetime.now().strftime("%Y-%m-%d-%H-%M"))
+    model_dir = os.path.join(sys.path[0],'../saved_models/door_open/sac',datetime.now().strftime("%Y-%m-%d-%H-%M"))
     summaryWriter = tf.summary.create_file_writer(model_dir)
 
     env = DoorOpenEnv(continuous=False)
     image_shape = env.observation_space[0]
     force_dim = env.observation_space[1]
     action_dim = env.action_space.n
+    act_limit = env.action_space.high[0]
     print("create door open environment.", image_shape, force_dim, action_dim)
 
     buffer = ReplayBuffer(image_shape,force_dim,action_dim,capacity=50000,batch_size=64)
-    agent = DQN(image_shape,force_dim,action_dim,gamma=0.99,lr=2e-4,update_freq=500)
+    agent = SAC(image_shape,force_dim,action_dim,act_limit,gamma=0.99,polyak=0.995,pi_lr=3e-4,q_lr=1e-3,alpha_lr=1e-4,alpha=0.1)
 
     ep_ret_list, avg_ret_list = [], []
-    epsilon, epsilon_stop, decay = 0.99, 0.1, 0.999
-    t, update_after = 0, 0
+    t, warmup_steps, update_after = 0, 0, 0
     success_counter, best_ep_return = 0, -np.inf
     for ep in range(args.max_ep):
-        epsilon = max(epsilon_stop, epsilon*decay)
         done, ep_ret, step = False, 0, 0
         obs, info = env.reset()
         while not done and step < args.max_step:
-            act = agent.policy(obs, epsilon)
+            act = agent.policy(obs) if t > warmup_steps else env.action_space.sample()
             nobs, rew, done, info = env.step(act)
             buffer.store((obs,act,rew,nobs,done))
             obs = nobs

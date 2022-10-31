@@ -47,12 +47,12 @@ if __name__=="__main__":
     action_dim = env.action_space.n
     print("create socket pluging environment.", image_shape, force_dim, action_dim)
 
-    buffer = ReplayBuffer(image_shape,force_dim,action_dim,capacity=100000,batch_size=64)
+    buffer = ReplayBuffer(image_shape,force_dim,action_dim,capacity=50000,batch_size=64)
     agent = DQN(image_shape,force_dim,action_dim,gamma=0.99,lr=2e-4,update_freq=500)
 
     ep_ret_list, avg_ret_list = [], []
     epsilon, epsilon_stop, decay = 0.99, 0.1, 0.999
-    t, update_after = 0, 1e3
+    t, update_after = 0, 0
     success_counter, best_ep_return = 0, -np.inf
     for ep in range(args.max_ep):
         epsilon = max(epsilon_stop, epsilon*decay)
