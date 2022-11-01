@@ -73,7 +73,6 @@ class DoorOpenEnv(GymGazeboEnv):
         self.obs_force = self.ftSensor.forces()
 
     def _take_action(self, action):
-        self.fdController.lock()
         act = self.get_action(action)
         # print(act)
         self.ftSensor.reset_temp()
@@ -85,7 +84,6 @@ class DoorOpenEnv(GymGazeboEnv):
         self.success = self.curr_angle > 0.45*math.pi # 81 degree
         self.fail = self.is_failed()
         self.safe = self.is_safe(self.ftSensor.temp_record())
-        self.fdController.unlock()
 
     def _is_done(self):
         return self.success or self.fail
@@ -115,7 +113,11 @@ class DoorOpenEnv(GymGazeboEnv):
         rx, ry, rt = self.robotConfig.robot_pose(cx,cy,theta)
         self.robotPoseReset.reset_robot(rx,ry,rt)
         # reset frame device
-        self.fdController.set_position(hk=True,vs=0.75,hs=0.13,pg=0.0)
+        self.fdController.set_position(hk=0.0,vs=0.75,hs=0.13,pg=0.0)
+        self.fdController.lock_hook()
+        self.fdController.lock_vslider()
+        self.fdController.lock_hslider()
+        self.fdController.lock_plug()
 
     def is_safe(self, record, max=70):
         """

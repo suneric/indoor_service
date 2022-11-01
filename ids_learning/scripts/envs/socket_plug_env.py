@@ -36,7 +36,7 @@ class SocketPlugEnv(GymGazeboEnv):
         self.obs_image = None # observation image
         self.obs_force = None # observation forces
         if self.continuous:
-            self.action_space = Box(-5.0,5.0,(2,),dtype=np.float32)
+            self.action_space = Box(-10.0,10.0,(2,),dtype=np.float32)
         else:
             self.action_space = Discrete(8) #
         self.observation_space = ((64,64,1),3) # image and force
@@ -77,12 +77,12 @@ class SocketPlugEnv(GymGazeboEnv):
         act = self.get_action(action)
         # print(act)
         hpos = self.fdController.hslider_pos()
-        self.fdController.move_hslider(hpos+act[0])
+        self.fdController.move_hslider_to(hpos+act[0])
         vpos = self.fdController.vslider_pos()
-        self.fdController.move_vslider(vpos+act[1])
+        self.fdController.move_vslider_to(vpos+act[1])
         dist1, dist2 = self.dist2goal()
         self.success = dist1 > 0.0
-        self.fail = dist2 > 0.03 # limit exploration area r < 2 cm
+        self.fail = dist2 > 0.03 # limit exploration area r < 3 cm
         if not self.success and not self.fail:
             self.obs_force = self.plug(f_max=25)
 
@@ -102,7 +102,8 @@ class SocketPlugEnv(GymGazeboEnv):
         return reward
 
     def plug(self, f_max=30):
-        self.fdController.lock()
+        self.fdController.lock_vslider()
+        self.fdController.lock_hslider()
         forces, dist1, dist2 = self.ftSensor.forces(), 0, 0
         while forces[0] > -f_max and abs(forces[1]) < f_max and abs(forces[2]) < f_max:
             self.driver.drive(0.25,0.0)
@@ -115,7 +116,8 @@ class SocketPlugEnv(GymGazeboEnv):
             rospy.sleep(0.01)
         self.driver.stop()
         self.curr_dist = dist2
-        self.fdController.unlock()
+        self.fdController.unlock_hslider()
+        self.fdController.unlock_vslider()
         return forces
 
     def reset_robot(self):
@@ -123,13 +125,15 @@ class SocketPlugEnv(GymGazeboEnv):
         # reset robot position
         rad = np.random.uniform(size=4)
         rx = 0.02*(rad[0]-0.5) + self.goal[0]# [-1cm, 1cm]
-        ry = 0.1*(rad[1]-0.5) + (self.goal[1]-0.45) # [-10cm, 10cm]
+        ry = 0.1*(rad[1]-0.5) + (self.goal[1]-0.45) # [-5cm, 5cm]
         rt = 0.002*(rad[2]-0.5) + (0.5*np.pi)
         self.robotPoseReset.reset_robot(rx,ry,rt)
         # reset frame device
         rh = 0.02*(rad[3]-0.5) + self.goal_h[0] # [-1cm, 1cm]
         self.initPose = [0.0,rh]
-        self.fdController.set_position(hk=False,vs=rh,hs=0,pg=0.03)
+        self.fdController.set_position(hk=1.57,vs=rh,hs=0,pg=0.03)
+        self.fdController.lock_hook()
+        self.fdController.lock_plug()
 
     def dist2goal(self):
         """
