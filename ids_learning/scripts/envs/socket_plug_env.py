@@ -99,18 +99,15 @@ class SocketPlugEnv(GymGazeboEnv):
             dist2goal_change = self.curr_dist - self.prev_dist
             reward = -1000*dist2goal_change - 1
             self.prev_dist = self.curr_dist
-            print(reward)
         return reward
 
     def plug(self, f_max=20):
         self.fdController.lock_vslider()
         self.fdController.lock_hslider()
         forces, dist1, dist2 = self.ftSensor.forces(), 0, 0
-        print(forces)
         while forces[0] > -f_max and abs(forces[1]) < 10 and abs(forces[2]+9.8) < 10:
             self.driver.drive(0.25,0.0)
             forces = self.ftSensor.forces()
-            print(forces)
             dist1, dist2 = self.dist2goal()
             self.success = dist1 > 0.0 and dist2 < 0.001
             self.fail = dist2 > 0.02 # limit exploration area r < 2 cm
