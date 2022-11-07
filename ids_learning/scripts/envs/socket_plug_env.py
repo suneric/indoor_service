@@ -36,7 +36,7 @@ class SocketPlugEnv(GymGazeboEnv):
         self.obs_image = None # observation image
         self.obs_force = None # observation forces
         if self.continuous:
-            self.action_space = Box(-10.0,10.0,(2,),dtype=np.float32)
+            self.action_space = Box(-5.0,5.0,(2,),dtype=np.float32)
         else:
             self.action_space = Discrete(8) #
         self.observation_space = ((64,64,1),3) # image and force
@@ -124,12 +124,12 @@ class SocketPlugEnv(GymGazeboEnv):
         self.driver.stop()
         # reset robot position
         rad = np.random.uniform(size=4)
-        rx = 0.02*(rad[0]-0.5) + self.goal[0]# [-1cm, 1cm]
+        rx = 0.01*(rad[0]-0.5) + self.goal[0]# [-1cm, 1cm]
         ry = 0.1*(rad[1]-0.5) + (self.goal[1]-0.45) # [-5cm, 5cm]
         rt = 0.002*(rad[2]-0.5) + (0.5*np.pi)
         self.robotPoseReset.reset_robot(rx,ry,rt)
         # reset frame device
-        rh = 0.02*(rad[3]-0.5) + self.goal_h[0] # [-1cm, 1cm]
+        rh = 0.01*(rad[3]-0.5) + self.goal_h[0] # [-1cm, 1cm]
         self.initPose = [0.0,rh]
         self.fdController.set_position(hk=1.57,vs=rh,hs=0,pg=0.03)
         self.fdController.lock_hook()
