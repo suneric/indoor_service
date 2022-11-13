@@ -30,7 +30,7 @@ class SocketPlugEnv(GymGazeboEnv):
         self.socketDetector = ObjectDetector(topic='detection',type=4)
         self.success = False
         self.fail = False
-        self.goal = [1.0350,2.9715,0.3606] # [x,y,z]
+        self.goal = [1.0350,2.97,0.3606] # [x,y,z]
         self.goal_h = [0.0882,0.0488]
         self.initPose = None # inistal position of endeffector [hpose, vpose]
         self.obs_image = None # observation image
@@ -97,7 +97,7 @@ class SocketPlugEnv(GymGazeboEnv):
             reward = -100
         else:
             dist2goal_change = self.curr_dist - self.prev_dist
-            reward = -1000*dist2goal_change - 1
+            reward = -1000*dist2goal_change - 0.3
             self.prev_dist = self.curr_dist
         return reward
 
@@ -106,7 +106,7 @@ class SocketPlugEnv(GymGazeboEnv):
         self.fdController.lock_hslider()
         forces, dist1, dist2 = self.ftSensor.forces(), 0, 0
         while forces[0] > -f_max and abs(forces[1]) < 10 and abs(forces[2]+9.8) < 10:
-            self.driver.drive(0.25,0.0)
+            self.driver.drive(0.2,0.0)
             forces = self.ftSensor.forces()
             dist1, dist2 = self.dist2goal()
             self.success = dist1 > 0.0 and dist2 < 0.001
@@ -126,7 +126,7 @@ class SocketPlugEnv(GymGazeboEnv):
         rad = np.random.uniform(size=4)
         rx = 0.01*(rad[0]-0.5) + self.goal[0]# [-1cm, 1cm]
         ry = 0.1*(rad[1]-0.5) + (self.goal[1]-0.45) # [-5cm, 5cm]
-        rt = 0.002*(rad[2]-0.5) + (0.5*np.pi)
+        rt = 0.02*(rad[2]-0.5) + (0.5*np.pi) # 1.14 deg, 0.01 rad
         self.robotPoseReset.reset_robot(rx,ry,rt)
         # reset frame device
         rh = 0.01*(rad[3]-0.5) + self.goal_h[0] # [-1cm, 1cm]

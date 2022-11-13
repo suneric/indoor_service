@@ -40,7 +40,7 @@ class RobotPoseReset:
         robot.model_name = 'mrobot'
         robot.pose.position.x = x
         robot.pose.position.y = y
-        # robot.pose.position.z = 0.072
+        robot.pose.position.z = 0.072
         rq = tft.quaternion_from_euler(0,0,yaw)
         robot.pose.orientation.x = rq[0]
         robot.pose.orientation.y = rq[1]
