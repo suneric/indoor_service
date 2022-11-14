@@ -363,3 +363,13 @@ class ObjectDetector:
 
     def detect_idx(self):
         return self.info_count
+
+    def get_upper(self):
+        idx = self.info_count
+        info = self.info
+        v0 = (info.t+info.b)/2
+        while (self.info_count-idx) > 0 and (self.info_count-idx) < 20:
+            cv = (self.info.t + self.info.b) / 2
+            if cv - v0 > 10:
+                return self.info
+        return info

@@ -49,7 +49,7 @@ class DQN:
         self.learn_iter = 0
         self.update_freq = update_freq
 
-    def policy(self, obs, epsilon):
+    def policy(self, obs, epsilon=0.0):
         """
         get action based on epsilon greedy
         """
