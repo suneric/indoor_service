@@ -6,4 +6,6 @@
 
 # test
 - dqn, last: 18/30 success
+- dqn, best: 12/30 success
 - ppo, last: 12/30 success
+- ppo, best: 18/30 success

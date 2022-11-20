@@ -78,9 +78,12 @@ if __name__=="__main__":
         with summaryWriter.as_default():
             tf.summary.scalar('episode reward', ep_ret, step=ep)
 
-        if ep > 1000 and ep_ret > best_ep_return:
+        if (ep+1) > 1000 and ep_ret > best_ep_return:
             best_ep_return = ep_ret
             save_model(agent, model_dir, 'best')
+
+        if (ep+1) % 50 == 0:
+            save_model(agent, model_dir, str(ep+1))
 
         ep_ret_list.append(ep_ret)
         avg_ret = np.mean(ep_ret_list[-30:])
@@ -88,10 +91,7 @@ if __name__=="__main__":
         print("Episode *{}*: average reward {:.4f}, episode step {}, total step {}, success count {} ".format(
                 ep, avg_ret, step, t, success_counter))
 
-    save_model(agent, model_dir, 'last')
-
     env.close()
-
     plt.plot(avg_ret_list)
     plt.xlabel('Episode')
     plt.ylabel('Avg. Episodic Reward')

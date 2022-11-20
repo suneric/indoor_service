@@ -12,6 +12,8 @@ from agents.dqn import DQN
 from agents.ppo import PPO
 from envs.socket_plug_env import SocketPlugEnv
 
+np.random.seed(123)
+
 class SocketPlugFullTest:
     def __init__(self):
         self.camera = RSD435('camera')
@@ -179,10 +181,10 @@ class SocketPlugTest:
     def load_agent(self,type):
         if type == 'dqn':
             self.agent = DQN((64,64,1),3,8,gamma=0.99,lr=2e-4,update_freq=500)
-            self.agent.load("../policy/socket_plug/dqn/q_net/best")
+            self.agent.load("../policy/socket_plug/dqn/q_net/2000")
         elif type == 'ppo':
             self.agent = PPO((64,64,1),3,8,pi_lr=3e-4,q_lr=1e-3,clip_ratio=0.3,beta=1e-3,target_kld=0.001)
-            self.agent.load("../policy/socket_plug/ppo/logits_net/best","../policy/socket_plug/ppo/val_net/best")
+            self.agent.load("../policy/socket_plug/ppo/logits_net/2000","../policy/socket_plug/ppo/val_net/2000")
         else:
             self.agent = None
             print("undefined agent")
@@ -209,7 +211,7 @@ class SocketPlugTest:
 if __name__ == '__main__':
     rospy.init_node('dqn_test', anonymous=True)
     env = SocketPlugEnv(continuous=False)
-    test = SocketPlugTest(env=env,type='ppo')
+    test = SocketPlugTest(env=env,type='dqn')
     success_counter = 0
     for i in range(30):
         rad = np.random.uniform(size=3)
