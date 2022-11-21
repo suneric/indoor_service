@@ -5,7 +5,9 @@
 </p>
 
 # test
-- dqn, last: 18/30 success
-- dqn, best: 12/30 success
-- ppo, last: 12/30 success
-- ppo, best: 18/30 success
+- random, 12/30 success, 0.4 rate, average steps 18.08 for success cases
+- dqn_2500, 23/30 success, 0.76 rate, average steps 9.3 for success cases
+- dqn_2850, 27/30 success, 0.90 rate, average steps 7.18 for success cases
+- ppo_2500, 18/30 success, 0.6 rate, average steps 8.2 for success cases
+- ppo_2850, 22/30 success, 0.73 rate, average steps 14.09 for success cases
+- dqn_

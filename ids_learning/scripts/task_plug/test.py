@@ -179,12 +179,13 @@ class SocketPlugTest:
         self.load_agent(type)
 
     def load_agent(self,type):
+        print("agent type", type)
         if type == 'dqn':
             self.agent = DQN((64,64,1),3,8,gamma=0.99,lr=2e-4,update_freq=500)
-            self.agent.load("../policy/socket_plug/dqn/q_net/2000")
+            self.agent.load("../policy/socket_plug/dqn/q_net/3000")
         elif type == 'ppo':
             self.agent = PPO((64,64,1),3,8,pi_lr=3e-4,q_lr=1e-3,clip_ratio=0.3,beta=1e-3,target_kld=0.001)
-            self.agent.load("../policy/socket_plug/ppo/logits_net/2000","../policy/socket_plug/ppo/val_net/2000")
+            self.agent.load("../policy/socket_plug/ppo/logits_net/2900","../policy/socket_plug/ppo/val_net/2900")
         else:
             self.agent = None
             print("undefined agent")
@@ -196,7 +197,7 @@ class SocketPlugTest:
         elif self.agent_type == 'ppo':
             act, _ = self.agent.policy(obs)
         else:
-            act = np.random.randint(8)
+            act = np.random.randint(self.env.action_space.n)
         return act
 
     def run(self):
@@ -206,19 +207,22 @@ class SocketPlugTest:
             act = self.action(obs)
             obs, rew, done, info = self.env.step(act)
             step += 1
-        return self.env.success
+        return self.env.success, step
 
 if __name__ == '__main__':
     rospy.init_node('dqn_test', anonymous=True)
     env = SocketPlugEnv(continuous=False)
     test = SocketPlugTest(env=env,type='dqn')
     success_counter = 0
+    success_steps = []
     for i in range(30):
         rad = np.random.uniform(size=3)
         rx = 0.05*(rad[0]-0.5) + 1.0
         ry = 0.05*(rad[1]-0.5) + 1.5
         rt = 0.1*(rad[2]-0.5) + 1.57
-        success = test.run()
+        success, step = test.run()
         if success:
             success_counter += 1
-        print("plug", i+1, "/", 30, success, "success_counter", success_counter)
+            success_steps.append(step)
+        print("plug", i+1, "/", 30, "steps", step, "success", success, "success_counter", success_counter)
+    print("sucess rate", success_counter/30, "average steps", np.mean(success_steps))
