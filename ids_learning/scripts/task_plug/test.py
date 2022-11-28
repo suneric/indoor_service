@@ -11,6 +11,7 @@ from envs.robot_driver import RobotDriver, RobotPoseReset
 from agents.dqn import DQN
 from agents.ppo import PPO
 from envs.socket_plug_env import SocketPlugEnv
+import argparse
 
 np.random.seed(123)
 
@@ -173,19 +174,19 @@ class SocketPlugFullTest:
 
 
 class SocketPlugTest:
-    def __init__(self, env, type='ppo'):
+    def __init__(self, env, type='ppo', iter=3000):
         self.env = env
         self.agent_type = type
-        self.load_agent(type)
+        self.load_agent(type, iter)
 
-    def load_agent(self,type):
-        print("agent type", type)
+    def load_agent(self,type,iter):
+        print("agent type", type, "iteration", iter)
         if type == 'dqn':
             self.agent = DQN((64,64,1),3,8,gamma=0.99,lr=2e-4,update_freq=500)
-            self.agent.load("../policy/socket_plug/dqn/q_net/3000")
+            self.agent.load("../policy/socket_plug/dqn/q_net/"+str(iter))
         elif type == 'ppo':
             self.agent = PPO((64,64,1),3,8,pi_lr=3e-4,q_lr=1e-3,clip_ratio=0.3,beta=1e-3,target_kld=0.001)
-            self.agent.load("../policy/socket_plug/ppo/logits_net/2900","../policy/socket_plug/ppo/val_net/2900")
+            self.agent.load("../policy/socket_plug/ppo/logits_net/"+str(iter),"../policy/socket_plug/ppo/val_net/"+str(iter))
         else:
             self.agent = None
             print("undefined agent")
@@ -209,20 +210,37 @@ class SocketPlugTest:
             step += 1
         return self.env.success, step
 
+def get_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--agent', type=str, default='dqn')
+    return parser.parse_args()
+
 if __name__ == '__main__':
+    args = get_args()
     rospy.init_node('dqn_test', anonymous=True)
     env = SocketPlugEnv(continuous=False)
-    test = SocketPlugTest(env=env,type='dqn')
-    success_counter = 0
-    success_steps = []
-    for i in range(30):
-        rad = np.random.uniform(size=3)
-        rx = 0.05*(rad[0]-0.5) + 1.0
-        ry = 0.05*(rad[1]-0.5) + 1.5
-        rt = 0.1*(rad[2]-0.5) + 1.57
-        success, step = test.run()
-        if success:
-            success_counter += 1
-            success_steps.append(step)
-        print("plug", i+1, "/", 30, "steps", step, "success", success, "success_counter", success_counter)
-    print("sucess rate", success_counter/30, "average steps", np.mean(success_steps))
+
+    test_res = []
+    start_iter, end_iter = 2950, 2950
+    try_count = 100
+    policy_iter = start_iter
+    while policy_iter >= end_iter:
+        test = SocketPlugTest(env=env,type=args.agent,iter=policy_iter)
+        success_counter = 0
+        success_steps = []
+        for i in range(try_count):
+            rad = np.random.uniform(size=3)
+            rx = 0.05*(rad[0]-0.5) + 1.0
+            ry = 0.05*(rad[1]-0.5) + 1.5
+            rt = 0.1*(rad[2]-0.5) + 1.57
+            success, step = test.run()
+            if success:
+                success_counter += 1
+                success_steps.append(step)
+            print("plug", i+1, "/", try_count, "steps", step, "success", success, "success_counter", success_counter)
+        print("sucess rate", success_counter/try_count, "average steps", np.mean(success_steps))
+        test_res.append((policy_iter, success_counter, np.mean(success_steps)))
+        policy_iter -= 50
+    print("results")
+    for res in test_res:
+        print(res[0], "success count", res[1], "rate", res[1]/try_count, "average steps in success", res[2])
