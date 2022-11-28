@@ -22,6 +22,18 @@ def copy_network_variables(target_weights, from_weights, polyak = 0.0):
     for (a,b) in zip(target_weights, from_weights):
         a.assign(a*polyak + b*(1-polyak))
 
+def force_actor_network(force_dim,output_dim,activation,output_activation,output_limit=None):
+    # MLP force network
+    force_input = keras.Input(shape=(force_dim))
+    fh = layers.Dense(32, activation=activation)(force_input)
+    fh = layers.Dense(16, activation=activation)(fh)
+    last_init = tf.random_uniform_initializer(minval=-3e-3, maxval=3e-3)
+    output = layers.Dense(output_dim, activation=output_activation,kernel_initializer=last_init)(fh)
+    if output_limit is not None:
+        output = output * output_limit
+    model = keras.Model(inputs=force_input, outputs=output)
+    return model
+
 def vision_force_actor_network(image_shape,force_dim,output_dim,activation,output_activation,output_limit=None):
     # CNN-like vision network
     vision_input = keras.Input(shape=image_shape)
