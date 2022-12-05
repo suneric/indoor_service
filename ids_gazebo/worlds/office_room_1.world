@@ -365,7 +365,7 @@
       </link>
       <link name="socket_2">
         <visual name="visual_socket_2">
-          <pose>1.0 2.98 0.4 1.57 0 0</pose>
+          <pose>1.0 2.996 0.4 1.57 0 0</pose>
           <geometry>
             <mesh>
               <uri>file://media/materials/obj/socket.obj</uri>
@@ -374,12 +374,12 @@
           <material>
             <script>
               <uri>file://media/materials/scripts/Gazebo.material</uri>
-              <name>Gazebo/PaintedWall</name>
+              <name>Gazebo/White</name>
             </script>
           </material>
         </visual>
         <collision name="collision_socket_2">
-          <pose>1.0 2.98 0.4 1.57 0 0</pose>
+          <pose>1.0 2.996 0.4 1.57 0 0</pose>
           <geometry>
             <mesh>
               <uri>file://media/materials/obj/socket.obj</uri>

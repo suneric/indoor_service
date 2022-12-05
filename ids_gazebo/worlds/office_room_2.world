@@ -365,24 +365,25 @@
       </link>
       <link name="socket_2">
         <visual name="visual_socket_2">
-          <pose>1.0 2.98 0.4 1.57 0 0</pose>
+          <pose>1.035 3.0 0.344 1.57 3.14 0</pose>
           <geometry>
             <mesh>
-              <uri>file://media/materials/obj/socket.obj</uri>
+              <uri>file://media/materials/obj/socket_1.obj</uri>
+              <scale>0.01 0.01 0.01</scale>
             </mesh>
           </geometry>
           <material>
             <script>
-              <uri>file://media/materials/scripts/Gazebo.material</uri>
-              <name>Gazebo/Gray</name>
+              <uri>file://media/materials/obj/11611_NEMA_5_20_Female_Wall_Socket_v1_l3.mtl</uri>
             </script>
           </material>
         </visual>
         <collision name="collision_socket_2">
-          <pose>1.0 2.98 0.4 1.57 0 0</pose>
+          <pose>1.035 3.0 0.344 1.57 3.14 0</pose>
           <geometry>
             <mesh>
-              <uri>file://media/materials/obj/socket.obj</uri>
+              <uri>file://media/materials/obj/socket_1.obj</uri>
+              <scale>0.01 0.01 0.01</scale>
             </mesh>
           </geometry>
         </collision>

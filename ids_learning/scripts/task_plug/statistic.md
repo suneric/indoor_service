@@ -4,13 +4,23 @@
 <img src="https://github.com/suneric/indoor_service/blob/main/ids_learning/scripts/task_plug/data/socket_plug_training_performance.png" width=80% height=80%>
 </p>
 
-# test 100 steps
+# Environment Test on DQN(2950) with 50 tries
+- env (training)[gray, type B without dash]:success count 44 rate 0.88 average steps in success 7.7727272727272725
+- env 1 [type B with dash]:success count 6 rate 0.12 average steps in success 3.8333333333333335
+- env 2 [type B with dash, darker]:success count 9 rate 0.18 average steps in success 3.3333333333333335
+- env 3 [white, type B without dash]:success count 11 rate 0.22 average steps in success 3.090909090909091
+- evn 4 [type B with dash, brisk wall]:success count 3 rate 0.06 average steps in success 2.6666666666666665
+- env 5 [yellow, type B without dash, yellow wall]: success count 1 rate 0.02 average steps in success 2.0
+- env 6 [red, type B without dash, green wall]:success count 9 rate 0.18 average steps in success 5.0
+
+
+# Test with trained models after different training episodes
+## 100 tries
 -DQN
   - 2950 success count 77 rate 0.77 average steps in success 5.1688311688311686
   - 2900 success count 68 rate 0.68 average steps in success 6.676470588235294
   - 2850 success count 66 rate 0.66 average steps in success 6.454545454545454
-
-# test 50 steps
+## 50 tries
 - DQN
   - 3000 success count 28 rate 0.56 average steps in success 6.25
   - **2950 success count 41 rate 0.82 average steps in success 5.2926829268292686**
@@ -19,21 +29,20 @@
   - 2800 success count 34 rate 0.68 average steps in success 6.0
   - 2750 success count 32 rate 0.64 average steps in success 4.96875
   - 2700 success count 25 rate 0.5 average steps in success 5.88
-
-# test
-- RANDOM, 12/30 success, rate 0.4, average steps 18.08
+## 30 tries
+- RANDOM, success count 12 rate 0.4 average steps in success 18.08
 - DQN
-  - 3000, 22/30 success, rate 0.73, average steps 6.18
-  - **2950, 25/30 success, rate 0.83, average steps 5.04**
-  - 2900, 16/30 success, rate 0.53, average steps 7.125
-  - **2850, 22/30 success, rate 0.73, average steps 6.77**
-  - 2800, 18/30 success, rate 0.6, average steps 4.17
-  - **2750, 24/30 success, rate 0.8, average steps 5.0**
-  - 2700, 16/30 success, rate 0.53, average steps 6.18
-  - 2650, 13/30 success, rate 0.43, average steps 4.23
-  - 2600, 14/30 success, rate 0.46, average steps 5.57
-  - 2550, 16/30 success, rate 0.53, average steps 5.5
-  - 2500, 19/30 success, rate 0.63, average steps 6.78
+  - 3000, success count 22 rate 0.73 average steps in success 6.18
+  - **2950, success count 25 rate 0.83 average steps in success 5.04**
+  - 2900, success count 16 rate 0.53 average steps in success 7.125
+  - **2850, success count 22 rate 0.73 average steps in success 6.77**
+  - 2800, success count 18 rate 0.6 average steps in success 4.17
+  - **2750, success count 24 rate 0.8 average steps in success 5.0**
+  - 2700, success count 16 rate 0.53 average steps in success 6.18
+  - 2650, success count 13 rate 0.43 average steps in success 4.23
+  - 2600, success count 14 rate 0.46 average steps in success 5.57
+  - 2550, success count 16 rate 0.53 average steps in success 5.5
+  - 2500, success count 19 rate 0.63 average steps in success 6.78
   - 2450 success count 18 rate 0.6 average steps in success 8.88888888888889
   - 2400 success count 17 rate 0.5666666666666667 average steps in success 8.058823529411764
   - 2350 success count 23 rate 0.7666666666666667 average steps in success 7.043478260869565

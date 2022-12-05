@@ -13,7 +13,7 @@ from agents.ppo import PPO
 from envs.socket_plug_env import SocketPlugEnv
 import argparse
 
-np.random.seed(123)
+# np.random.seed(123)
 
 class SocketPlugFullTest:
     def __init__(self):
@@ -221,8 +221,8 @@ if __name__ == '__main__':
     env = SocketPlugEnv(continuous=False)
 
     test_res = []
-    start_iter, end_iter = 2950, 2950
-    try_count = 100
+    start_iter, end_iter = 2850, 2850
+    try_count = 50
     policy_iter = start_iter
     while policy_iter >= end_iter:
         test = SocketPlugTest(env=env,type=args.agent,iter=policy_iter)
