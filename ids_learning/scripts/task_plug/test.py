@@ -12,6 +12,8 @@ from agents.dqn import DQN
 from agents.ppo import PPO
 from envs.socket_plug_env import SocketPlugEnv
 import argparse
+import matplotlib.pyplot as plt
+import csv
 
 # np.random.seed(123)
 
@@ -183,10 +185,10 @@ class SocketPlugTest:
         print("agent type", type, "iteration", iter)
         if type == 'dqn':
             self.agent = DQN((64,64,1),3,8,gamma=0.99,lr=2e-4,update_freq=500)
-            self.agent.load("../policy/socket_plug/dqn/q_net/"+str(iter))
+            self.agent.load("../policy/socket_plug/dqn_1/q_net/"+str(iter))
         elif type == 'ppo':
             self.agent = PPO((64,64,1),3,8,pi_lr=3e-4,q_lr=1e-3,clip_ratio=0.3,beta=1e-3,target_kld=0.001)
-            self.agent.load("../policy/socket_plug/ppo/logits_net/"+str(iter),"../policy/socket_plug/ppo/val_net/"+str(iter))
+            self.agent.load("../policy/socket_plug/ppo_0/logits_net/"+str(iter),"../policy/socket_plug/ppo_1/val_net/"+str(iter))
         else:
             self.agent = None
             print("undefined agent")
@@ -202,13 +204,16 @@ class SocketPlugTest:
         return act
 
     def run(self):
+        positions = []
         obs, info = self.env.reset()
+        positions.append(info["plug"])
         done, step = False, 0
         while not done and step < 60:
             act = self.action(obs)
             obs, rew, done, info = self.env.step(act)
+            positions.append(info["plug"])
             step += 1
-        return self.env.success, step
+        return self.env.success, step, self.env.ftSensor.record, positions
 
 def get_args():
     parser = argparse.ArgumentParser()
@@ -221,9 +226,10 @@ if __name__ == '__main__':
     env = SocketPlugEnv(continuous=False)
 
     test_res = []
-    start_iter, end_iter = 2850, 2850
+    start_iter, end_iter = 2950, 2950
     try_count = 50
     policy_iter = start_iter
+    test_cases = [] # specific test case
     while policy_iter >= end_iter:
         test = SocketPlugTest(env=env,type=args.agent,iter=policy_iter)
         success_counter = 0
@@ -233,14 +239,35 @@ if __name__ == '__main__':
             rx = 0.05*(rad[0]-0.5) + 1.0
             ry = 0.05*(rad[1]-0.5) + 1.5
             rt = 0.1*(rad[2]-0.5) + 1.57
-            success, step = test.run()
+            success, step, forces, positions = test.run()
             if success:
                 success_counter += 1
                 success_steps.append(step)
             print("plug", i+1, "/", try_count, "steps", step, "success", success, "success_counter", success_counter)
+            test_cases.append((success, (rx,ry,rt), step, forces, positions))
         print("sucess rate", success_counter/try_count, "average steps", np.mean(success_steps))
         test_res.append((policy_iter, success_counter, np.mean(success_steps)))
         policy_iter -= 50
     print("results")
     for res in test_res:
         print(res[0], "success count", res[1], "rate", res[1]/try_count, "average steps in success", res[2])
+
+    # write test data to csv
+    with open('data/test_data.csv', 'w', encoding='UTF8') as f:
+        writer = csv.writer(f)
+        for i in range(len(test_cases)):
+            case = test_cases[i]
+            data = [case[0],case[1][0],case[1][1],case[1][2],case[2]]
+            writer.writerow(data)
+            forces = case[3]
+            positions = case[4]
+            force_file = 'data/forces_'+str(i)+'.csv'
+            with open(force_file,'w',encoding='UTF8') as f1:
+                writer1 = csv.writer(f1)
+                for force in forces:
+                    writer1.writerow(force)
+            pos_file = 'data/positions_'+str(i)+'.csv'
+            with open(pos_file,'w',encoding='UTF8') as f2:
+                writer2 = csv.writer(f2)
+                for position in positions:
+                    writer2.writerow(position)
