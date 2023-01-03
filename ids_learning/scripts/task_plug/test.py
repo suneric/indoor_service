@@ -14,6 +14,7 @@ from envs.socket_plug_env import SocketPlugEnv
 import argparse
 import matplotlib.pyplot as plt
 import csv
+import pandas as pd
 
 # np.random.seed(123)
 
@@ -203,8 +204,9 @@ class SocketPlugTest:
             act = np.random.randint(self.env.action_space.n)
         return act
 
-    def run(self):
+    def run(self, init_rad):
         positions = []
+        self.env.set_init_random(rad)
         obs, info = self.env.reset()
         positions.append(info["plug"])
         done, step = False, 0
@@ -212,8 +214,11 @@ class SocketPlugTest:
             act = self.action(obs)
             obs, rew, done, info = self.env.step(act)
             positions.append(info["plug"])
+            if step == 0:
+                self.env.ftSensor.reset()
             step += 1
-        return self.env.success, step, self.env.ftSensor.record, positions
+
+        return self.env.success, step, self.env.ftSensor.record, positions, info["init"]
 
 def get_args():
     parser = argparse.ArgumentParser()
@@ -235,16 +240,13 @@ if __name__ == '__main__':
         success_counter = 0
         success_steps = []
         for i in range(try_count):
-            rad = np.random.uniform(size=3)
-            rx = 0.05*(rad[0]-0.5) + 1.0
-            ry = 0.05*(rad[1]-0.5) + 1.5
-            rt = 0.1*(rad[2]-0.5) + 1.57
-            success, step, forces, positions = test.run()
+            rad = np.random.uniform(size=4)
+            success, step, forces, positions, init = test.run(rad)
             if success:
                 success_counter += 1
                 success_steps.append(step)
             print("plug", i+1, "/", try_count, "steps", step, "success", success, "success_counter", success_counter)
-            test_cases.append((success, (rx,ry,rt), step, forces, positions))
+            test_cases.append((success, init, step, forces, positions))
         print("sucess rate", success_counter/try_count, "average steps", np.mean(success_steps))
         test_res.append((policy_iter, success_counter, np.mean(success_steps)))
         policy_iter -= 50
@@ -252,22 +254,14 @@ if __name__ == '__main__':
     for res in test_res:
         print(res[0], "success count", res[1], "rate", res[1]/try_count, "average steps in success", res[2])
 
-    # write test data to csv
-    with open('data/test_data.csv', 'w', encoding='UTF8') as f:
-        writer = csv.writer(f)
-        for i in range(len(test_cases)):
-            case = test_cases[i]
-            data = [case[0],case[1][0],case[1][1],case[1][2],case[2]]
-            writer.writerow(data)
-            forces = case[3]
-            positions = case[4]
-            force_file = 'data/forces_'+str(i)+'.csv'
-            with open(force_file,'w',encoding='UTF8') as f1:
-                writer1 = csv.writer(f1)
-                for force in forces:
-                    writer1.writerow(force)
-            pos_file = 'data/positions_'+str(i)+'.csv'
-            with open(pos_file,'w',encoding='UTF8') as f2:
-                writer2 = csv.writer(f2)
-                for position in positions:
-                    writer2.writerow(position)
+    results = []
+    for i in range(len(test_cases)):
+        case = test_cases[i]
+        data = [case[0],case[1][0],case[1][1],case[1][2],case[1][3],case[2]]
+        results.append(data)
+        forces = pd.DataFrame(case[3])
+        forces.to_csv('data/forces_'+str(i)+'.csv', index=False)
+        positions = pd.DataFrame(case[4])
+        positions.to_csv('data/positions_'+str(i)+'.csv', index=False)
+    df = pd.DataFrame(results)
+    df.to_csv('data/test_data.csv', index=False)

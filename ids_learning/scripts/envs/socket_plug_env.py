@@ -30,7 +30,7 @@ class SocketPlugEnv(GymGazeboEnv):
         self.socketDetector = ObjectDetector(topic='detection',type=4)
         self.success = False
         self.fail = False
-        self.goal = [1.0350,2.97,0.3606] # [x,y,z]
+        self.goal = [1.0350,2.97,0.3606] # [x,y,z] wall outlet on x-z plane
         self.goal_h = [0.0882,0.0488]
         self.initPose = None # inistal position of endeffector [hpose, vpose]
         self.obs_image = None # observation image
@@ -42,6 +42,8 @@ class SocketPlugEnv(GymGazeboEnv):
         self.observation_space = ((64,64,1),3) # image and force
         self.prev_dist = 0.0
         self.curr_dist = 0.0
+        self.init_random = []
+        self.init_position = None
 
     def _check_all_systems_ready(self):
         self.camera.check_sensor_ready()
@@ -59,7 +61,11 @@ class SocketPlugEnv(GymGazeboEnv):
         return dict(
             plug=self.poseSensor.bumper(),
             socket=self.goal,
+            init=self.init_position
         )
+
+    def set_init_random(self,rad):
+        self.init_random = rad
 
     def _set_init(self):
         # reset system
@@ -115,6 +121,7 @@ class SocketPlugEnv(GymGazeboEnv):
                 break
             rospy.sleep(0.01)
         self.driver.stop()
+
         self.curr_dist = dist2
         self.fdController.unlock_hslider()
         self.fdController.unlock_vslider()
@@ -123,7 +130,9 @@ class SocketPlugEnv(GymGazeboEnv):
     def reset_robot(self):
         self.driver.stop()
         # reset robot position
-        rad = np.random.uniform(size=4)
+        rad = self.init_random
+        if len(rad) < 4:
+            rad = np.random.uniform(size=4)
         rx = 0.01*(rad[0]-0.5) + self.goal[0]# [-1cm, 1cm]
         ry = 0.1*(rad[1]-0.5) + (self.goal[1]-0.45) # [-5cm, 5cm]
         rt = 0.02*(rad[2]-0.5) + (0.5*np.pi) # 1.14 deg, 0.01 rad
@@ -134,6 +143,7 @@ class SocketPlugEnv(GymGazeboEnv):
         self.fdController.set_position(hk=1.57,vs=rh,hs=0,pg=0.03)
         self.fdController.lock_hook()
         self.fdController.lock_plug()
+        self.init_position = (rx,ry,rt,rh)
 
     def dist2goal(self):
         """
