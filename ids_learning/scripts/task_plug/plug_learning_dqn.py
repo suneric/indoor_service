@@ -8,8 +8,8 @@ import numpy as np
 import argparse
 from datetime import datetime
 import os
-from envs.socket_plug_env2 import SocketPlugEnv
-from agents.dqn import DQN, DQN2, ReplayBuffer
+from envs.socket_plug_env import SocketPlugEnv
+from agents.dqn import DQN, ReplayBuffer
 import matplotlib.pyplot as plt
 
 """
@@ -48,8 +48,7 @@ if __name__=="__main__":
     print("create socket pluging environment.", image_shape, force_dim, action_dim)
 
     buffer = ReplayBuffer(image_shape,force_dim,action_dim,capacity=50000,batch_size=64)
-    agent = DQN2(image_shape,force_dim,action_dim,gamma=0.99,lr=2e-4,update_freq=500)
-    #agent = DQN(image_shape,force_dim,action_dim,gamma=0.99,lr=2e-4,update_freq=500)
+    agent = DQN(image_shape,force_dim,action_dim,gamma=0.99,lr=2e-4,update_freq=500)
 
     ep_ret_list, avg_ret_list = [], []
     epsilon, epsilon_stop, decay = 0.99, 0.1, 0.999

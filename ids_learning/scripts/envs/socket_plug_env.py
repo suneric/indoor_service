@@ -8,6 +8,15 @@ from .sensors import RSD435, FTSensor, PoseSensor, BumpSensor, ObjectDetector
 from .joints_controller import FrameDeviceController
 from .robot_driver import RobotDriver, RobotPoseReset
 from gym.spaces import Box, Discrete
+import math
+
+SOCKET_HOLE_X = 1.0348
+SOCKET_HOLE_Z1 = 0.2969 # higher circular hole to the floor
+SOCKET_HOLE_Z2 = 0.2574 # lower circular hole to the floor
+SOCKET_HOLE_Y = 2.992
+VSLIDER_BASE_H = 0.2725 # height to the floor of center of the plug
+PIN_OFFSET_Z = 0.0636 # the circular pin offset in z to the center of the plug
+PIN_OFFSET_Y = 0.0214
 
 register(
   id='SocketPlugEnv-v0',
@@ -20,6 +29,11 @@ class SocketPlugEnv(GymGazeboEnv):
             reset_world_or_sim='WORLD'
         )
         self.continuous = continuous
+        if self.continuous:
+            self.action_space = Box(-5.0,5.0,(2,),dtype=np.float32)
+        else:
+            self.action_space = Discrete(8) #
+        self.observation_space = ((64,64,1),3) # image and force
         self.camera = RSD435('camera')
         self.ftSensor = FTSensor('ft_endeffector')
         self.bpSensor = BumpSensor('bumper_plug')
@@ -30,20 +44,13 @@ class SocketPlugEnv(GymGazeboEnv):
         self.socketDetector = ObjectDetector(topic='detection',type=4)
         self.success = False
         self.fail = False
-        self.goal = [1.0350,2.97,0.3606] # [x,y,z] wall outlet on x-z plane
-        self.goal_h = [0.0882,0.0488]
-        self.initPose = None # inistal position of endeffector [hpose, vpose]
         self.obs_image = None # observation image
         self.obs_force = None # observation forces
-        if self.continuous:
-            self.action_space = Box(-5.0,5.0,(2,),dtype=np.float32)
-        else:
-            self.action_space = Discrete(8) #
-        self.observation_space = ((64,64,1),3) # image and force
-        self.prev_dist = 0.0
-        self.curr_dist = 0.0
+        self.goal = [SOCKET_HOLE_X,SOCKET_HOLE_Y,SOCKET_HOLE_Z1]
         self.init_random = []
         self.init_position = None
+        self.prev_dist = 0.0
+        self.curr_dist = 0.0
 
     def _check_all_systems_ready(self):
         self.camera.check_sensor_ready()
@@ -59,7 +66,7 @@ class SocketPlugEnv(GymGazeboEnv):
 
     def _post_information(self):
         return dict(
-            plug=self.poseSensor.bumper(),
+            plug=self.plug_pose(),
             socket=self.goal,
             init=self.init_position
         )
@@ -68,20 +75,17 @@ class SocketPlugEnv(GymGazeboEnv):
         self.init_random = rad
 
     def _set_init(self):
-        # reset system
         self.success = False
         self.fail = False
         self.ftSensor.reset()
         self.reset_robot()
         _, self.prev_dist = self.dist2goal()
         self.curr_dist = self.prev_dist
-        # get observation
         self.obs_image = self.camera.grey_arr((64,64))
         self.obs_force = self.ftSensor.forces()
 
     def _take_action(self, action):
         act = self.get_action(action)
-        # print(act)
         hpos = self.fdController.hslider_pos()
         self.fdController.move_hslider_to(hpos+act[0])
         vpos = self.fdController.vslider_pos()
@@ -121,29 +125,40 @@ class SocketPlugEnv(GymGazeboEnv):
                 break
             rospy.sleep(0.01)
         self.driver.stop()
-
         self.curr_dist = dist2
+        # back for reduce force
+        f = self.ftSensor.forces()
+        while f[0] <= -f_max or abs(f[1]) >= 10 or abs(f[2]+9.8) >= 10:
+            self.driver.drive(-0.2,0.0)
+            f = self.ftSensor.forces()
+            rospy.sleep(0.01)
+        self.driver.stop()
         self.fdController.unlock_hslider()
         self.fdController.unlock_vslider()
         return forces
 
     def reset_robot(self):
         self.driver.stop()
-        # reset robot position
         rad = self.init_random
         if len(rad) < 4:
             rad = np.random.uniform(size=4)
-        rx = 0.01*(rad[0]-0.5) + self.goal[0]# [-1cm, 1cm]
+        rx = 0.01*(rad[0]-0.5) + self.goal[0]# [-0.5cm, 0.5cm]
         ry = 0.1*(rad[1]-0.5) + (self.goal[1]-0.45) # [-5cm, 5cm]
         rt = 0.02*(rad[2]-0.5) + (0.5*np.pi) # 1.14 deg, 0.01 rad
+        rh = 0.01*(rad[3]-0.5) + self.goal[2]+PIN_OFFSET_Z-VSLIDER_BASE_H # [-0.5cm, 0.5cm]
         self.robotPoseReset.reset_robot(rx,ry,rt)
-        # reset frame device
-        rh = 0.01*(rad[3]-0.5) + self.goal_h[0] # [-1cm, 1cm]
-        self.initPose = [0.0,rh]
         self.fdController.set_position(hk=1.57,vs=rh,hs=0,pg=0.03)
         self.fdController.lock_hook()
         self.fdController.lock_plug()
-        self.init_position = (rx,ry,rt,rh)
+        self.init_position = (rx,ry,rt,rh+VSLIDER_BASE_H-PIN_OFFSET_Z)
+
+    def plug_pose(self):
+        bpPos = self.poseSensor.bumper()
+        e = (bpPos[3][2]-0.5*np.pi)
+        x = bpPos[0]+math.sin(e)*PIN_OFFSET_Y
+        y = bpPos[1]+math.cos(e)*PIN_OFFSET_Y
+        z = bpPos[2]-PIN_OFFSET_Z
+        return (x,y,z)
 
     def dist2goal(self):
         """
@@ -151,10 +166,9 @@ class SocketPlugEnv(GymGazeboEnv):
         return dist1: bumper to goal position in y
         return dist2: bumper to goal position in x-z
         """
-        bpPos = self.poseSensor.bumper()
-        dist1 = bpPos[1] - self.goal[1]
-        dist2 = np.sqrt((bpPos[0]-self.goal[0])**2 + (bpPos[2]-self.goal[2])**2)
-        # print(dist1, dist2)
+        pos = self.plug_pose()
+        dist1 = pos[1]-self.goal[1]
+        dist2 = np.sqrt((pos[0]-self.goal[0])**2 + (pos[2]-self.goal[2])**2)
         return dist1, dist2
 
     def get_action(self, action):

@@ -322,7 +322,9 @@ class PoseSensor():
         x = bpPos.position.x
         y = bpPos.position.y
         z = bpPos.position.z
-        return (x,y,z)
+        q = bpPos.orientation
+        e = tft.euler_from_quaternion([q.x,q.y,q.z,q.w])
+        return (x,y,z,e)
 
     def pose_matrix(self,cp):
         p, q = cp.position, cp.orientation
