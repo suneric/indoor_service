@@ -158,7 +158,7 @@ class SocketPlugEnv(GymGazeboEnv):
         x = bpPos[0]+math.sin(e)*PIN_OFFSET_Y
         y = bpPos[1]+math.cos(e)*PIN_OFFSET_Y
         z = bpPos[2]-PIN_OFFSET_Z
-        return (x,y,z)
+        return (x,y,z,e)
 
     def dist2goal(self):
         """

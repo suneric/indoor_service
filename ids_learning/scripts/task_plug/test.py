@@ -206,9 +206,10 @@ class SocketPlugTest:
 
     def run(self, init_rad):
         positions = []
-        self.env.set_init_random(rad)
+        self.env.set_init_random(init_rad)
         obs, info = self.env.reset()
-        positions.append(info["plug"])
+        init = info["plug"]
+        positions.append(init)
         done, step = False, 0
         while not done and step < 60:
             act = self.action(obs)
@@ -217,8 +218,7 @@ class SocketPlugTest:
             if step == 0:
                 self.env.ftSensor.reset()
             step += 1
-
-        return self.env.success, step, self.env.ftSensor.record, positions, info["init"]
+        return self.env.success, step, self.env.ftSensor.record, positions, init
 
 def get_args():
     parser = argparse.ArgumentParser()
@@ -254,6 +254,7 @@ if __name__ == '__main__':
     for res in test_res:
         print(res[0], "success count", res[1], "rate", res[1]/try_count, "average steps in success", res[2])
 
+    # record results
     results = []
     for i in range(len(test_cases)):
         case = test_cases[i]
