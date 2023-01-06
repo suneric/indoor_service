@@ -10,13 +10,18 @@ from .robot_driver import RobotDriver, RobotPoseReset
 from gym.spaces import Box, Discrete
 import math
 
-SOCKET_HOLE_X = 1.0348
-SOCKET_HOLE_Z1 = 0.2969 # higher circular hole to the floor
-SOCKET_HOLE_Z2 = 0.2574 # lower circular hole to the floor
-SOCKET_HOLE_Y = 2.992
 VSLIDER_BASE_H = 0.2725 # height to the floor of center of the plug
+PIN_OFFSET_Y = 0.0214 # the length of circular pin
 PIN_OFFSET_Z = 0.0636 # the circular pin offset in z to the center of the plug
-PIN_OFFSET_Y = 0.0214
+
+"""
+socket holes (goal) in x-y-z
+"""
+goalList = [(0.7348,2.992,0.2969),(0.7348,2.992,0.2584),
+            (1.435,2.992,0.2975),(1.435,2.992,0.2575),
+            (2.1348,2.992,0.2969),(2.1348,2.992,0.2584),
+            (2.835,2.992,0.2975),(2.835,2.992,0.2575),
+            (3.5348,2.992,0.2969),(3.5348,2.992,0.2584)]
 
 register(
   id='SocketPlugEnv-v0',
@@ -46,8 +51,9 @@ class SocketPlugEnv(GymGazeboEnv):
         self.fail = False
         self.obs_image = None # observation image
         self.obs_force = None # observation forces
-        self.goal = [SOCKET_HOLE_X,SOCKET_HOLE_Y,SOCKET_HOLE_Z1]
-        self.init_random = []
+        self.goal = None
+        self.goal_index = None
+        self.init_random = None
         self.init_position = None
         self.prev_dist = 0.0
         self.curr_dist = 0.0
@@ -74,7 +80,14 @@ class SocketPlugEnv(GymGazeboEnv):
     def set_init_random(self,rad):
         self.init_random = rad
 
+    def set_goal(self,idx):
+        self.goal_index = idx
+
     def _set_init(self):
+        idx = self.goal_index
+        if idx is None:
+            idx = np.random.randint(10)
+        self.goal = goalList[idx]
         self.success = False
         self.fail = False
         self.ftSensor.reset()
@@ -139,13 +152,18 @@ class SocketPlugEnv(GymGazeboEnv):
 
     def reset_robot(self):
         self.driver.stop()
+        rx = self.goal[0]
+        ry = self.goal[1]-0.5
+        rt = 0.5*np.pi
+        rh = self.goal[2]+PIN_OFFSET_Z-VSLIDER_BASE_H
+        # add uncertainty
         rad = self.init_random
-        if len(rad) < 4:
+        if rad is None:
             rad = np.random.uniform(size=4)
-        rx = 0.01*(rad[0]-0.5) + self.goal[0]# [-0.5cm, 0.5cm]
-        ry = 0.1*(rad[1]-0.5) + (self.goal[1]-0.45) # [-5cm, 5cm]
-        rt = 0.02*(rad[2]-0.5) + (0.5*np.pi) # 1.14 deg, 0.01 rad
-        rh = 0.01*(rad[3]-0.5) + self.goal[2]+PIN_OFFSET_Z-VSLIDER_BASE_H # [-0.5cm, 0.5cm]
+        rx += 0.02*(rad[0]-0.5) # [-1cm, 1cm]
+        ry += 0.1*(rad[1]-0.5) # [-5cm, 5cm]
+        rt += 0.05*(rad[2]-0.5) # 2.86 deg, 0.05 rad
+        rh += 0.02*(rad[3]-0.5) # [-1cm, 1cm]
         self.robotPoseReset.reset_robot(rx,ry,rt)
         self.fdController.set_position(hk=1.57,vs=rh,hs=0,pg=0.03)
         self.fdController.lock_hook()
@@ -169,6 +187,7 @@ class SocketPlugEnv(GymGazeboEnv):
         pos = self.plug_pose()
         dist1 = pos[1]-self.goal[1]
         dist2 = np.sqrt((pos[0]-self.goal[0])**2 + (pos[2]-self.goal[2])**2)
+        # print(dist1, dist2)
         return dist1, dist2
 
     def get_action(self, action):
