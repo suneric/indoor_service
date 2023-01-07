@@ -17,11 +17,10 @@ PIN_OFFSET_Z = 0.0636 # the circular pin offset in z to the center of the plug
 """
 socket holes (goal) in x-y-z
 """
-goalList = [(0.7348,2.992,0.2969),(0.7348,2.992,0.2584),
-            (1.435,2.992,0.2975),(1.435,2.992,0.2575),
-            (2.1348,2.992,0.2969),(2.1348,2.992,0.2584),
-            (2.835,2.992,0.2975),(2.835,2.992,0.2575),
-            (3.5348,2.992,0.2969),(3.5348,2.992,0.2584)]
+goalList = [(0.8348,2.992,0.2969),(0.8348,2.992,0.2584),
+            (1.635,2.992,0.2975),(1.635,2.992,0.2575),
+            (2.4348,2.992,0.2969),(2.4348,2.992,0.2584),
+            (3.235,2.992,0.2975),(3.235,2.992,0.2575)]
 
 register(
   id='SocketPlugEnv-v0',
@@ -86,7 +85,7 @@ class SocketPlugEnv(GymGazeboEnv):
     def _set_init(self):
         idx = self.goal_index
         if idx is None:
-            idx = np.random.randint(10)
+            idx = np.random.randint(8)
         self.goal = goalList[idx]
         self.success = False
         self.fail = False
@@ -162,7 +161,7 @@ class SocketPlugEnv(GymGazeboEnv):
             rad = np.random.uniform(size=4)
         rx += 0.02*(rad[0]-0.5) # [-1cm, 1cm]
         ry += 0.1*(rad[1]-0.5) # [-5cm, 5cm]
-        rt += 0.05*(rad[2]-0.5) # 2.86 deg, 0.05 rad
+        rt += 0.02*(rad[2]-0.5) # 2.86 deg, 0.05 rad
         rh += 0.02*(rad[3]-0.5) # [-1cm, 1cm]
         self.robotPoseReset.reset_robot(rx,ry,rt)
         self.fdController.set_position(hk=1.57,vs=rh,hs=0,pg=0.03)
