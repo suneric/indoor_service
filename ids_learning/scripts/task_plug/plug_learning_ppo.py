@@ -25,7 +25,7 @@ tf.random.set_seed(123)
 
 def get_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--max_ep', type=int, default=3000)
+    parser.add_argument('--max_ep', type=int, default=2000)
     parser.add_argument('--max_step', type=int ,default=60)
     return parser.parse_args()
 
@@ -43,13 +43,15 @@ if __name__=="__main__":
     summaryWriter = tf.summary.create_file_writer(model_dir)
 
     env = SocketPlugEnv(continuous=False)
+    env.set_goal(2)
     image_shape = env.observation_space[0]
     force_dim = env.observation_space[1]
+    joint_dim = env.observation_space[2]
     action_dim = env.action_space.n
-    print("create socket pluging environment.", image_shape, force_dim, action_dim)
+    print("create socket pluging environment.", image_shape, force_dim, joint_dim, action_dim)
 
-    buffer = ReplayBuffer(image_shape,force_dim,capacity=1000,gamma=0.99,lamda=0.97)
-    agent = PPO(image_shape,force_dim,action_dim,pi_lr=3e-4,q_lr=1e-3,clip_ratio=0.2,beta=1e-3,target_kld=0.01)
+    buffer = ReplayBuffer(image_shape,force_dim,joint_dim,capacity=1000,gamma=0.99,lamda=0.97)
+    agent = PPO(image_shape,force_dim,joint_dim,action_dim,pi_lr=3e-4,q_lr=1e-3,clip_ratio=0.2,beta=1e-3,target_kld=0.01)
 
     ep_ret_list, avg_ret_list = [], []
     t, update_after = 0, 500

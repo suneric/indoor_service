@@ -16,7 +16,7 @@ import matplotlib.pyplot as plt
 import csv
 import pandas as pd
 
-# np.random.seed(123)
+np.random.seed(111)
 
 class SocketPlugFullTest:
     def __init__(self):
@@ -207,6 +207,7 @@ class SocketPlugTest:
     def run(self, init_rad):
         positions = []
         self.env.set_init_random(init_rad)
+        self.env.set_goal(0)
         obs, info = self.env.reset()
         init = info["plug"]
         positions.append(init)
@@ -222,7 +223,7 @@ class SocketPlugTest:
 
 def get_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--agent', type=str, default='dqn')
+    parser.add_argument('--agent', type=str, default=None)
     return parser.parse_args()
 
 if __name__ == '__main__':
@@ -231,8 +232,8 @@ if __name__ == '__main__':
     env = SocketPlugEnv(continuous=False)
 
     test_res = []
-    start_iter, end_iter = 2950, 2950
-    try_count = 50
+    start_iter, end_iter = 3000, 2400
+    try_count = 30
     policy_iter = start_iter
     test_cases = [] # specific test case
     while policy_iter >= end_iter:
@@ -255,14 +256,14 @@ if __name__ == '__main__':
         print(res[0], "success count", res[1], "rate", res[1]/try_count, "average steps in success", res[2])
 
     # record results
-    results = []
-    for i in range(len(test_cases)):
-        case = test_cases[i]
-        data = [case[0],case[1][0],case[1][1],case[1][2],case[1][3],case[2]]
-        results.append(data)
-        forces = pd.DataFrame(case[3])
-        forces.to_csv('data/forces_'+str(i)+'.csv', index=False)
-        positions = pd.DataFrame(case[4])
-        positions.to_csv('data/positions_'+str(i)+'.csv', index=False)
-    df = pd.DataFrame(results)
-    df.to_csv('data/test_data.csv', index=False)
+    # results = []
+    # for i in range(len(test_cases)):
+    #     case = test_cases[i]
+    #     data = [case[0],case[1][0],case[1][1],case[1][2],case[1][3],case[2]]
+    #     results.append(data)
+    #     forces = pd.DataFrame(case[3])
+    #     forces.to_csv('data/forces_'+str(i)+'.csv', index=False)
+    #     positions = pd.DataFrame(case[4])
+    #     positions.to_csv('data/positions_'+str(i)+'.csv', index=False)
+    # df = pd.DataFrame(results)
+    # df.to_csv('data/test_data.csv', index=False)

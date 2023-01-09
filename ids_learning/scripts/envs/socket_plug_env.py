@@ -163,10 +163,10 @@ class SocketPlugEnv(GymGazeboEnv):
         rad = self.init_random
         if rad is None:
             rad = np.random.uniform(size=4)
-        rx += 0.01*(rad[0]-0.5) # [-1cm, 1cm]
-        ry += 0.1*(rad[1]-0.5) # [-5cm, 5cm]
-        rt += 0.02*(rad[2]-0.5) # 2.86 deg, 0.05 rad
-        rh += 0.01*(rad[3]-0.5) # [-1cm, 1cm]
+        rx += 0.01*(rad[0]-0.5) # 1cm
+        ry += 0.1*(rad[1]-0.5) # 10cm
+        rt += 0.02*(rad[2]-0.5) # 1.146 deg, 0.02 rad
+        rh += 0.01*(rad[3]-0.5) # 1cm
         self.robotPoseReset.reset_robot(rx,ry,rt)
         self.fdController.set_position(hk=1.57,vs=rh,hs=0,pg=0.03)
         self.fdController.lock_hook()
