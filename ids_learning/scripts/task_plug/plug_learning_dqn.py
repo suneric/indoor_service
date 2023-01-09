@@ -42,14 +42,15 @@ if __name__=="__main__":
     summaryWriter = tf.summary.create_file_writer(model_dir)
 
     env = SocketPlugEnv(continuous=False)
-    # env.set_goal(3)
+    env.set_goal(2)
     image_shape = env.observation_space[0]
     force_dim = env.observation_space[1]
+    joint_dim = env.observation_space[2]
     action_dim = env.action_space.n
-    print("create socket pluging environment.", image_shape, force_dim, action_dim)
+    print("create socket pluging environment.", image_shape, force_dim, joint_dim, action_dim)
 
-    buffer = ReplayBuffer(image_shape,force_dim,action_dim,capacity=50000,batch_size=64)
-    agent = DQN(image_shape,force_dim,action_dim,gamma=0.99,lr=2e-4,update_freq=500)
+    buffer = ReplayBuffer(image_shape,force_dim,joint_dim,action_dim,capacity=50000,batch_size=64)
+    agent = DQN(image_shape,force_dim,joint_dim,action_dim,gamma=0.99,lr=2e-4,update_freq=500)
 
     ep_ret_list, avg_ret_list = [], []
     epsilon, epsilon_stop, decay = 0.99, 0.1, 0.999
