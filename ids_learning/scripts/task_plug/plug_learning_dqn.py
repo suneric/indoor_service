@@ -20,12 +20,12 @@ gpu_devices = tf.config.experimental.list_physical_devices('GPU')
 for device in gpu_devices:
     tf.config.experimental.set_memory_growth(device, True)
 
-np.random.seed(123)
-tf.random.set_seed(123)
+np.random.seed(321)
+tf.random.set_seed(321)
 
 def get_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--max_ep', type=int, default=2000)
+    parser.add_argument('--max_ep', type=int, default=3000)
     parser.add_argument('--max_step', type=int ,default=60)
     return parser.parse_args()
 
@@ -42,7 +42,7 @@ if __name__=="__main__":
     summaryWriter = tf.summary.create_file_writer(model_dir)
 
     env = SocketPlugEnv(continuous=False)
-    env.set_goal(2)
+    env.set_goal(1)
     image_shape = env.observation_space[0]
     force_dim = env.observation_space[1]
     joint_dim = env.observation_space[2]

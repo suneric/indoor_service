@@ -129,7 +129,7 @@
 
       <!--contact bumper-->
       <joint name="joint_contact_bp" type="revolute">
-        <origin xyz="0.1405 0 0" rpy="0 0 0"/>
+        <origin xyz="0.161 0 -0.00636" rpy="0 0 0"/>
         <parent link="link_plug"/>
         <child link="link_contact_bp"/>
         <axis xyz="1 0 0"/>
@@ -139,19 +139,19 @@
         <visual>
           <origin rpy="0 0 0" xyz="0 0 0"/>
           <geometry>
-            <box size="0.001 0.002 0.005"/>
+            <box size="0.001 0.001 0.001"/>
           </geometry>
         </visual>
         <collision name="bump_sensor_collision">
           <origin rpy="0 0 0" xyz="0 0 0"/>
           <geometry>
-            <box size="0.001 0.002 0.005"/>
+            <box size="0.001 0.001 0.001"/>
           </geometry>
         </collision>
         <inertial>
-          <mass value="0.01"/>
+          <mass value="0.001"/>
           <origin rpy="0 0 0" xyz="0 0 0"/>
-          <inertia ixx="0.000000001" ixy="0" ixz="0" iyy="0.000000002" iyz="0" izz="0.000000001"/>
+          <inertia ixx="0.000000001" ixy="0" ixz="0" iyy="0.000000001" iyz="0" izz="0.000000001"/>
         </inertial>
       </link>
 

@@ -146,7 +146,7 @@ def vision_force_joint_actor_network(image_shape,force_dim,joint_dim,output_dim,
     joint_out = layers.Dense(8, activation=activation)(jh)
 
     concat = layers.concatenate([vision_out, force_out, joint_out])
-    output = layers.Dense(32, activation=activation)(concat)
+    output = layers.Dense(128, activation=activation)(concat)
     last_init = tf.random_uniform_initializer(minval=-3e-3, maxval=3e-3)
     output = layers.Dense(output_dim, activation=output_activation,kernel_initializer=last_init)(output)
     if output_limit is not None:
@@ -173,7 +173,7 @@ def vision_force_joint_critic_network(image_shape, force_dim, joint_dim, activat
     joint_out = layers.Dense(8, activation=activation)(jh)
 
     concat = layers.concatenate([vision_out, force_out, joint_out])
-    output = layers.Dense(32, activation=activation)(concat)
+    output = layers.Dense(128, activation=activation)(concat)
     output = layers.Dense(1, activation='linear')(output)
     model = keras.Model(inputs=[vision_input, force_input, joint_input], outputs=output)
     return model

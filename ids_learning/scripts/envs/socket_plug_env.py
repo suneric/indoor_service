@@ -13,15 +13,16 @@ import cv2 as cv
 
 VSLIDER_BASE_H = 0.2725 # height to the floor of center of the plug
 PIN_OFFSET_Y = 0.0214 # the length of circular pin
-PIN_OFFSET_Z = 0.0636 # the circular pin offset in z to the center of the plug
+PIN_OFFSET_Z = 0.00636 # the circular pin offset in z to the center of the plug
+#OUTLET_HEIGHT = 0.4 - 0.5*(0.1143) = 0.34285
 
 """
 socket holes (goal) in x-y-z
 """
-goalList = [(0.8348,2.992,0.2969),(0.8348,2.992,0.2584),
-            (1.6348,2.992,0.2969),(1.6348,2.992,0.2584),
-            (2.4348,2.992,0.2969),(2.4348,2.992,0.2584),
-            (3.2348,2.992,0.2969),(3.2348,2.992,0.2584)]
+goalList = [(0.83497,2.993,0.35454),(0.83497,2.993,0.31551),
+            (1.63497,2.993,0.35454),(1.63497,2.993,0.31551)]
+#            (2.43497,2.993,0.35454),(2.43497,2.993,0.31551)
+#            (3.23497,2.993,0.35454),(3.23497,2.993,0.31551)
 
 register(
   id='SocketPlugEnv-v0',
@@ -87,7 +88,7 @@ class SocketPlugEnv(GymGazeboEnv):
     def _set_init(self):
         idx = self.goal_index
         if idx is None:
-            idx = np.random.randint(8)
+            idx = np.random.randint(len(goalList))
         self.goal = goalList[idx]
         self.success = False
         self.fail = False
@@ -176,9 +177,9 @@ class SocketPlugEnv(GymGazeboEnv):
     def plug_pose(self):
         bpPos = self.poseSensor.bumper()
         e = (bpPos[3][2]-0.5*np.pi)
-        x = bpPos[0]+math.sin(e)*PIN_OFFSET_Y
-        y = bpPos[1]+math.cos(e)*PIN_OFFSET_Y
-        z = bpPos[2]-PIN_OFFSET_Z
+        x = bpPos[0]
+        y = bpPos[1]
+        z = bpPos[2]
         return (x,y,z,e)
 
     def plug_joint(self):

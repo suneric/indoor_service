@@ -9,7 +9,7 @@ import argparse
 import pandas as pd
 from envs.socket_plug_env import goalList
 
-GOAL = goalList[2]
+GOAL = goalList[0]
 
 def draw_socket(ax):
     ax.set_xlim([-0.012,0.012]) # mm
