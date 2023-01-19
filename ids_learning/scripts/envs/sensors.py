@@ -152,6 +152,19 @@ class RSD435:
     def zero_arr(self, resolution):
         return np.zeros((resolution[0],resolution[1],1))
 
+    def binary_arr(self,resolution, detectInfo):
+        """
+        Generate a binary array for detected area given by the bounding box
+        """
+        t,b = detectInfo.t, detectInfo.b
+        l,r = detectInfo.l, detectInfo.r
+        img = np.zeros((self.height,self.width),dtype=np.float32)
+        img[int(t):int(b),int(l):int(r)] = 255.0
+        img = resize_image(img,resolution)
+        img = np.array(img)/255 - 0.5
+        img = img.reshape((resolution[0],resolution[1],1))
+        return img
+
     def ready(self):
         return self.cameraInfoUpdate and self.cv_color is not None and self.cv_depth is not None
 
@@ -352,26 +365,63 @@ class PoseSensor():
                 rospy.logerr("Current  /gazebo/link_states not ready yet, retrying for getting  /gazebo/link_states")
 
 class ObjectDetector:
-    def __init__(self, topic, type):
+    def __init__(self, topic, type, max=6):
         self.sub = rospy.Subscriber(topic, DetectionInfo, self.detect_cb)
-        self.info = None
-        self.info_count = 0
+        self.info = []
         self.type = type
+        self.max_count = max
+
+    def reset(self):
+        self.info = []
+
+    def ready(self):
+        if len(self.info) < self.max_count:
+            return False
+        else:
+            print("object detector is ready.")
+            return True
 
     def detect_cb(self, data):
         if data.type == self.type:
-            self.info_count += 1
-            self.info = data
+            if len(self.info) < self.max_count:
+                self.info.append(data)
+            else:
+                self.info.pop(0)
+                self.info.append(data)
+
+    def getDetectInfo(self,idx=0):
+        """
+        idx: 0 for upper, 1 for lower
+        """
+        print("get detected info", idx)
+        detected = []
+        last = self.info[-1]
+        detected.append(last)
+        i = self.max_count-2
+        while len(detected) < 2 and i >= 0:
+            check = self.info[i]
+            if self.info_dist(check,last) > 5:
+                detected.append(check)
+            i -= 1
+
+        if len(detected) == 0:
+            print("undetected.")
+        elif len(detected) == 1:
+            return detected[0]
+        else:
+            first_c = (detected[0].t + detected[0].b)/2
+            last_c = (detected[1].t+detected[1].b)/2
+            print(first_c, last_c)
+            if first_c > last_c:
+                return detected[idx]
+            else:
+                return detected[idx-1]
+
+    def info_dist(self, info1, info2):
+        cu1,cv1 = (info1.l+info1.r)/2, (info1.t+info1.b)/2
+        cu2,cv2 = (info2.l+info2.r)/2, (info2.t+info2.b)/2
+        dist = math.sqrt((cu1-cu2)**2+(cv1-cv2)**2)
+        return dist
 
     def detect_idx(self):
         return self.info_count
-
-    def get_upper(self):
-        idx = self.info_count
-        info = self.info
-        v0 = (info.t+info.b)/2
-        while (self.info_count-idx) > 0 and (self.info_count-idx) < 20:
-            cv = (self.info.t + self.info.b) / 2
-            if cv - v0 > 10:
-                return self.info
-        return info

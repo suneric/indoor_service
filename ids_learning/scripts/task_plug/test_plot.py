@@ -7,19 +7,37 @@ import csv
 import numpy as np
 import argparse
 import pandas as pd
-from envs.socket_plug_env import goalList
 
-GOAL = goalList[0]
+goalList = [(0.83497,2.993,0.35454),(0.83497,2.993,0.31551),
+            (1.63497,2.993,0.35454),(1.63497,2.993,0.31551),
+            (2.43497,2.993,0.35454),(2.43497,2.993,0.31551),
+            (3.23497,2.993,0.35454),(3.23497,2.993,0.31551)]
+
+GOAL = goalList[1]
+
+def smoothExponential(data, weight):
+    last = data[0]  # First value in the plot (first timestep)
+    smoothed = []
+    for point in data:
+        smoothed_val = last * weight + (1 - weight) * point  # Calculate smoothed value
+        smoothed.append(smoothed_val)                        # Save it
+        last = smoothed_val                                  # Anchor the last smoothed value
+    return smoothed
 
 def draw_socket(ax):
     ax.set_xlim([-0.012,0.012]) # mm
     ax.set_ylim([-0.012,0.012]) # mm
-    ax.add_patch(Circle([0,0],0.001,facecolor='y'))
-    ax.add_patch(Circle([0,0],0.004,edgecolor='y',fill=False))
+    ax.set_xlabel("x")
+    ax.set_ylabel("z")
+    ax.add_patch(Circle([0,0],0.0025,facecolor='lightgrey'))
+    ax.add_patch(Rectangle((-0.0025,-0.003),0.005,0.003,facecolor='lightgrey'))
+    ax.add_patch(Circle([0,0],0.001,edgecolor='blue',linewidth=2,fill=False))
 
 def draw_wall(ax):
     ax.set_xlim([-0.012,0.012]) # m
     ax.set_ylim([2.8,3]) # m
+    ax.set_xlabel("x")
+    ax.set_ylabel("y")
     ax.plot([-0.012,0.012],[2.99,2.99],color='k')
     ax.plot([-0.012,0.012],[2.82,2.82],color='k')
     ax.plot([0,0],[2.8,3],linestyle ='dashed', color='k')
@@ -62,14 +80,10 @@ if __name__ == "__main__":
         test_case = test_data[args.case]
         fig.suptitle(str(test_case[0])+"["+str(test_case[1])+","+str(test_case[2])+","+str(test_case[3])+"]")
         force = pd.read_csv(os.path.join(data_dir,"forces_"+str(args.case)+".csv")).to_numpy()
-        axs[0].plot(force)
+        axs[0].plot(smoothExponential(force,0.9), linewidth=3)
         axs[0].legend(["x","y","z"])
+        draw_socket(axs[1])
         position = pd.read_csv(os.path.join(data_dir,"positions_"+str(args.case)+".csv")).to_numpy()
-        axs[1].plot(position[0,0]-GOAL[0],position[0,2]-GOAL[2], marker="o", color="r")
-        axs[1].plot(position[:,0]-GOAL[0],position[:,2]-GOAL[2], marker="*", color="b", linestyle='--')
-        axs[1].add_patch(Circle([0,0],0.001,facecolor='y'))
-        axs[1].set_xlabel("x")
-        axs[1].set_ylabel("z")
-        axs[1].set_xlim([-0.015,0.015]) # m
-        axs[1].set_ylim([-0.015,0.015]) # m
+        axs[1].plot(position[0,0]-GOAL[0],position[0,2]-GOAL[2], marker="o", color="k")
+        axs[1].plot(position[:,0]-GOAL[0],position[:,2]-GOAL[2], marker="*", color="k", linestyle='--')
     plt.show()

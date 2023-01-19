@@ -19,10 +19,13 @@ PIN_OFFSET_Z = 0.00636 # the circular pin offset in z to the center of the plug
 """
 socket holes (goal) in x-y-z
 """
-# goalList = [(0.83497,2.993,0.35454),(0.83497,2.993,0.31551),
-#             (1.63497,2.993,0.35454),(1.63497,2.993,0.31551)
-goalList = [(2.43497,2.993,0.35454),(2.43497,2.993,0.31551),
-           (3.23497,2.993,0.35454),(3.23497,2.993,0.31551)]
+goalList = [(1.63497,2.993,0.35454),(1.63497,2.993,0.31551)] # NEMA-R15
+# goalList = [(1.63497,2.993,0.35454),(1.63497,2.993,0.31551), # NEMA-R15
+#             (2.43497,2.993,0.35454),(2.43497,2.993,0.31551)] # NEMA-R20
+# goalList = [(0.83497,2.993,0.35454),(0.83497,2.993,0.31551), # all 8 cases
+#             (1.63497,2.993,0.35454),(1.63497,2.993,0.31551),
+#             (2.43497,2.993,0.35454),(2.43497,2.993,0.31551),
+#             (3.23497,2.993,0.35454),(3.23497,2.993,0.31551)]
 
 register(
   id='SocketPlugEnv-v0',
@@ -69,6 +72,8 @@ class SocketPlugEnv(GymGazeboEnv):
         print("System READY")
 
     def _get_observation(self):
+        # cv.imshow('binary_image', self.obs_image)
+        # cv.waitKey(1)
         obs = dict(image = self.obs_image, force=self.obs_force, joint=self.obs_joint)
         return obs
 
@@ -96,7 +101,10 @@ class SocketPlugEnv(GymGazeboEnv):
         self.reset_robot()
         _, self.prev_dist = self.dist2goal()
         self.curr_dist = self.prev_dist
-        self.obs_image = self.camera.grey_arr((64,64))
+        socketInfo = self.socketDetector.getDetectInfo(idx%2)
+        self.obs_image = self.camera.binary_arr((64,64),socketInfo) # detected vision
+        # self.obs_image = self.camera.grey_arr((64,64)) # raw vision
+        # self.obs_image = self.camera.zero_arr((64,64)) # no vision
         self.obs_force = self.ftSensor.forces()
         self.obs_joint = self.plug_joint()
 
@@ -172,6 +180,12 @@ class SocketPlugEnv(GymGazeboEnv):
         self.fdController.set_position(hk=1.57,vs=rh,hs=0,pg=0.03)
         self.fdController.lock_hook()
         self.fdController.lock_plug()
+        # reset socket detector
+        self.socketDetector.reset()
+        while not self.socketDetector.ready():
+            self.driver.drive(-0.01,0.0)
+            rospy.sleep(0.01)
+        self.driver.stop()
         self.init_position = (rx,ry,rt,rh+VSLIDER_BASE_H-PIN_OFFSET_Z)
 
     def plug_pose(self):

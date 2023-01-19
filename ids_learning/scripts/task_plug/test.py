@@ -186,7 +186,7 @@ class SocketPlugTest:
         print("agent type", type, "iteration", iter)
         if type == 'dqn':
             self.agent = DQN((64,64,1),3,2,8,gamma=0.99,lr=2e-4,update_freq=500)
-            self.agent.load("../policy/socket_plug/dqn_2/q_net/"+str(iter))
+            self.agent.load("../policy/socket_plug/NEMA-R15-1/q_net/"+str(iter))
         elif type == 'ppo':
             self.agent = PPO((64,64,1),3,8,pi_lr=3e-4,q_lr=1e-3,clip_ratio=0.3,beta=1e-3,target_kld=0.001)
             self.agent.load("../policy/socket_plug/ppo_0/logits_net/"+str(iter),"../policy/socket_plug/ppo_1/val_net/"+str(iter))
@@ -229,10 +229,10 @@ if __name__ == '__main__':
     args = get_args()
     rospy.init_node('dqn_test', anonymous=True)
     env = SocketPlugEnv(continuous=False)
-    env.set_goal(3)
+    env.set_goal(1)
     test_res = []
-    start_iter, end_iter = 1900, 1900
-    try_count = 30
+    start_iter, end_iter = 2900, 2900
+    try_count = 50
     policy_iter = start_iter
     test_cases = [] # specific test case
     while policy_iter >= end_iter:

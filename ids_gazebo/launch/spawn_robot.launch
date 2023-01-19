@@ -12,7 +12,7 @@
 
   <!--load controller-->
   <include file="$(find ids_control)/launch/device_control.launch"/>
-  <!-- <include file="$(find ids_detection)/launch/object_detection.launch"/> -->
+  <include file="$(find ids_detection)/launch/object_detection.launch"/>
 
   <!--spawn mobile robot-->
   <param name="robot_description" command="$(find xacro)/xacro --inorder '$(arg model)'" />
