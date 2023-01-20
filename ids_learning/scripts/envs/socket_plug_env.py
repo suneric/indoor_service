@@ -99,9 +99,9 @@ class SocketPlugEnv(GymGazeboEnv):
         self.reset_robot()
         _, self.prev_dist = self.dist2goal()
         self.curr_dist = self.prev_dist
-        # socketInfo = self.socketDetector.getDetectInfo(idx%2)
-        # self.obs_image = self.camera.binary_arr((64,64),socketInfo) # detected vision
-        self.obs_image = self.camera.grey_arr((64,64)) # raw vision
+        socketInfo = self.socketDetector.getDetectInfo(idx%2)
+        self.obs_image = self.camera.binary_arr((64,64),socketInfo) # detected vision
+        # self.obs_image = self.camera.grey_arr((64,64)) # raw vision
         # self.obs_image = self.camera.zero_arr((64,64)) # no vision
         self.obs_force = self.ftSensor.forces()
         self.obs_joint = self.plug_joint()

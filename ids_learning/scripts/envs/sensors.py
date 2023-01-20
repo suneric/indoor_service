@@ -159,7 +159,7 @@ class RSD435:
         t,b = detectInfo.t, detectInfo.b
         l,r = detectInfo.l, detectInfo.r
         img = np.zeros((self.height,self.width),dtype=np.float32)
-        img[int(t):int(b),int(l):int(r)] = 255.0
+        img[int(t):int(b),int(l):int(r)] = 255
         img = resize_image(img,resolution)
         img = np.array(img)/255 - 0.5
         img = img.reshape((resolution[0],resolution[1],1))
@@ -386,50 +386,43 @@ class ObjectDetector:
         if len(self.info) < self.max_count:
             return False
         else:
-            print("object detector is ready.")
+            print("object detector ready.")
             return True
 
     def detect_cb(self, data):
         if data.type == self.type:
-            if len(self.info) < self.max_count:
-                self.info.append(data)
-            else:
+            if len(self.info) == self.max_count:
                 self.info.pop(0)
-                self.info.append(data)
+            self.info.append(data)
 
     def getDetectInfo(self,idx=0):
         """
         idx: 0 for upper, 1 for lower
         """
         print("get detected info", idx)
-        detected = []
-        last = self.info[-1]
-        detected.append(last)
-        i = self.max_count-2
-        while len(detected) < 2 and i >= 0:
-            check = self.info[i]
-            if self.info_dist(check,last) > 5:
-                detected.append(check)
-            i -= 1
-
-        if len(detected) == 0:
-            print("undetected.")
-        elif len(detected) == 1:
-            return detected[0]
+        infoList = self.getLatestDetection()
+        if len(infoList) == 1:
+            return infoList[0]
         else:
-            first_c = (detected[0].t + detected[0].b)/2
-            last_c = (detected[1].t+detected[1].b)/2
-            print(first_c, last_c)
-            if first_c > last_c:
-                return detected[idx]
+            print(infoList[0].t, infoList[0].b, infoList[1].t, infoList[1].b)
+            return infoList[idx]
+
+    def getLatestDetection(self):
+        detected = []
+        for info in self.info:
+            detected.append(info)
+        infoList = [detected[-1]]
+        info = detected[-1]
+        i = len(detected)-2
+        while i >= 0:
+            check = detected[i]
+            if (check.b-info.b)-(info.b-info.t) > 5:
+                infoList.append(check)
+                break
+            elif (info.b-check.b)-(check.b-check.t) > 5:
+                infoList.insert(0,check)
+                break
             else:
-                return detected[idx-1]
-
-    def info_dist(self, info1, info2):
-        cu1,cv1 = (info1.l+info1.r)/2, (info1.t+info1.b)/2
-        cu2,cv2 = (info2.l+info2.r)/2, (info2.t+info2.b)/2
-        dist = math.sqrt((cu1-cu2)**2+(cv1-cv2)**2)
-        return dist
-
-    def detect_idx(self):
-        return self.info_count
+                info = check
+            i = i-1
+        return infoList
