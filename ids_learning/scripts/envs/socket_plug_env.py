@@ -19,9 +19,9 @@ PIN_OFFSET_Z = 0.00636 # the circular pin offset in z to the center of the plug
 """
 socket holes (goal) in x-y-z
 """
-goalList = [(1.63497,2.992,0.35454),(1.63497,2.992,0.31551)] # NEMA-R15
-# goalList = [(1.63497,2.992,0.35454),(1.63497,2.992,0.31551), # NEMA-R15
-#             (2.43497,2.992,0.35454),(2.43497,2.992,0.31551)] # NEMA-R20
+# goalList = [(1.63497,2.992,0.35454),(1.63497,2.992,0.31551)] # NEMA-R15
+goalList = [(1.63497,2.992,0.35454),(1.63497,2.992,0.31551), # NEMA-R15
+            (2.43497,2.992,0.35454),(2.43497,2.992,0.31551)] # NEMA-R20
 # goalList = [(0.83497,2.992,0.35454),(0.83497,2.992,0.31551), # all 8 cases
 #             (1.63497,2.992,0.35454),(1.63497,2.992,0.31551),
 #             (2.43497,2.992,0.35454),(2.43497,2.992,0.31551),
@@ -45,7 +45,6 @@ class SocketPlugEnv(GymGazeboEnv):
         self.observation_space = ((64,64,1),3,2) # image,force,joint
         self.camera = RSD435('camera')
         self.ftSensor = FTSensor('ft_endeffector')
-        self.bpSensor = BumpSensor('bumper_plug')
         self.poseSensor = PoseSensor()
         self.driver = RobotDriver()
         self.fdController = FrameDeviceController()
@@ -66,14 +65,13 @@ class SocketPlugEnv(GymGazeboEnv):
     def _check_all_systems_ready(self):
         self.camera.check_sensor_ready()
         self.ftSensor.check_sensor_ready()
-        self.bpSensor.check_sensor_ready()
         self.driver.check_publisher_connection()
         self.fdController.check_publisher_connection()
         print("System READY")
 
     def _get_observation(self):
-        # cv.imshow('binary_image', self.obs_image)
-        # cv.waitKey(1)
+        cv.imshow('observation', self.obs_image)
+        cv.waitKey(1)
         obs = dict(image = self.obs_image, force=self.obs_force, joint=self.obs_joint)
         return obs
 
@@ -101,9 +99,9 @@ class SocketPlugEnv(GymGazeboEnv):
         self.reset_robot()
         _, self.prev_dist = self.dist2goal()
         self.curr_dist = self.prev_dist
-        socketInfo = self.socketDetector.getDetectInfo(idx%2)
-        self.obs_image = self.camera.binary_arr((64,64),socketInfo) # detected vision
-        # self.obs_image = self.camera.grey_arr((64,64)) # raw vision
+        # socketInfo = self.socketDetector.getDetectInfo(idx%2)
+        # self.obs_image = self.camera.binary_arr((64,64),socketInfo) # detected vision
+        self.obs_image = self.camera.grey_arr((64,64)) # raw vision
         # self.obs_image = self.camera.zero_arr((64,64)) # no vision
         self.obs_force = self.ftSensor.forces()
         self.obs_joint = self.plug_joint()
@@ -176,6 +174,7 @@ class SocketPlugEnv(GymGazeboEnv):
         ry += 0.1*(rad[1]-0.5) # 10cm
         rt += 0.02*(rad[2]-0.5) # 1.146 deg, 0.02 rad
         rh += 0.01*(rad[3]-0.5) # 1cm
+        # reset robot and device
         self.robotPoseReset.reset_robot(rx,ry,rt)
         self.fdController.set_position(hk=1.57,vs=rh,hs=0,pg=0.03)
         self.fdController.lock_hook()
@@ -186,15 +185,25 @@ class SocketPlugEnv(GymGazeboEnv):
             self.driver.drive(-0.01,0.0)
             rospy.sleep(0.01)
         self.driver.stop()
-        self.init_position = (rx,ry,rt,rh+VSLIDER_BASE_H-PIN_OFFSET_Z)
+        # save initial pose
+        rPos = self.robot_pose()
+        bPos = self.plug_pose()
+        self.init_position = (rPos[0],rPos[1],rPos[2],bPos[0],bPos[1],bPos[2],bPos[3])
 
     def plug_pose(self):
-        bpPos = self.poseSensor.bumper()
-        e = (bpPos[3][2]-0.5*np.pi)
+        bpPos = self.poseSensor.plug()
+        e = bpPos[3][2]-0.5*np.pi
         x = bpPos[0]
         y = bpPos[1]
         z = bpPos[2]
         return (x,y,z,e)
+
+    def robot_pose(self):
+        rPos = self.poseSensor.robot()
+        e = rPos[2][2]-0.5*np.pi
+        x = rPos[0]
+        y = rPos[1]
+        return (x,y,e)
 
     def plug_joint(self):
         hpos = self.fdController.hslider_pos()
@@ -203,9 +212,9 @@ class SocketPlugEnv(GymGazeboEnv):
 
     def dist2goal(self):
         """
-        distance of bumper to goal position
-        return dist1: bumper to goal position in y
-        return dist2: bumper to goal position in x-z
+        distance of plug to goal position
+        return dist1: plug to goal position in y
+        return dist2: plug to goal position in x-z
         """
         pos = self.plug_pose()
         dist1 = pos[1]-self.goal[1]

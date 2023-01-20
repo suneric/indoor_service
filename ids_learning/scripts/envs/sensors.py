@@ -295,11 +295,11 @@ class PoseSensor():
         self.model_pos_sub = rospy.Subscriber('/gazebo/model_states', ModelStates, self._model_pose_cb)
         self.robot_pose = None
         self.door_pose = None
-        self.bumper_pose = None
+        self.plug_pose = None
 
     def _link_pose_cb(self,data):
         self.door_pose = data.pose[data.name.index('hinged_door::door')]
-        self.bumper_pose = data.pose[data.name.index('mrobot::link_contact_bp')]
+        self.plug_pose = data.pose[data.name.index('mrobot::link_contact_bp')]
 
     def _model_pose_cb(self,data):
         self.robot_pose = data.pose[data.name.index('mrobot')]
@@ -330,12 +330,20 @@ class PoseSensor():
         door_edge_mat = np.dot(door_mat, np.array(door_edge))
         return math.atan2(door_edge_mat[0,3],door_edge_mat[1,3])
 
-    def bumper(self):
-        bpPos = self.bumper_pose
-        x = bpPos.position.x
-        y = bpPos.position.y
-        z = bpPos.position.z
-        q = bpPos.orientation
+    def robot(self):
+        rPos = self.robot_pose
+        x = rPos.position.x
+        y = rPos.position.y
+        q = rPos.orientation
+        e = tft.euler_from_quaternion([q.x,q.y,q.z,q.w])
+        return (x,y,e)
+
+    def plug(self):
+        pPos = self.plug_pose
+        x = pPos.position.x
+        y = pPos.position.y
+        z = pPos.position.z
+        q = pPos.orientation
         e = tft.euler_from_quaternion([q.x,q.y,q.z,q.w])
         return (x,y,z,e)
 
