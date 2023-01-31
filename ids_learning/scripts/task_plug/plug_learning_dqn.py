@@ -27,6 +27,7 @@ def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--max_ep', type=int, default=10000)
     parser.add_argument('--max_step', type=int ,default=50)
+    parser.add_argument('--agent', type=str, default=None)
     return parser.parse_args()
 
 def save_model(agent, model_dir, name):
@@ -51,6 +52,10 @@ if __name__=="__main__":
 
     buffer = ReplayBuffer(image_shape,force_dim,joint_dim,action_dim,capacity=50000,batch_size=64)
     agent = DQN(image_shape,force_dim,joint_dim,action_dim,gamma=0.99,lr=2e-4,update_freq=500)
+    if args.agent is not None:
+        agent_dir = os.path.join(sys.path[0],'../policy/socket_plug/',args.agent,'q_net/6900')
+        agent.load(agent_dir)
+        print("load agent from", agent_dir)
 
     ep_ret_list, avg_ret_list = [], []
     epsilon, epsilon_stop, decay = 0.99, 0.1, 0.999
