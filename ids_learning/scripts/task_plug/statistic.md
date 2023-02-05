@@ -1,28 +1,25 @@
 # Test Results
 
-## Environment: office room with 4 wall outlets (2 types, NEMA 15R and NEMA 20R)
-## 8 receptacles in total, with upper and lower in one wall outlet
+## Environment:
+- office room with 4 wall outlets (2 types, NEMA 15R and NEMA 20R), Outlet 1 and Outlet 2 are used in training, Outlet 3 and Outlet 4 are not used in training.
+- 8 receptacles in total, with upper and lower in one wall outlet
 
-## two policies
+## policies
+- random action
 - raw image of first-look, gray-scaled
 - binary image with detected bounding box
 
 ## Metrics
-### Binary Vision 85.83%, unseen 86.67%, seen 85%
-- outlet 1, receptacle upper: 28/30 success (0.93), 8.857 steps average
-- outlet 1, receptacle lower: 24/30 success (0.8), 11.583 steps average
-- **outlet 2, receptacle upper: 27/30 success (0.9), 14.185 steps average**
-- **outlet 2, receptacle lower: 26/30 success (0.86), 10.269 steps average**
-- **outlet 3, receptacle upper: 26/30 success (0.86), 8.69 steps average**
-- **outlet 3, receptacle lower: 23/30 success (0.76), 11.56 steps average**
-- outlet 4, receptacle upper: 26/30 success (0.86), 13.038 steps average
-- outlet 4, receptacle lower: 26/30 success (0.86), 13.115 steps average
-### Raw Vision 87.91% , unseen 80.83%, seen 95%
-- outlet 1, receptacle upper: 29/30 success (0.96),  9.448 steps average
-- outlet 1, receptacle lower: 17/30 success (0.56),  11.411 steps average
-- **outlet 2, receptacle upper: 29/30 success (0.96),  12.689 steps average**
-- **outlet 2, receptacle lower: 28/30 success (0.93),  10.107 steps average**
-- **outlet 3, receptacle upper: 29/30 success (0.96),  12.482 steps average**
-- **outlet 3, receptacle lower: 28/30 success (0.93),  11.07 steps average**
-- outlet 4, receptacle upper:  24/30 success (0.8),  10.708 steps average
-- outlet 4, receptacle lower:  27/30 success (0.9),  8.518 steps average
+### iteration 6850, 30 maximum tries
+| Policy | **O1U** | **O1L** | **O2U** | **O2L** | O3U | O3L | O4U | O4L | **Train** | Test | Overall | Avg. Dist2Goal (mm) | Avg. TrajLen (mm) |
+|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+| Random | 6 | 3 | 5 | 5 | 2 | 1 | 8 | 5 | 16.83% | 13.33% | 14.58% | - | - |
+| Grey | 29 | 30 | 27 | 28 | 25 | 18 | 27 | 27 | 95% | 80.83% | 87.92% | - | - |
+| Binary | 27 | 23 | 29 | 26 | 27 | 24 | 27 | 30 | 87.5% | 90% | 88.75% | - | - |
+
+### iteration 6850, 50 maximum tries
+| Policy | **O1U** | **O1L** | **O2U** | **O2L** | O3U | O3L | O4U | O4L | **Train** | Test | Overall | Avg. Dist2Goal (mm) | Avg. TrajLen (mm) |
+|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+| Random | 5 | 5 | 3 | 6 | 4 | 7 | 5 | 3 | 9.5% | 9.5% | 9.5% | 3.348 | 17.3 |
+| Grey | 48 | 44 | 50 | 47 | 42 | 32 | 47 | 42 | 94.5% | 81.5% | 88% | 4.49 | 10.85 |
+| Binary | 42 | 39 | 43 | 46 | 43 | 40 | 41 | 41 | 85% | 82.5% | 83.75% | 4.29 | 11.48 |

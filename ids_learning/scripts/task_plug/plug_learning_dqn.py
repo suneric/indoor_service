@@ -43,6 +43,7 @@ if __name__=="__main__":
     summaryWriter = tf.summary.create_file_writer(model_dir)
 
     env = SocketPlugEnv(continuous=False)
+    env.set_vision_type('binary')
     # env.set_goal(1)
     image_shape = env.observation_space[0]
     force_dim = env.observation_space[1]

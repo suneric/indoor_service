@@ -20,12 +20,12 @@ PIN_OFFSET_Z = 0.00636 # the circular pin offset in z to the center of the plug
 socket holes (goal) in x-y-z
 """
 # goalList = [(1.63497,2.992,0.35454),(1.63497,2.992,0.31551)] # NEMA-R15
-goalList = [(1.63497,2.992,0.35454),(1.63497,2.992,0.31551), # NEMA-R15
-            (2.43497,2.992,0.35454),(2.43497,2.992,0.31551)] # NEMA-R20
-# goalList = [(0.83497,2.992,0.35454),(0.83497,2.992,0.31551), # all 8 cases
-#             (1.63497,2.992,0.35454),(1.63497,2.992,0.31551),
-#             (2.43497,2.992,0.35454),(2.43497,2.992,0.31551),
-#             (3.23497,2.992,0.35454),(3.23497,2.992,0.31551)]
+# goalList = [(1.63497,2.992,0.35454),(1.63497,2.992,0.31551), # NEMA-R15
+#             (2.43497,2.992,0.35454),(2.43497,2.992,0.31551)] # NEMA-R20
+goalList = [(0.83497,2.992,0.35454),(0.83497,2.992,0.31551), # all 8 cases
+            (1.63497,2.992,0.35454),(1.63497,2.992,0.31551),
+            (2.43497,2.992,0.35454),(2.43497,2.992,0.31551),
+            (3.23497,2.992,0.35454),(3.23497,2.992,0.31551)]
 
 register(
   id='SocketPlugEnv-v0',
@@ -61,6 +61,7 @@ class SocketPlugEnv(GymGazeboEnv):
         self.init_position = None
         self.prev_dist = 0.0
         self.curr_dist = 0.0
+        self.vision_type = None
 
     def _check_all_systems_ready(self):
         self.camera.check_sensor_ready()
@@ -88,6 +89,9 @@ class SocketPlugEnv(GymGazeboEnv):
     def set_goal(self,idx):
         self.goal_index = idx
 
+    def set_vision_type(self,vision_type):
+        self.vision_type = vision_type
+
     def _set_init(self):
         idx = self.goal_index
         if idx is None:
@@ -99,10 +103,13 @@ class SocketPlugEnv(GymGazeboEnv):
         self.reset_robot()
         _, self.prev_dist = self.dist2goal()
         self.curr_dist = self.prev_dist
-        socketInfo = self.socketDetector.getDetectInfo(idx%2)
-        self.obs_image = self.camera.binary_arr((64,64),socketInfo) # detected vision
-        # self.obs_image = self.camera.grey_arr((64,64)) # raw vision
-        # self.obs_image = self.camera.zero_arr((64,64)) # no vision
+        if self.vision_type == 'binary':
+            socketInfo = self.socketDetector.getDetectInfo(idx%2)
+            self.obs_image = self.camera.binary_arr((64,64),socketInfo) # detected vision
+        elif self.vision_type == 'raw':
+            self.obs_image = self.camera.grey_arr((64,64)) # raw vision
+        else:
+            self.obs_image = self.camera.zero_arr((64,64)) # no vision
         self.obs_force = self.ftSensor.forces()
         self.obs_joint = self.plug_joint()
 

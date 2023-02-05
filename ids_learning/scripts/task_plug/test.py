@@ -175,33 +175,32 @@ class SocketPlugFullTest:
         dist2 = np.sqrt((bpPos[0]-self.goal[0])**2 + (bpPos[2]-self.goal[2])**2)
         return dist1, dist2
 
-
+"""
+TEST socket plug
+"""
 class SocketPlugTest:
-    def __init__(self, env, type='ppo', iter=3000):
+    def __init__(self,env,type=None,policy=None,iter=0):
         self.env = env
         self.agent_type = type
-        self.load_agent(type, iter)
+        self.policy = policy
+        self.load_agent(type,policy,iter)
 
-    def load_agent(self,type,iter):
-        print("agent type", type, "iteration", iter)
-        if type == 'dqn':
-            self.agent = DQN((64,64,1),3,2,8,gamma=0.99,lr=2e-4,update_freq=500)
-            self.agent.load("../policy/socket_plug/raw/q_net/"+str(iter))
-        elif type == 'ppo':
-            self.agent = PPO((64,64,1),3,8,pi_lr=3e-4,q_lr=1e-3,clip_ratio=0.3,beta=1e-3,target_kld=0.001)
-            self.agent.load("../policy/socket_plug/ppo_0/logits_net/"+str(iter),"../policy/socket_plug/ppo_1/val_net/"+str(iter))
-        else:
+    def load_agent(self,type,policy,iter):
+        if policy == 'random':
             self.agent = None
             print("undefined agent")
+        else:
+            self.agent = DQN((64,64,1),3,2,8,gamma=0.99,lr=2e-4,update_freq=500)
+            policy_path = os.path.join(sys.path[0],"../policy/socket_plug/",policy)+'/q_net/'+str(iter)
+            self.agent.load(policy_path)
+            print("load", type, "from", policy_path)
 
     def action(self,obs):
         act = None
-        if self.agent_type == 'dqn':
-            act = self.agent.policy(obs)
-        elif self.agent_type == 'ppo':
-            act, _ = self.agent.policy(obs)
-        else:
+        if self.policy == 'random':
             act = np.random.randint(self.env.action_space.n)
+        else:
+            act = self.agent.policy(obs)
         return act
 
     def run(self, init_rad):
@@ -211,7 +210,7 @@ class SocketPlugTest:
         init = info["plug"]
         positions.append(init)
         done, step = False, 0
-        while not done and step < 60:
+        while not done and step < 50:
             act = self.action(obs)
             obs, rew, done, info = self.env.step(act)
             positions.append(info["plug"])
@@ -225,46 +224,42 @@ def get_args():
     parser.add_argument('--agent', type=str, default=None)
     return parser.parse_args()
 
+"""
+RUN a single test for a policy on a target
+"""
+def run_test(env, agent_type, vision_type, iter, target, init_rads):
+    print("run test", agent_type, vision_type, iter, target, init_rads)
+    data_dir = os.path.join(sys.path[0],'data',vision_type+'_'+str(target))
+    try_count = len(init_rads)
+    test = SocketPlugTest(env=env,type=agent_type,policy=vision_type,iter=iter)
+    success_steps, results = [],[]
+    for i in range(try_count):
+        success, step, forces, positions, init = test.run(init_rads[i])
+        pd.DataFrame(forces).to_csv(data_dir+'/forces_'+str(i)+'.csv', index=False)
+        pd.DataFrame(positions).to_csv(data_dir+'/positions_'+str(i)+'.csv', index=False)
+        if success:
+            success_steps.append(step)
+        results.append((success,init[0],init[1],init[2],init[3],step))
+        print("plug", i+1, "/", try_count, "steps", step, "success", success, "success_counter", len(success_steps))
+    pd.DataFrame(results).to_csv(data_dir+'/test_data.csv', index=False)
+    print("sucess rate", len(success_steps)/try_count, "average steps", np.mean(success_steps))
+    return len(success_steps), np.mean(success_steps)
+
 if __name__ == '__main__':
     args = get_args()
     rospy.init_node('dqn_test', anonymous=True)
-    env = SocketPlugEnv(continuous=False)
-    env.set_goal(7)
+    # binary = 6850, raw = 6700
+    target_count,try_count = 8,30
+    rads = np.random.uniform(size=(target_count,try_count,4))
+    vision_inputs = ['raw','binary']
     test_res = []
-    # binary = 6850
-    # raw = 6700
-    start_iter, end_iter = 6700, 6700
-    try_count = 30
-    policy_iter = start_iter
-    test_cases = [] # specific test case
-    while policy_iter >= end_iter:
-        test = SocketPlugTest(env=env,type=args.agent,iter=policy_iter)
-        success_counter = 0
-        success_steps = []
-        for i in range(try_count):
-            rad = np.random.uniform(size=4)
-            success, step, forces, positions, init = test.run(rad)
-            if success:
-                success_counter += 1
-                success_steps.append(step)
-            print("plug", i+1, "/", try_count, "steps", step, "success", success, "success_counter", success_counter)
-            test_cases.append((success, init, step, forces, positions))
-        print("sucess rate", success_counter/try_count, "average steps", np.mean(success_steps))
-        test_res.append((policy_iter, success_counter, np.mean(success_steps)))
-        policy_iter -= 50
-    print("results")
-    for res in test_res:
-        print(res[0], "success count", res[1], "rate", res[1]/try_count, "average steps in success", res[2])
+    env = SocketPlugEnv(continuous=False)
+    for vision_input in vision_inputs:
+        env.set_vision_type(vision_input)
+        for i in range(target_count):
+            env.set_goal(i)
+            success_count, mean_steps = run_test(env,'dqn',vision_input,6850,i,rads[i])
+            test_res.append((vision_input,i,success_count,mean_steps))
 
-    #record results
-    results = []
-    for i in range(len(test_cases)):
-        case = test_cases[i]
-        data = [case[0],case[1][0],case[1][1],case[1][2],case[1][3],case[2]]
-        results.append(data)
-        forces = pd.DataFrame(case[3])
-        forces.to_csv('data/forces_'+str(i)+'.csv', index=False)
-        positions = pd.DataFrame(case[4])
-        positions.to_csv('data/positions_'+str(i)+'.csv', index=False)
-    df = pd.DataFrame(results)
-    df.to_csv('data/test_data.csv', index=False)
+    for res in test_res:
+        print("vision input", res[0], "target outlet", res[1], "success count", res[2], "average steps", res[3])
