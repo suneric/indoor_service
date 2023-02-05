@@ -251,7 +251,7 @@ if __name__ == '__main__':
     # binary = 6850, raw = 6700
     target_count,try_count = 8,30
     rads = np.random.uniform(size=(target_count,try_count,4))
-    vision_inputs = ['raw','binary']
+    vision_inputs = ['binary']
     test_res = []
     env = SocketPlugEnv(continuous=False)
     for vision_input in vision_inputs:
