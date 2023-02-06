@@ -348,9 +348,10 @@
             </mesh>
           </geometry>
           <material>
-            <script>
-              <uri>file://media/materials/obj/NEMA5-15R-Gray.mtl</uri>
-            </script>
+          <script>
+            <uri>file://media/materials/scripts/Gazebo.material</uri>
+            <name>Gazebo/Grey</name>
+          </script>
           </material>
         </visual>
         <collision name="collision_socket_1">
@@ -381,7 +382,8 @@
           </geometry>
           <material>
             <script>
-              <uri>file://media/materials/obj/NEMA5-15R-Gray.mtl</uri>
+              <uri>file://media/materials/scripts/Gazebo.material</uri>
+              <name>Gazebo/Red</name>
             </script>
           </material>
         </visual>
@@ -414,7 +416,8 @@
           </geometry>
           <material>
             <script>
-              <uri>file://media/materials/obj/NEMA5-15R-Beige.mtl</uri>
+              <uri>file://media/materials/scripts/Gazebo.material</uri>
+              <name>Gazebo/Black</name>
             </script>
           </material>
         </visual>
@@ -447,7 +450,8 @@
           </geometry>
           <material>
             <script>
-              <uri>file://media/materials/obj/NEMA5-15-20R-White.mtl</uri>
+              <uri>file://media/materials/scripts/Gazebo.material</uri>
+              <name>Gazebo/Orange</name>
             </script>
           </material>
         </visual>
@@ -480,7 +484,8 @@
           </geometry>
           <material>
             <script>
-              <uri>file://media/materials/obj/NEMA5-15-20R-Zinc.mtl</uri>
+              <uri>file://media/materials/scripts/Gazebo.material</uri>
+              <name>Gazebo/Green</name>
             </script>
           </material>
         </visual>

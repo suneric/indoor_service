@@ -3,3 +3,4 @@
 *.pyc
 logs
 saved_models
+data
