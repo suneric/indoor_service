@@ -383,7 +383,7 @@
           <material>
             <script>
               <uri>file://media/materials/scripts/Gazebo.material</uri>
-              <name>Gazebo/Red</name>
+              <name>Gazebo/Blue</name>
             </script>
           </material>
         </visual>
@@ -417,7 +417,7 @@
           <material>
             <script>
               <uri>file://media/materials/scripts/Gazebo.material</uri>
-              <name>Gazebo/Black</name>
+              <name>Gazebo/FlatBlack</name>
             </script>
           </material>
         </visual>
@@ -485,7 +485,7 @@
           <material>
             <script>
               <uri>file://media/materials/scripts/Gazebo.material</uri>
-              <name>Gazebo/Green</name>
+              <name>Gazebo/Indigo</name>
             </script>
           </material>
         </visual>
