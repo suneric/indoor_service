@@ -106,7 +106,7 @@ class SocketPlugEnv(GymGazeboEnv):
         if self.vision_type == 'binary':
             socketInfo = self.socketDetector.getDetectInfo(idx%2)
             self.obs_image = self.camera.binary_arr((64,64),socketInfo) # detected vision
-        elif self.vision_type == 'raw':
+        elif self.vision_type == 'greyscale':
             self.obs_image = self.camera.grey_arr((64,64)) # raw vision
         else:
             self.obs_image = self.camera.zero_arr((64,64)) # no vision

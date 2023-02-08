@@ -19,7 +19,7 @@ import pandas as pd
 np.random.seed(111)
 
 class SocketPlugFullTest:
-    def __init__(self):
+    def __init__(self, agent, policy, index):
         self.camera = RSD435('camera')
         self.ftSensor = FTSensor('ft_endeffector')
         self.bpSensor = BumpSensor('bumper_plug')
@@ -28,9 +28,6 @@ class SocketPlugFullTest:
         self.fdController = FrameDeviceController()
         self.robotPoseReset = RobotPoseReset(self.poseSensor)
         self.socketDetector = ObjectDetector(topic='detection',type=4)
-        self.agent = DQN((64,64,1),3,8,gamma=0.99,lr=2e-4,update_freq=500)
-        self.agent.load("../policy/socket_plug/dqn/q_net/last")
-        print(self.agent.q.summary())
         self.goal = [1.0350,2.97,0.3606]
         self.success = False
         self.fail = False
@@ -179,29 +176,28 @@ class SocketPlugFullTest:
 TEST socket plug
 """
 class SocketPlugTest:
-    def __init__(self,env,type=None,policy=None,iter=0):
+    def __init__(self,env,agent=None,policy=None,index=None):
         self.env = env
-        self.agent_type = type
+        self.agent = agent
         self.policy = policy
-        self.load_agent(type,policy,iter)
+        self.load_model(agent,policy,index)
 
-    def load_agent(self,type,policy,iter):
-        if policy == 'random':
-            self.agent = None
-            print("undefined agent")
+    def load_model(self,agent,policy,index):
+        if agent == 'dqn':
+            model_path = os.path.join(sys.path[0],"../policy/socket_plug/")+policy+"/q_net/"+str(index)
+            print("load model from", model_path)
+            self.model = DQN((64,64,1),3,2,8,gamma=0.99,lr=2e-4,update_freq=500)
+            self.model.load(model_path)
         else:
-            self.agent = DQN((64,64,1),3,2,8,gamma=0.99,lr=2e-4,update_freq=500)
-            policy_path = os.path.join(sys.path[0],"../policy/socket_plug/",policy)+'/q_net/'+str(iter)
-            self.agent.load(policy_path)
-            print("load", type, "from", policy_path)
+            print("undefined agent")
+            self.model = None
+
 
     def action(self,obs):
-        act = None
-        if self.policy == 'random':
-            act = np.random.randint(self.env.action_space.n)
+        if self.agent is None:
+            return np.random.randint(self.env.action_space.n)
         else:
-            act = self.agent.policy(obs)
-        return act
+            return self.model.policy(obs)
 
     def run(self, init_rad):
         positions = []
@@ -221,17 +217,26 @@ class SocketPlugTest:
 
 def get_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--agent', type=str, default=None)
+    parser.add_argument('--type', type=str, default='plug') # 'plug','full'
+    parser.add_argument('--agent', type=str, default='dqn') # dqn, ppo, none
+    parser.add_argument('--policy', type=str, default=None) # binary, greyscale, blind
+    parser.add_argument('--iter', type=int, default=6850) # binary 6850, raw 6700
     return parser.parse_args()
 
 """
-RUN a single test for a policy on a target
+RUN full test
 """
-def run_test(env, agent_type, vision_type, iter, target, init_rads):
-    print("run test", agent_type, vision_type, iter, target, init_rads)
-    data_dir = os.path.join(sys.path[0],'data',vision_type+'_'+str(target))
+
+"""
+RUN a single plug test for a policy on a target
+"""
+def run_plug_test(env, agent, policy, index, target, init_rads):
+    print("run plug test", agent, policy, index, target)
+    data_dir = os.path.join(sys.path[0],'data',policy+'_'+str(target))
+    if not os.path.exists(data_dir):
+        os.mkdir(data_dir)
     try_count = len(init_rads)
-    test = SocketPlugTest(env=env,type=agent_type,policy=vision_type,iter=iter)
+    test = SocketPlugTest(env,agent,policy,index)
     success_steps, results = [],[]
     for i in range(try_count):
         success, step, forces, positions, init = test.run(init_rads[i])
@@ -247,19 +252,25 @@ def run_test(env, agent_type, vision_type, iter, target, init_rads):
 
 if __name__ == '__main__':
     args = get_args()
-    rospy.init_node('dqn_test', anonymous=True)
-    # binary = 6850, raw = 6700
-    target_count,try_count = 8,30
-    rads = np.random.uniform(size=(target_count,try_count,4))
-    vision_inputs = ['binary', 'raw']
-    test_res = []
-    env = SocketPlugEnv(continuous=False)
-    for vision_input in vision_inputs:
-        env.set_vision_type(vision_input)
-        for i in range(target_count):
-            env.set_goal(i)
-            success_count, mean_steps = run_test(env,'dqn',vision_input,6850,i,rads[i])
-            test_res.append((vision_input,i,success_count,mean_steps))
+    rospy.init_node('plug_test', anonymous=True)
+    if args.type == 'plug':
+        target_count,try_count = 8,30
+        rads = np.random.uniform(size=(target_count,try_count,4))
+        policy_list = []
+        if args.policy is None:
+            policy_list = ['binary', 'greyscale', 'blind', 'raw']
+        else:
+            policy_list = [args.policy]
 
-    for res in test_res:
-        print("vision input", res[0], "target outlet", res[1], "success count", res[2], "average steps", res[3])
+        test_res = []
+        env = SocketPlugEnv(continuous=False)
+        for policy in policy_list:
+            env.set_vision_type(policy)
+            for i in range(target_count):
+                env.set_goal(i)
+                success_count, mean_steps = run_plug_test(env,args.agent,policy,args.iter,i,rads[i])
+                test_res.append((policy,i,success_count,mean_steps))
+        for res in test_res:
+            print("policy", res[0], "target outlet", res[1], "success count", res[2], "average steps", res[3])
+    else:
+        print("undefined test")
