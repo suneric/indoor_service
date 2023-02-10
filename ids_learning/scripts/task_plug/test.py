@@ -5,81 +5,92 @@ sys.path.append('.')
 import numpy as np
 import rospy
 import os
-from envs.sensors import RSD435, FTSensor, PoseSensor, ObjectDetector, BumpSensor
-from envs.joints_controller import FrameDeviceController
-from envs.robot_driver import RobotDriver, RobotPoseReset
+from envs.mrobot import MRobot
 from agents.dqn import DQN
 from agents.ppo import PPO
-from envs.socket_plug_env import SocketPlugEnv
+from envs.env_socket_plug import SocketPlugEnv
 import argparse
 import matplotlib.pyplot as plt
 import csv
 import pandas as pd
 
-np.random.seed(111)
+# np.random.seed(111)
 
+"""
+Test full plugging process
+"""
 class SocketPlugFullTest:
-    def __init__(self, agent, policy, index):
+    def __init__(self, model):
+        self.model = model
         self.camera = RSD435('camera')
         self.ftSensor = FTSensor('ft_endeffector')
-        self.bpSensor = BumpSensor('bumper_plug')
         self.poseSensor = PoseSensor()
         self.driver = RobotDriver()
         self.fdController = FrameDeviceController()
         self.robotPoseReset = RobotPoseReset(self.poseSensor)
         self.socketDetector = ObjectDetector(topic='detection',type=4)
-        self.goal = [1.0350,2.97,0.3606]
-        self.success = False
-        self.fail = False
+        self.outletDetector = ObjectDetector(topic='detection',type=3)
 
-    def init_test(self,x,y,yaw):
-        print("init test")
-        self.robotPoseReset.reset_robot(x,y,yaw)
-        self.fdController.move_hslider_to(0.0)
-        self.fdController.move_vslider_to(0.0)
-        self.fdController.move_hook_to(1.57)
-        self.fdController.move_plug_to(0.03)
+    def robot_pose(self):
+        pos = self.poseSensor.robot()
+        noise = np.random.uniform(size=3)
+        x = pos[0] + 0.1*(noise[0]-0.5) # position noise = 0.1 m
+        y = pos[1] + 0.1*(noise[1]-0.5) # position noise = 0.1 m
+        yaw = pos[2][2] + 0.1*(noise[2]-0.5) # orientation noise = 0.1 rad
+        return x,y,yaw
+
+    def reset(self,rx,ry,rt):
+        print("reset robot",rx,ry,rt)
+        self.driver.stop()
+        self.robotPoseReset.reset_robot(rx,ry,rt)
+        self.fdController.set_position(hk=1.57,vs=0,hs=0,pg=0.03)
         self.fdController.lock_hook()
         self.fdController.lock_plug()
+        self.socketDetector.reset()
+        self.outletDetector.reset()
 
-    def end_test(self):
-        print("end test")
+    def terminate(self):
+        print("terminate test.")
         self.fdController.unlock_hook()
         self.fdController.unlock_plug()
 
-    def run(self,rx,ry,rt):
-        self.init_test(rx,ry,rt)
-        detect = self.search_target(vel=-1.0)
-        detect = self.align_normal(detect,tolerance=0.002)
-        detect = self.align_endeffector(detect)
-        detect = self.move_closer(detect,distance=0.8)
-        detect = self.align_normal(detect,tolerance=0.001)
-        detect = self.align_endeffector(detect)
-        detect = self.approach(detect,distance=0.2)
-        isSuccess = self.perform_plug()
-        self.end_test()
-        return isSuccess
-
-    def search_target(self,vel):
-        print("searching socket")
+    def search_outlet(self,vz):
+        print("searching outlet")
         self.driver.stop()
+        rospy.sleep(1)
         rate = rospy.Rate(10)
-        while self.socketDetector.info == None:
-            self.driver.drive(vel,0.0)
+        while not self.outletDetector.ready():
+            self.driver.drive(0.0,vz)
             rate.sleep()
+        # put the target in center of view
+        last = self.outletDetector.get_detect_info()[-1]
+        cx = 0.5*(last.l+last.r)
+        while abs(cx-320) > 10:
+            self.driver.drive(0.0, np.sign(320-cx)*vz)
+            last = self.outletDetector.get_detect_info()[-1]
+            cx = 0.5*(last.l+last.r)
         self.driver.stop()
-        return self.socketDetector.get_upper()
+        # calculate target position
+        dist2outlet = last.z
+        rx, ry, rt = self.robot_pose()
+        ox = rx + dist2outlet*np.cos(rt)
+        oy = ry + dist2outlet*np.sin(rt)
+        print("robot at ({:.3f},{:.3f}) with yaw {:.3f}, detected outlet at ({:.3f},{:.3f}) with normal {:.3f}".format(rx,ry,rt,ox,oy,last.nx))
+        return (ox,oy)
 
-    def align_normal(self,info,tolerance=0.01):
-        print("aligning normal")
-        detect = info
-        rate = rospy.Rate(10)
+    def align_with_outlet(self,outlet,tolerance=0.01):
+        print("aligning with outlet")
+        detect = outlet
         while abs(detect.nx) > tolerance:
-            self.driver.drive(0.0, np.sign(detect.nx)*0.5)
-            detect = self.socketDetector.info
-            rate.sleep()
+            self.driver.drive(0.0, -np.sign(detect.nx)*2*np.pi)
+            rospy.sleep(5)
+            self.driver.drive(2.0, 0.0)
+            rospy.sleep(3)
+            self.driver.drive(0.0, np.sign(detect.nx)*2*np.pi)
+            rospy.sleep(3)
+            detect = self.outletDetector.get_detect_info()[-1]
         self.driver.stop()
-        return self.search_target(vel=0.2)
+        return detect
 
     def align_endeffector(self,detect):
         print("aligning endeffector")
@@ -172,6 +183,40 @@ class SocketPlugFullTest:
         dist2 = np.sqrt((bpPos[0]-self.goal[0])**2 + (bpPos[2]-self.goal[2])**2)
         return dist1, dist2
 
+    def run(self,rx,ry,rt):
+        self.reset(rx,ry,rt)
+        outletPos = self.search_outlet(vz=2*np.pi)
+        # outlet = self.align_with_outlet(outletPos,tolerance=0.005)
+        # detect = self.align_endeffector(detect)
+        # detect = self.move_closer(detect,distance=0.8)
+        # detect = self.align_normal(detect,tolerance=0.001)
+        # detect = self.align_endeffector(detect)
+        # detect = self.approach(detect,distance=0.2)
+        # isSuccess = self.perform_plug()
+        self.terminate()
+        return
+
+"""
+RUN full test
+"""
+def run_full_test(agent, policy, index, rad):
+    print("run full test", agent, policy, index)
+    if agent != 'dqn':
+        print("undefined agent type")
+        return
+
+    model_path = os.path.join(sys.path[0],"../policy/socket_plug/")+policy+"/q_net/"+str(index)
+    print("load model from", model_path)
+    model = DQN((64,64,1),3,2,8,gamma=0.99,lr=2e-4,update_freq=500)
+    model.load(model_path)
+    test = SocketPlugFullTest(model)
+    rx = 2 + 2*(rad[0]-0.5)
+    ry = 1 + (rad[1]-0.5)
+    rt = 2*np.pi*(rad[2]-0.5)
+    test.run(rx,ry,rt)
+    print("terminated")
+
+
 """
 TEST socket plug
 """
@@ -211,21 +256,9 @@ class SocketPlugTest:
             obs, rew, done, info = self.env.step(act)
             positions.append(info["plug"])
             if step == 0:
-                self.env.ftSensor.reset()
+                self.env.robot.ftPlug.reset()
             step += 1
-        return self.env.success, step, self.env.ftSensor.record, positions, init
-
-def get_args():
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--type', type=str, default='plug') # 'plug','full'
-    parser.add_argument('--agent', type=str, default='dqn') # dqn, ppo, none
-    parser.add_argument('--policy', type=str, default=None) # binary, greyscale, blind
-    parser.add_argument('--iter', type=int, default=6850) # binary 6850, raw 6700
-    return parser.parse_args()
-
-"""
-RUN full test
-"""
+        return self.env.success, step, self.env.robot.ftPlug.record, positions, init
 
 """
 RUN a single plug test for a policy on a target
@@ -250,6 +283,14 @@ def run_plug_test(env, agent, policy, index, target, init_rads):
     print("sucess rate", len(success_steps)/try_count, "average steps", np.mean(success_steps))
     return len(success_steps), np.mean(success_steps)
 
+def get_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--type', type=str, default='plug') # 'plug','full'
+    parser.add_argument('--agent', type=str, default='dqn') # dqn, ppo, none
+    parser.add_argument('--policy', type=str, default='binary') # binary, greyscale, blind
+    parser.add_argument('--iter', type=int, default=6850) # binary 6850, raw 6700
+    return parser.parse_args()
+
 if __name__ == '__main__':
     args = get_args()
     rospy.init_node('plug_test', anonymous=True)
@@ -267,10 +308,12 @@ if __name__ == '__main__':
         for policy in policy_list:
             env.set_vision_type(policy)
             for i in range(target_count):
-                env.set_goal(i)
+                env.set_goal(2)
                 success_count, mean_steps = run_plug_test(env,args.agent,policy,args.iter,i,rads[i])
                 test_res.append((policy,i,success_count,mean_steps))
         for res in test_res:
             print("policy", res[0], "target outlet", res[1], "success count", res[2], "average steps", res[3])
     else:
-        print("undefined test")
+        print("full plugging test")
+        rad = np.random.uniform(size=3)
+        run_full_test(args.agent,args.policy,args.iter,rad)

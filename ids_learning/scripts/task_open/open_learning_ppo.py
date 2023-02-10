@@ -8,8 +8,8 @@ import numpy as np
 import argparse
 from datetime import datetime
 import os
-from envs.door_open_env import DoorOpenEnv
-from agents.ppo import PPO, ReplayBuffer
+from envs.env_door_open import DoorOpenEnv
+from agents.ppo_1 import PPO, ReplayBuffer
 import matplotlib.pyplot as plt
 
 """

@@ -6,9 +6,8 @@ from .gym_gazebo_env import GymGazeboEnv
 from gym.envs.registration import register
 import tf.transformations as tft
 import math
-from .sensors import ArduCam, RSD435, FTSensor, PoseSensor
-from .robot_driver import RobotDriver, RobotPoseReset, RobotConfig
-from .joints_controller import FrameDeviceController
+from .mrobot import MRobot
+from .sensors import PoseSensor
 from gym.spaces import Box, Discrete
 
 register(
@@ -21,14 +20,10 @@ class DoorOpenEnv(GymGazeboEnv):
             start_init_physics_parameters=False,
             reset_world_or_sim="WORLD"
         )
-        self.continuous = continuous
-        self.camera = ArduCam('arducam')
-        self.ftSensor = FTSensor('ft_sidebar')
+        self.door_length = door_length
+        self.robot = MRobot()
         self.poseSensor = PoseSensor()
-        self.driver = RobotDriver()
-        self.robotConfig = RobotConfig()
-        self.fdController = FrameDeviceController()
-        self.robotPoseReset = RobotPoseReset(self.poseSensor)
+        self.continuous = continuous
         self.success = False
         self.fail = False
         self.safe = True
@@ -39,15 +34,11 @@ class DoorOpenEnv(GymGazeboEnv):
         self.observation_space = ((64,64,1),3) # image and force
         self.obs_image = None
         self.obs_force = None
-        self.door_length = door_length
         self.prev_angle = 0
         self.curr_angle = 0
 
     def _check_all_systems_ready(self):
-        self.camera.check_sensor_ready()
-        self.ftSensor.check_sensor_ready()
-        self.driver.check_publisher_connection()
-        self.fdController.check_publisher_connection()
+        self.robot.check_ready()
         print("System READY")
 
     def _get_observation(self):
@@ -61,29 +52,26 @@ class DoorOpenEnv(GymGazeboEnv):
         )
 
     def _set_init(self):
+        self.reset_robot()
         self.success = False
         self.fail = False
         self.safe = True
-        self.ftSensor.reset()
-        self.reset_robot()
         self.prev_angle = self.poseSensor.door_angle()
         self.curr_angle = self.poseSensor.door_angle()
-        # get observation
-        self.obs_image = self.camera.grey_arr((64,64))
-        self.obs_force = self.ftSensor.forces()
+        self.obs_image = self.robot.ard_vision(size=(64,64),type='greyscale')
+        self.obs_force = self.robot.hook_forces()
 
     def _take_action(self, action):
+        self.robot.ftHook.reset_temp()
         act = self.get_action(action)
-        # print(act)
-        self.ftSensor.reset_temp()
-        self.driver.drive(act[0],act[1])
-        rospy.sleep(1) # command in 1 Hz
+        self.robot.move(act[0],act[1])
+        rospy.sleep(1)
         self.curr_angle = self.poseSensor.door_angle()
-        self.obs_image = self.camera.grey_arr((64,64))
-        self.obs_force = self.ftSensor.forces()
+        self.obs_image = self.robot.ard_vision(size=(64,64),type='greyscale')
+        self.obs_force = self.robot.hook_forces()
         self.success = self.curr_angle > 0.45*math.pi # 81 degree
         self.fail = self.is_failed()
-        self.safe = self.is_safe(self.ftSensor.temp_record())
+        self.safe = self.is_safe(self.robot.ftHook.temp_record())
 
     def _is_done(self):
         return self.success or self.fail
@@ -101,23 +89,33 @@ class DoorOpenEnv(GymGazeboEnv):
         return reward
 
     def reset_robot(self):
-        self.driver.stop()
-        # wait door close
+        self.robot.stop()
         while self.poseSensor.door_angle() > 0.11:
-            rospy.sleep(0.5)
+            rospy.sleep(0.5) # wait door close
         # reset robot position with a random camera position
         rad = np.random.uniform(size=3)
         cx = 0.01*(rad[0]-0.5) + 0.025
         cy = 0.01*(rad[1]-0.5) + self.door_length + 0.045
         theta = 0.1*math.pi*(rad[2]-0.5) + math.pi
-        rx, ry, rt = self.robotConfig.robot_pose(cx,cy,theta)
-        self.robotPoseReset.reset_robot(rx,ry,rt)
-        # reset frame device
-        self.fdController.set_position(hk=0.0,vs=0.75,hs=0.13,pg=0.0)
-        self.fdController.lock_hook()
-        self.fdController.lock_vslider()
-        self.fdController.lock_hslider()
-        self.fdController.lock_plug()
+        rx, ry, rt = self.robot_init_pose(cx,cy,theta)
+        self.robot.reset_robot(rx,ry,rt)
+        self.robot.reset_joints(vpos=0.75,hpos=0.13,spos=0,ppos=0)
+        self.robot.lock_joints(v=True,h=True,s=True,p=True)
+        self.robot.reset_ft_sensors()
+        print("reset robot")
+
+    def robot_init_pose(self,cx,cy,theta):
+        """
+        given a camera pose, evaluate robot pose, only for reset robot
+        """
+        camera_offset = (0.49,-0.19)
+        robot_length = 0.5
+        cam_pose = [[math.cos(theta),math.sin(theta),0,cx],[-math.sin(theta),math.cos(theta),0,cy],[0,0,1,0.75],[0,0,0,1]]
+        robot_to_cam_mat = [[1,0,0,camera_offset[0]],[0,1,0,camera_offset[1]],[0,0,1,0],[0,0,0,1]]
+        R = np.dot(np.array(cam_pose),np.linalg.inv(np.array(robot_to_cam_mat)))
+        E = tft.euler_from_matrix(R[0:3,0:3],'rxyz')
+        rx, ry, rt = R[0,3], R[1,3], E[2]
+        return rx, ry, rt
 
     def is_safe(self, record, max=70):
         """

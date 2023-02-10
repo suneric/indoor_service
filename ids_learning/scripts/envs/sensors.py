@@ -8,10 +8,53 @@ import sensor_msgs.point_cloud2 as pc2
 import skimage
 from geometry_msgs.msg import WrenchStamped
 from gazebo_msgs.msg import ContactsState, ModelStates, LinkStates
-from .filters import KalmanFilter
-from ids_detection.msg import DetectionInfo
 import tf.transformations as tft
 import math
+
+"""
+https://en.wikipedia.org/wiki/Kalman_filter
+https://scipy-cookbook.readthedocs.io/items/KalmanFiltering.html
+"""
+class KalmanFilter:
+    def __init__(self, Q=1e-5, R=1e-4, sz=1):
+        self.Q = Q # process variance
+        self.R = R # estimate of measurment variance
+        self.xhat = np.zeros(sz) # posteri estimate of x
+        self.P = np.zeros(sz) # posteri error estimate
+        self.xhatminus = np.zeros(sz) # priori estimate of x
+        self.Pminus = np.zeros(sz) # priori error estimate
+        self.K = np.zeros(sz) # gain or blending factor
+        #initial guesses
+        self.xhat = 0.0
+        self.P = 1.0
+        self.A = 1
+        self.H = 1
+
+    def update(self,z):
+        # time update
+        self.xhatminus = self.A*self.xhat
+        self.Pminus = self.A*self.P+self.Q
+        # measurment update
+        self.K = self.Pminus/(self.Pminus + self.R)
+        self.xhat = self.xhatminus+self.K*(z-self.H*self.xhatminus)
+        self.P = (1-self.K*self.H)*self.Pminus
+        return self.xhat
+
+"""
+running mean or moving average filter
+"""
+class MovingAverageFilter:
+    def __init__(self, sz=8):
+        self.size = sz
+        self.data = []
+
+    def update(self,z):
+        if len(self.data) < self.size:
+            self.data.append(z)
+        else:
+            self.data.pop(0)
+            self.data.append(z)
+        return np.mean(self.data)
 
 def resize_image(image, shape=None, inter = cv.INTER_AREA):
     """
@@ -152,7 +195,7 @@ class RSD435:
     def zero_arr(self, resolution):
         return np.zeros((resolution[0],resolution[1],1))
 
-    def binary_arr(self,resolution, detectInfo):
+    def binary_arr(self,resolution,detectInfo):
         """
         Generate a binary array for detected area given by the bounding box
         """
@@ -334,9 +377,10 @@ class PoseSensor():
         rPos = self.robot_pose
         x = rPos.position.x
         y = rPos.position.y
+        z = rPos.position.z
         q = rPos.orientation
         e = tft.euler_from_quaternion([q.x,q.y,q.z,q.w])
-        return (x,y,e)
+        return (x,y,z,e)
 
     def plug(self):
         pPos = self.plug_pose
@@ -371,58 +415,3 @@ class PoseSensor():
                 rospy.logdebug("Current  /gazebo/link_states READY=>")
             except:
                 rospy.logerr("Current  /gazebo/link_states not ready yet, retrying for getting  /gazebo/link_states")
-
-class ObjectDetector:
-    def __init__(self, topic, type, max=6):
-        self.sub = rospy.Subscriber(topic, DetectionInfo, self.detect_cb)
-        self.info = []
-        self.type = type
-        self.max_count = max
-
-    def reset(self):
-        self.info = []
-
-    def ready(self):
-        if len(self.info) < self.max_count:
-            return False
-        else:
-            print("object detector ready.")
-            return True
-
-    def detect_cb(self, data):
-        if data.type == self.type:
-            if len(self.info) == self.max_count:
-                self.info.pop(0)
-            self.info.append(data)
-
-    def getDetectInfo(self,idx=0):
-        """
-        idx: 0 for upper, 1 for lower
-        """
-        print("get detected info", idx)
-        infoList = self.getLatestDetection()
-        if len(infoList) == 1:
-            return infoList[0]
-        else:
-            print(infoList[0].t, infoList[0].b, infoList[1].t, infoList[1].b)
-            return infoList[idx]
-
-    def getLatestDetection(self):
-        detected = []
-        for info in self.info:
-            detected.append(info)
-        infoList = [detected[-1]]
-        info = detected[-1]
-        i = len(detected)-2
-        while i >= 0:
-            check = detected[i]
-            if (check.b-info.b)-(info.b-info.t) > 5:
-                infoList.append(check)
-                break
-            elif (info.b-check.b)-(check.b-check.t) > 5:
-                infoList.insert(0,check)
-                break
-            else:
-                info = check
-            i = i-1
-        return infoList

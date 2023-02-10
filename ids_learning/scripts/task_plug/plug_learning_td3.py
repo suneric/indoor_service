@@ -8,7 +8,7 @@ import numpy as np
 import argparse
 from datetime import datetime
 import os
-from envs.socket_plug_env import SocketPlugEnv
+from envs.env_socket_plug import SocketPlugEnv
 from agents.td3 import TD3, ReplayBuffer, GSNoise, OUNoise
 import matplotlib.pyplot as plt
 

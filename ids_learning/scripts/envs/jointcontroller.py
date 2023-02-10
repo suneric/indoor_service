@@ -286,45 +286,37 @@ class FrameDeviceController:
             self.plug.set_pos(pg)
             rospy.sleep(0.5)
 
-    def lock_hook(self, pos=None):
-        if pos is not None:
-            self.move_hook_to(pos)
-        if not self.hook.locked:
+    def lock_hook(self, lock=True):
+        if lock and not self.hook.locked:
             self.hook.lock()
-
-    def unlock_hook(self):
-        if self.hook.locked:
+        elif not lock and self.hook.locked:
             self.hook.unlock()
+        else:
+            return
 
-    def lock_vslider(self, pos=None):
-        if pos is not None:
-            self.move_vslider_to(pos)
-        if not self.vslider.locked:
+    def lock_vslider(self, lock=True):
+        if lock and not self.vslider.locked:
             self.vslider.lock()
-
-    def unlock_vslider(self):
-        if self.vslider.locked:
+        elif not lock and self.vslider.locked:
             self.vslider.unlock()
+        else:
+            return
 
-    def lock_hslider(self, pos=None):
-        if pos is not None:
-            self.move_hslider_to(pos)
-        if not self.hslider.locked:
+    def lock_hslider(self, lock=True):
+        if lock and not self.hslider.locked:
             self.hslider.lock()
-
-    def unlock_hslider(self):
-        if self.hslider.locked:
+        elif not lock and self.hslider.locked:
             self.hslider.unlock()
+        else:
+            return
 
-    def lock_plug(self, pos=None):
-        if pos is not None:
-            self.move_plug_to(pos)
-        if not self.plug.locked:
+    def lock_plug(self, lock=True):
+        if lock and not self.plug.locked:
             self.plug.lock()
-
-    def unlock_plug(self):
-        if self.plug.locked:
+        elif not lock and self.plug.locked:
             self.plug.unlock()
+        else:
+            return
 
     def check_publisher_connection(self):
         self.hook.check_publisher_connection()
