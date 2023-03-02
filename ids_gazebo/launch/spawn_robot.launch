@@ -1,7 +1,8 @@
 <launch>
-  <arg name="name" default="robot"/>
+  <arg name="name" default="mrobot"/>
   <arg name="model" default="$(find ids_description)/urdf/mrobot.urdf.xacro"/>
-  <arg name="tf_prefix" default="$(optenv ROS_NAMESPACE)"/>
+  <arg name="robot_ns" default=""/>
+  <arg name="tf_prefix" default=""/>
 
   <arg name="x" default="1.5"/>
   <arg name="y" default="0.5"/>
@@ -11,11 +12,13 @@
   <arg name="yaw" default="0"/>
 
   <!--load controller-->
-  <include file="$(find ids_control)/launch/device_control.launch"/>
+  <include file="$(find ids_control)/launch/controller.launch">
+    <arg name="robot_ns" value="$(arg robot_ns)"/>
+  </include>
   <include file="$(find ids_detection)/launch/object_detection.launch"/>
 
   <!--spawn mobile robot-->
-  <param name="robot_description" command="$(find xacro)/xacro --inorder '$(arg model)'" />
+  <param name="robot_description" command="$(find xacro)/xacro '$(arg model)' ns:=$(arg robot_ns) tf_prefix:=$(arg tf_prefix)" />
   <node name="urdf_spawner" pkg="gazebo_ros" type="spawn_model" respawn="false" output="screen"
         args="-param robot_description
            -urdf
@@ -25,6 +28,13 @@
            -R $(arg roll)
            -P $(arg pitch)
            -Y $(arg yaw)
-           -model mrobot" />
+           -model $(arg name)" />
+
+  <!--convert joint states to TF transform for rvis, etc-->
+  <node name="robot_state_publisher" pkg="robot_state_publisher" type="robot_state_publisher" respawn="false" output="screen">
+    <param name="publish_frequency" type="double" value="50.0" />
+    <param name="tf_prefix" type="string" value="$(arg tf_prefix)"/>
+    <remap from="joint_states" to="$(arg robot_ns)/joint_states"/>
+  </node>
 
 </launch>

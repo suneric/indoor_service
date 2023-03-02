@@ -1,25 +1,24 @@
-mrobot:
-  # publish all joint states
-  joint_state_controller:
-    type: joint_state_controller/JointStateController
-    publish_rate: 50
+# Joints for frame controlling
+joint_state_controller:
+  type: joint_state_controller/JointStateController
+  publish_rate: 50
 
-  joint_vslider_controller:
-    type: effort_controllers/JointPositionController
-    joint: joint_frame_vslider
-    pid: {p: 100000.0, i: 0.0, d: 10.0}
+joint_vslider_controller:
+  type: effort_controllers/JointPositionController
+  joint: joint_frame_vslider
+  pid: {p: 100000.0, i: 0.0, d: 10.0}
 
-  joint_hslider_controller:
-    type: effort_controllers/JointPositionController
-    joint: joint_vslider_hslider
-    pid: {p: 100000.0, i: 0.0, d: 10.0}
+joint_hslider_controller:
+  type: effort_controllers/JointPositionController
+  joint: joint_vslider_hslider
+  pid: {p: 100000.0, i: 0.0, d: 10.0}
 
-  joint_plug_controller:
-    type: effort_controllers/JointPositionController
-    joint: joint_hslider_plug
-    pid: {p: 100000.0, i: 0.0, d: 10.0}
+joint_plug_controller:
+  type: effort_controllers/JointPositionController
+  joint: joint_hslider_plug
+  pid: {p: 100000.0, i: 0.0, d: 10.0}
 
-  joint_hook_controller:
-    type: effort_controllers/JointPositionController
-    joint: joint_frame_hook
-    pid: {p: 100.0, i: 0.0, d: 10.0}
+joint_hook_controller:
+  type: effort_controllers/JointPositionController
+  joint: joint_frame_hook
+  pid: {p: 100.0, i: 0.0, d: 10.0}

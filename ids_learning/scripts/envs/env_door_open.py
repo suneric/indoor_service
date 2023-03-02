@@ -9,6 +9,7 @@ import math
 from .mrobot import MRobot
 from .sensors import PoseSensor
 from gym.spaces import Box, Discrete
+import cv2 as cv
 
 register(
   id='DoorOpen-v0',
@@ -42,6 +43,8 @@ class DoorOpenEnv(GymGazeboEnv):
         print("System READY")
 
     def _get_observation(self):
+        cv.imshow('observation', self.obs_image)
+        cv.waitKey(1)
         obs = dict(image = self.obs_image, force = self.obs_force)
         return obs
 

@@ -1,0 +1,10 @@
+<launch>
+  <arg name="x" default="1.5"/>
+  <arg name="y" default="0.5"/>
+  <arg name="a" default="0.0"/>
+  <include file="$(find ids_control)/launch/navigation.launch">
+    <arg name="x" value="$(arg x)"/>
+    <arg name="y" value="$(arg y)"/>
+    <arg name="a" value="$(arg a)"/>
+  </include>
+</launch>

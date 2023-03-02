@@ -9,7 +9,7 @@
     <xacro:property name="hook_m" value="0.5"/>
     <xacro:property name="tip_m" value="0.2"/>
 
-    <xacro:macro name="frame_macro" params="parent name *origin">
+    <xacro:macro name="frame_macro" params="parent *origin">
       <joint name="joint_jazzy_frame" type="fixed">
         <xacro:insert_block name="origin"/>
         <parent link="${parent}"/>
@@ -260,9 +260,9 @@
 
       <gazebo>
         <plugin name="gazebo_ros_control" filename="libgazebo_ros_control.so">
-          <robotNamespace>/${name}</robotNamespace>
           <robotSimType>gazebo_ros_control/DefaultRobotHWSim</robotSimType>
           <legacyModeNS>true</legacyModeNS>
+          <robotNamespace>$(arg ns)</robotNamespace>
         </plugin>
       </gazebo>
 
@@ -303,7 +303,7 @@
       <gazebo>
         <plugin name="sidebar_force_sensor" filename="libgazebo_ros_ft_sensor.so">
           <updateRate>100.0</updateRate>
-          <topicName>ft_sidebar</topicName>
+          <topicName>$(arg ns)/ft_sidebar</topicName>
           <jointName>joint_frame_hook</jointName>
           <noise>
             <type>guassian</type>
@@ -316,7 +316,7 @@
       <gazebo>
         <plugin name="endeffector_force_sensor" filename="libgazebo_ros_ft_sensor.so">
           <updateRate>100.0</updateRate>
-          <topicName>ft_endeffector</topicName>
+          <topicName>$(arg ns)/ft_endeffector</topicName>
           <jointName>joint_vslider_hslider</jointName>
           <noise>
             <type>guassian</type>
@@ -331,10 +331,10 @@
             <collision>link_contact_bp_fixed_joint_lump__bump_sensor_collision_collision</collision>
           </contact>
           <plugin name="gazebo_ros_bumper_controller" filename="libgazebo_ros_bumper.so">
-            <bumperTopicName>bumper_plug</bumperTopicName>
-            <frameName>world</frameName>
+            <bumperTopicName>$(arg ns)/bumper_plug</bumperTopicName>
+            <frameName>$(arg tf_prefix)/link_bp</frameName>
             <alwaysOn>true</alwaysOn>
-            <updateRate>5.0</updateRate>
+            <updateRate>100.0</updateRate>
           </plugin>
         </sensor>
       </gazebo>

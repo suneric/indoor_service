@@ -1,0 +1,12 @@
+<launch>
+  <arg name="robot_ns" default=""/>
+    <!--load joint controller configuration from yaml file to parameter server-->
+  <rosparam ns="$(arg robot_ns)" file="$(find ids_control)/config/device_control.yaml" command="load"/>
+  <node name="controller_spawner" pkg="controller_manager" type="spawner" respawn="false"
+    output="log" args="--namespace=$(arg robot_ns) joint_hook_controller joint_vslider_controller joint_hslider_controller joint_plug_controller joint_state_controller"/>
+
+  <node name="joint_state_publisher" pkg="joint_state_publisher" type="joint_state_publisher" respawn="false" output="screen">
+    <remap from="joint_states" to="$(arg robot_ns)/joint_states"/>
+  </node>
+
+</launch>

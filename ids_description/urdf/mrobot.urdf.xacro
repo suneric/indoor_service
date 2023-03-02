@@ -1,49 +1,52 @@
 <?xml version="1.0"?>
 
-<robot name="jazzy" xmlns:xacro="https://www.ros.org/wiki/xacro" >
-    <!--mobile base-->
-    <xacro:include filename="$(find ids_description)/urdf/base_square.urdf.xacro" />
-      <xacro:property name="mu" value="0.9"/>
-      <xacro:property name="mu2" value="0.7"/>
-    <xacro:fourwheeler_base_macro/>
+<robot name="mrobot" xmlns:xacro="https://www.ros.org/wiki/xacro">
+  <xacro:arg name="ns" default="" />
+  <xacro:arg name="tf_prefix" default=""/>
 
-    <!--frame 3DOF-->
-    <xacro:include filename="$(find ids_description)/urdf/frame.urdf.xacro" />
-    <xacro:frame_macro parent="link_fbumper" name="mrobot">
-      <origin xyz="-0.11 0 0.14" rpy="0 0 0"/>
-    </xacro:frame_macro>
+  <!--mobile base-->
+  <xacro:include filename="$(find ids_description)/urdf/base_square.urdf.xacro" />
+    <xacro:property name="mu" value="0.98"/>
+    <xacro:property name="mu2" value="0.98"/>
+  <xacro:fourwheeler_base_macro/>
 
-    <!--RGB-D camera, look forward-->
-    <xacro:include filename="$(find ids_description)/urdf/realsense.urdf.xacro" />
-    <xacro:realsense_macro parent="link_hslider">
-      <xacro:property name="location_x" value="0.06"/>
-      <xacro:property name="location_y" value="0.0"/>
-      <xacro:property name="location_z" value="0.0725"/>
-      <xacro:property name="camera_width" value="640" />
-      <xacro:property name="camera_height" value="480" />
-      <xacro:property name="camera_name" value="camera" />
-    </xacro:realsense_macro>
+  <!--frame 3DOF-->
+  <xacro:include filename="$(find ids_description)/urdf/frame.urdf.xacro" />
+  <xacro:frame_macro parent="link_fbumper">
+    <origin xyz="-0.11 0 0.14" rpy="0 0 0"/>
+  </xacro:frame_macro>
 
-    <!--camera, look upward-->
-    <xacro:include filename="$(find ids_description)/urdf/camera.urdf.xacro"/>
-    <xacro:camera_macro parent="link_tip">
-      <xacro:property name="location_x" value="0.02" />
-      <xacro:property name="location_y" value="0.0" />
-      <xacro:property name="location_z" value="0.015" />
-      <xacro:property name="location_r" value="0" />
-      <xacro:property name="location_p" value="-1.57" />
-      <xacro:property name="location_y" value="0" />
-      <xacro:property name="camera_width" value="600" />
-      <xacro:property name="camera_height" value="600" />
-      <xacro:property name="camera_name" value="arducam"/>
-    </xacro:camera_macro>
+  <!--RGB-D camera, look forward-->
+  <xacro:include filename="$(find ids_description)/urdf/realsense.urdf.xacro" />
+  <xacro:realsense_macro parent="link_hslider">
+    <xacro:property name="location_x" value="0.06"/>
+    <xacro:property name="location_y" value="0.0"/>
+    <xacro:property name="location_z" value="0.0725"/>
+    <xacro:property name="camera_width" value="640" />
+    <xacro:property name="camera_height" value="480" />
+    <xacro:property name="camera_name" value="camera" />
+  </xacro:realsense_macro>
 
-    <!-- laser -->
-    <xacro:include filename="$(find ids_description)/urdf/laser.urdf.xacro"/>
-    <xacro:laser_macro parent="link_fbumper">
-      <xacro:property name="location_x" value="0.05" />
-      <xacro:property name="location_y" value="0" />
-      <xacro:property name="location_z" value="0" />
-    </xacro:laser_macro>
+  <!--camera, look upward-->
+  <xacro:include filename="$(find ids_description)/urdf/camera.urdf.xacro"/>
+  <xacro:camera_macro parent="link_tip">
+    <xacro:property name="location_x" value="0.02" />
+    <xacro:property name="location_y" value="0.0" />
+    <xacro:property name="location_z" value="0.015" />
+    <xacro:property name="location_r" value="0" />
+    <xacro:property name="location_p" value="-1.57" />
+    <xacro:property name="location_y" value="0" />
+    <xacro:property name="camera_width" value="600" />
+    <xacro:property name="camera_height" value="600" />
+    <xacro:property name="camera_name" value="arducam"/>
+  </xacro:camera_macro>
+
+  <!-- laser -->
+  <xacro:include filename="$(find ids_description)/urdf/laser.urdf.xacro"/>
+  <xacro:laser_macro parent="link_fbumper">
+    <xacro:property name="location_x" value="0.05" />
+    <xacro:property name="location_y" value="0" />
+    <xacro:property name="location_z" value="0" />
+  </xacro:laser_macro>
 
 </robot>

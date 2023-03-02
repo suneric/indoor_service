@@ -1,0 +1,7 @@
+image: office_room_5_20230302.pgm
+resolution: 0.012000
+origin: [-0.996000, -11.364000, 0.000000]
+negate: 0
+occupied_thresh: 0.65
+free_thresh: 0.196
+

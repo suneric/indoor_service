@@ -9,10 +9,9 @@
     <xacro:property name="location_y" value="0" />
     <xacro:property name="camera_width" value="600" />
     <xacro:property name="camera_height" value="600" />
-
     <xacro:property name="camera_link" value="0.02" />
-
     <xacro:property name="camera_name" value="front_cam" />
+
     <xacro:macro name="camera_macro" params="parent">
     <!--movable camera-->
     <joint name="camera_joint_${camera_name}" type="fixed">
@@ -63,11 +62,11 @@
         </camera>
         <plugin name="camera_controller" filename="libgazebo_ros_camera.so">
           <alwaysOn>true</alwaysOn>
-          <updateRate>0.0</updateRate>
-          <cameraName>${camera_name}</cameraName>
+          <updateRate>60</updateRate>
+          <cameraName>/$(arg ns)/${camera_name}</cameraName>
           <imageTopicName>image</imageTopicName>
           <cameraInfoTopicName>camera_info</cameraInfoTopicName>
-          <frameName>${camera_name}</frameName>
+          <frameName>$(arg tf_prefix)/${camera_name}</frameName>
           <hackBaseline>0.07</hackBaseline>
           <distortionK1>0.0</distortionK1>
           <distortionK2>0.0</distortionK2>
