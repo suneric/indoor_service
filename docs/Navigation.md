@@ -72,6 +72,10 @@ rosrun map_server map_saver -f [path_to_map]
 roslaunch ids_task service.launch 2> >(grep -v TF_REPEATED_DATA buffer_core)
 ```
 
+## Coding
+
+
+
 ## Reference
 1. [Setup and configuration of the navigation stack on a robot](https://wiki.ros.org/navigation/Tutorials/RobotSetup)
 2. [How to make better maps using gmapping](https://answers.ros.org/question/269280/how-to-make-better-maps-using-gmapping/?answer=269293#post-id-269293)
@@ -82,3 +86,4 @@ roslaunch ids_task service.launch 2> >(grep -v TF_REPEATED_DATA buffer_core)
 7. [Basic Navigation Tuning Guide](http://wiki.ros.org/navigation/Tutorials/Navigation%20Tuning%20Guide)
 8. [Gmapping configuration](https://github.com/samialperen/oko_slam/blob/master/ros_ws/src/kamu_robotu/kamu_robotu_launch/launch/oko_gmapping.launch)
 9. [global planner](http://wiki.ros.org/global_planner)
+10. [ROS navigation python code](https://hotblackrobotics.github.io/en/blog/2018/01/29/seq-goals-py/)

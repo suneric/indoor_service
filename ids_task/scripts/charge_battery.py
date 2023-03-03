@@ -13,9 +13,7 @@ import cv2 as cv
 import matplotlib
 import matplotlib.pyplot as plt
 import math
-from actionlib_msgs.msg import GoalStatus
-from move_base_msgs.msg import MoveBaseAction, MoveBaseGoal
-import actionlib
+
 from sensors.ftsensor import FTSensor
 from sensors.bpsensor import BumpSensor
 
@@ -111,39 +109,6 @@ class EnvPoseReset:
         t_mat = tft.translation_matrix([p.x,p.y,p.z])
         r_mat = tft.quaternion_matrix([q.x,q.y,q.z,q.w])
         return np.dot(t_mat,r_mat)
-
-
-class Navigator:
-    def __init__(self, goal):
-        self.goal = goal
-        self.client = actionlib.SimpleActionClient('move_base', MoveBaseAction)
-        self.client.wait_for_server()
-        self.reached = False
-
-    def arrived(self):
-        return self.reached
-
-    def done_cb(self,status,result):
-        if status == 3:
-            rospy.loginfo("Goal pose is reached.")
-            self.reached = True
-        else:
-            rospy.loginfo("Goal pose is aborted.")
-
-    def active_cb(self):
-        rospy.loginfo("Goal pose is now being processed.")
-
-    def feedback_cb(self, feedback):
-        rospy.loginfo("Feedback is receive.")
-
-    def move2goal(self):
-        print("move to goal...")
-        self.last_time = rospy.Time.now()
-        goal = MoveBaseGoal()
-        goal.target_pose.header.frame_id = "map"
-        goal.target_pose.header.stamp = rospy.Time.now()
-        goal.target_pose.pose = self.goal
-        self.client.send_goal(goal, self.done_cb, self.active_cb, self.feedback_cb)
 
 
 class AutoChagerTask:

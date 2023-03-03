@@ -42,6 +42,7 @@
     <rosparam file="$(find ids_control)/config/costmap_common_params.yaml" command="load" ns="local_costmap" />
     <rosparam file="$(find ids_control)/config/local_costmap_params.yaml" command="load" />
     <rosparam file="$(find ids_control)/config/global_costmap_params.yaml" command="load" />
+    <rosparam file="$(find ids_control)/config/base_global_planner_params.yaml" command="load" />
     <rosparam file="$(find ids_control)/config/base_local_planner_params.yaml" command="load" />
   </node>
 </launch>
