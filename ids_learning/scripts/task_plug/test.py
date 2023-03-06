@@ -293,7 +293,7 @@ def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--agent', type=str, default='dqn') # dqn, ppo, none
     parser.add_argument('--policy', type=str, default='binary') # binary, greyscale, blind
-    parser.add_argument('--iter', type=int, default=6850) # binary 6850, raw 6700
+    parser.add_argument('--iter', type=int, default=10000) # binary 6850, raw 6700
     return parser.parse_args()
 
 if __name__ == '__main__':
@@ -304,7 +304,7 @@ if __name__ == '__main__':
     rads = np.random.uniform(size=(target_count,try_count,4))
     policy_list = []
     if args.policy is None:
-        policy_list = ['binary', 'greyscale', 'blind', 'raw']
+        policy_list = ['binary', 'greyscale', 'blind']
     else:
         policy_list = [args.policy]
 
@@ -313,7 +313,7 @@ if __name__ == '__main__':
     for policy in policy_list:
         env.set_vision_type(policy)
         for i in range(target_count):
-            env.set_goal(2)
+            env.set_goal(i)
             success_count, mean_steps = run_plug_test(env,args.agent,policy,args.iter,i,rads[i])
             test_res.append((policy,i,success_count,mean_steps))
     for res in test_res:
