@@ -481,10 +481,3 @@ class DoorOpeningTask:
         plt.plot(np.matrix(robot_t)[:,0],np.matrix(robot_t)[:,1], linewidth=1.0, color='dimgrey', linestyle='dashed', label="vehicle path")
         plt.legend(loc='lower right', bbox_to_anchor=(0.7,0.05))
         plt.show()
-
-if __name__ == '__main__':
-    rospy.init_node("door_opening", anonymous=True, log_level=rospy.INFO)
-    env = EnvPoseReset()
-    env.reset_robot(2.5,0.2,2.0)
-    task = DoorOpeningTask(env)
-    task.operation()

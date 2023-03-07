@@ -32,6 +32,8 @@ class AMCLNavigator:
         self.pose = data.pose.pose
 
     def move2goal(self,goal,vscale=2.0):
+        goalPose = self.eular_pose(goal)
+        print("=== navigate to ({:.4f},{:.4f},{:.4f}).".format(goalPose[0],goalPose[1],goalPose[2]))
         self.goal = goal
         rate = rospy.Rate(10)
         dp,da = self.linear_dist()

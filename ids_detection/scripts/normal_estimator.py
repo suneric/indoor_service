@@ -33,7 +33,7 @@ class SNE:
         nx = Gu*self.K[0] # fx = K[0]
         ny = Gv*self.K[4] # fy = K[4]
         # compute nz
-        nzVolume = np.zeros((self.H, self.W, 8))
+        nzVolume = np.zeros((self.H,self.W,8))
         for i in range(0,8):
             Xd,Yd,Zd = self.delta_xyz_computation(X,Y,Z,i+1)
             nzVolume[:,:,i] = -(nx*Xd+ny*Yd)/Zd

@@ -1,360 +1,198 @@
 #!/usr/bin/env python3
 import rospy
 import numpy as np
-from sensors.joints_controller import FrameDeviceController, HookController, VSliderController, HSliderController, PlugController
-from sensors.robot_driver import RobotDriver
 from ids_detection.msg import DetectionInfo
 from gazebo_msgs.msg import ModelStates, ModelState, LinkStates
 from geometry_msgs.msg import Pose, Twist, PoseWithCovarianceStamped
+from policy.dqn import DQN
 import tf.transformations as tft
-import os
-import sys
-import cv2 as cv
-import matplotlib
-import matplotlib.pyplot as plt
-import math
+from robot.mrobot import *
+from robot.sensors import *
+import os,sys
 
-from sensors.ftsensor import FTSensor
-from sensors.bpsensor import BumpSensor
+class AutoChargeTask:
+    def __init__(self, robot):
+        self.robot = robot
+        self.config = RobotConfig()
+        self.socketIdx = 0
+        self.socketDetector = ObjectDetector(topic='detection',type=4)
+        self.outletDetector = ObjectDetector(topic='detection',type=3)
+        self._load_plug_model()
+        self.bumper = BumpSensor()
 
-class EnvPoseReset:
-    def __init__(self):
-        self.sub1 = rospy.Subscriber('/gazebo/link_states', LinkStates ,self._pose_cb1)
-        self.sub2 = rospy.Subscriber('/gazebo/model_states', ModelStates, self._pose_cb2)
-        self.pub = rospy.Publisher('/gazebo/set_model_state', ModelState, queue_size=1)
-        self.pose1 = None
-        self.pose2 = None
-        self.trajectory1 = []
-        self.trajectory2 = []
-        self.index1 = 0
-        self.index2 = 0
+    def _load_plug_model(self):
+        model_path = os.path.join(sys.path[0],"./policy/socket_plug/binary/q_net/10000")
+        print("load model from", model_path)
+        self.model = DQN((64,64,1),3,2,8,gamma=0.99,lr=2e-4,update_freq=500)
+        self.model.load(model_path)
 
-    def _pose_cb1(self,data):
-        index = data.name.index('hinged_door::door')
-        self.pose1 = data.pose[index]
-        self.index1 += 1
-        if self.index1 % 1000 == 0:
-            self.trajectory1.append(data.pose[index])
-
-    def _pose_cb2(self,data):
-        index = data.name.index('mrobot')
-        self.pose2 = data.pose[index]
-        self.index2 += 1
-        if self.index2 % 1000 == 0:
-            self.trajectory2.append(data.pose[index])
-
-    def door_pose(self):
-        return self.pose1
-
-    def robot_pose(self):
-        return self.pose2
-
-    def door_trajectory(self):
-        return self.trajectory1
-
-    def robot_trajectory(self):
-        return self.trajectory2
-
-    def reset_robot(self,x,y,yaw):
-        #ref = np.random.uniform(size=3)
-        robot = ModelState()
-        robot.model_name = 'mrobot'
-        robot.pose.position.x = x
-        robot.pose.position.y = y
-        # robot.pose.position.z = 0.072
-        rq = tft.quaternion_from_euler(0,0,yaw)
-        robot.pose.orientation.x = rq[0]
-        robot.pose.orientation.y = rq[1]
-        robot.pose.orientation.z = rq[2]
-        robot.pose.orientation.w = rq[3]
-        self.pub.publish(robot)
-        # check if reset success
-        rospy.sleep(0.5)
-        if not self._same_position(self.pose2, robot.pose):
-            print("required reset to ", robot.pose)
-            print("current ", self.pose2)
-            self.pub.publish(robot)
-
-    def _same_position(self, pose1, pose2):
-        x1, y1 = pose1.position.x, pose1.position.y
-        x2, y2 = pose2.position.x, pose2.position.y
-        tolerance = 0.001
-        if abs(x1-x2) > tolerance or abs(y1-y2) > tolerance:
-            return False
+    def _socket_info(self):
+        detected = self.socketDetector.get_detect_info()
+        infoList = [detected[-1]]
+        info = detected[-1]
+        i = len(detected)-2
+        while i >= 0:
+            check = detected[i]
+            if (check.b-info.b)-(info.b-info.t) > 5:
+                infoList.append(check)
+                break
+            elif (info.b-check.b)-(check.b-check.t) > 5:
+                infoList.insert(0,check)
+                break
+            else:
+                info = check
+            i = i-1
+        # choose upper or lower
+        if len(infoList) == 1:
+            return infoList[0]
         else:
-            return True
+            return infoList[self.socketIdx]
 
-    def door_position(self,cp,w):
-        door_matrix = self._pose_matrix(cp)
-        door_edge = np.array([[1,0,0,w],
-                            [0,1,0,0],
-                            [0,0,1,0],
-                            [0,0,0,1]])
-        door_edge_mat = np.dot(door_matrix, door_edge)
-        open_angle = math.atan2(door_edge_mat[0,3],door_edge_mat[1,3])
-        return w, open_angle
-
-    def robot_position(self,cp,x,y):
-        robot_matrix = self._pose_matrix(cp)
-        footprint_trans = np.array([[1,0,0,x],
-                                    [0,1,0,y],
-                                    [0,0,1,0],
-                                    [0,0,0,1]])
-        fp_mat = np.dot(robot_matrix, footprint_trans)
-        return fp_mat
-
-    def _pose_matrix(self,cp):
-        p = cp.position
-        q = cp.orientation
-        t_mat = tft.translation_matrix([p.x,p.y,p.z])
-        r_mat = tft.quaternion_matrix([q.x,q.y,q.z,q.w])
-        return np.dot(t_mat,r_mat)
-
-
-class AutoChagerTask:
-    def __init__(self):
-        self.driver = RobotDriver()
-        self.fdController = FrameDeviceController()
-        self.task_status = "unknown"
-        self.detect_sub = rospy.Subscriber("detection", DetectionInfo, self.detect_cb)
-        self.ftsensor = FTSensor('/ft_endeffector')
-        self.contact = BumpSensor('/bumper_plug')
-        self.info = None
-        self.info_count = 0
-        self.target = None
-
-    def detect_cb(self,info):
-        self.info_count += 1
-        self.info = info
-
-    def status(self):
-        return self.task_status
-
-    def detect_info(self, type, size=3):
-        rate = rospy.Rate(10)
-        info_count = self.info_count
-        c,l,r,t,b,x,y,z,nx,ny,nz=[],[],[],[],[],[],[],[],[],[],[]
-        while len(c) < size:
-            if self.info_count <= info_count or self.info.type != type or self.info.c < 0.5:
-                continue
-
-            if len(c) == 0: # first detected
-                c.append(self.info.c)
-                l.append(self.info.l)
-                r.append(self.info.r)
-                t.append(self.info.t)
-                b.append(self.info.b)
-                x.append(self.info.x)
-                y.append(self.info.y)
-                z.append(self.info.z)
-                nx.append(self.info.nx)
-                ny.append(self.info.ny)
-                nz.append(self.info.nz)
-            else: # check if it is the same target
-                rcu,rcv = (l[0]+r[0])/2, (t[0]+b[0])/2
-                cu,cv = (self.info.l+self.info.r)/2,(self.info.t+self.info.b)/2
-                if abs(cu-rcu) < 3 and abs(cv-rcv) < 3:
-                    c.append(self.info.c)
-                    l.append(self.info.l)
-                    r.append(self.info.r)
-                    t.append(self.info.t)
-                    b.append(self.info.b)
-                    x.append(self.info.x)
-                    y.append(self.info.y)
-                    z.append(self.info.z)
-                    nx.append(self.info.nx)
-                    ny.append(self.info.ny)
-                    nz.append(self.info.nz)
-            info_count = self.info_count
-            rate.sleep()
-        # create a info based on the average value
-        info = DetectionInfo()
-        info.detectable = True
-        info.type = type
-        info.c = np.mean(c)
-        info.l = np.mean(l)
-        info.r = np.mean(r)
-        info.t = np.mean(t)
-        info.b = np.mean(b)
-        info.x = np.mean(x)
-        info.y = np.mean(y)
-        info.z = np.mean(z)
-        info.nx = np.mean(nx)
-        info.ny = np.mean(ny)
-        info.nz = np.mean(nz)
-        return info
+    def _outlet_info(self):
+        detected = self.outletDetector.get_detect_info()
+        return detected[-1]
 
     def prepare(self):
-        self.task_status = "preparing"
-        self.driver.stop()
-        self.fdController.set_position(hk=False,vs=0.1,hs=0.0,pg=0.0)
-        self.task_status = "prepared"
+        print("=== prepare for battery charging.")
+        self.robot.stop()
+        self.robot.reset_joints(vpos=0.1,hpos=0,spos=1.57,ppos=0.03)
+        self.robot.lock_joints(v=False,h=False,s=True,p=True)
 
-    def searching(self):
-        """
-        get size of target type detected info, and average the values
-        """
-        def search_target(type,vel=1.0):
-            print("searching target type {}".format(type))
-            self.driver.stop()
-            rate = rospy.Rate(10)
-            while self.info == None or self.info.type != type:
-                self.driver.drive(vel,0.0)
-                rate.sleep()
-            self.driver.stop()
-            return self.detect_info(type=type,size=1)
+    def finish(self):
+        self.robot.stop()
+        self.robot.lock_joints(v=False,h=False,s=False,p=False)
+        print("=== charging completed.")
 
-        def align_endeffector(detect):
-            detect = self.detect_info(type=detect.type,size=3)
-            print("aligning endeffector to ({:.4f},{:.4f})".format(detect.x,detect.y))
-            pos = self.fdController.hslider_pos()
-            self.fdController.move_hslider(pos - detect.x)
-            pos = self.fdController.vslider_height()
-            self.fdController.move_vslider(pos - detect.y + 0.072)
-            return self.detect_info(type=detect.type,size=3)
+    def perform(self):
+        self._approach()
+        self._plug()
 
-        def align_normal(info, tolerance=0.01):
-            print("adjusting orientation to nx < {:.4f}".format(tolerance))
-            detect = info
-            rate = rospy.Rate(10)
-            while abs(detect.nx) > tolerance:
-                self.driver.drive(0.0,np.sign(detect.nx)*0.5)
-                detect = self.detect_info(type=info.type,size=1)
-                print(" === normal: ({:.4f},{:.4f},{:.4f})".format(detect.nx,detect.ny,detect.nz))
-                rate.sleep()
-            self.driver.stop()
-            return search_target(type=info.type,vel=0.2)
-
-        def move_closer(info, distance=0.8):
-            print("moving closer to {:.4f}".format(distance))
-            detect = info
-            rate = rospy.Rate(10)
-            while detect.z > distance:
-                self.driver.drive(0.5,0.0)
-                detect = self.detect_info(type=info.type,size=1)
-                print(" === position: ({:.4f},{:.4f},{:.4f})".format(detect.x,detect.y,detect.z))
-                rate.sleep()
-            self.driver.stop()
-            return self.detect_info(type=info.type,size=3)
-
-        def approach(info, distance=0.3):
-            d0 = info.z
-            w0 = info.r-info.l
-            h0 = info.b-info.t
-            u0 = (info.l+info.r)/2
-            v0 = (info.t+info.b)/2
-            print(" === initial distance: {:.4f},{:.4f},{:.4f}".format(d0, w0, h0))
-            d = d0
-            while d > distance:
-                self.driver.drive(0.5,0.0)
-                detect = self.detect_info(type=4,size=1)
-                w = detect.r-detect.l
-                h = detect.b-detect.t
-                d = (0.5*(w0/w)+0.5*(h0/h))*d0
-                print(" === estimated dsiatnce: {:.4f},{:.4f},{:.4f}".format(d, w, h))
-            self.driver.stop()
-            return self.detect_info(type=4,size=1)
-
-        self.task_status = "searching"
-        detect = search_target(type=4,vel=-1.0)
-        detect = align_normal(detect,tolerance=0.005)
-        detect = align_endeffector(detect)
-        detect = move_closer(detect,distance=0.8)
-        detect = align_normal(detect,tolerance=0.005)
-        detect = align_endeffector(detect)
-        self.target = approach(detect,distance=0.2)
-        print(self.target)
-        self.task_status = "ready"
-
-    def plugin(self):
-        def plug():
-            self.fdController.vslider.lock()
-            self.fdController.hslider.lock()
-            success = False
-            forces = self.ftsensor.forces()
-            print("Force Sensor 1: detected forces [x, y, z]", forces)
-            rate = rospy.Rate(10)
-            while not success and forces[0] > -30 and abs(forces[1]) < 30 and abs (forces[2]) < 30:
-                self.driver.drive(0.2,0)
-                rate.sleep()
-                forces = self.ftsensor.forces()
-                print("Force Sensor 1: detected forces [x, y, z]", forces)
-                success = self.contact.connected()
-            self.driver.stop()
-            self.fdController.vslider.unlock()
-            self.fdController.hslider.unlock()
-            return success
-
-        def leave(vel=-0.2):
-            w0 = self.target.r-self.target.l
-            h0 = self.target.b-self.target.t
-            detect = None
-            w,h = w0+10,h0+10
-            while not detect or w > w0 or h > h0:
-                self.driver.drive(vel,0.0)
-                detect = self.detect_info(type=4,size=1)
-                w = detect.r-detect.l
-                h = detect.b-detect.t
-            self.driver.stop()
-
-        def adjust():
-            delta = 0.001
-            forces = self.ftsensor.forces()
-            dh = 0
-            if (forces[1] > 0.2):
-                dh = delta
-            elif (forces[1] < -0.2):
-                dh = -delta
-            dv = 0
-            if (forces[2] > 0.2):
-                dv = -delta
-            elif (forces[2] < -0.2):
-                dv = delta
-            hpos = self.fdController.hslider_pos()
-            self.fdController.move_hslider(hpos+dh)
-            vpos = self.fdController.vslider_height()
-            self.fdController.move_vslider(vpos+dv)
-
-        print("plugin to charge...")
-        self.task_status == "plugin"
-        self.fdController.move_plug(0.03)
-        self.fdController.plug.lock()
-        hpos = self.fdController.hslider_pos()
-        vpos = self.fdController.vslider_height()
-        success, numOfTry = False, 0
-        while numOfTry < 20:
-            numOfTry += 1
-            success = plug()
-            if not success:
-                adjust()
-            else:
-                break
-        leave(vel=-0.5)
-        self.driver.stop()
-        self.fdController.plug.unlock()
-        print("plugin finished {} with {} tries".format(success, numOfTry))
-        self.task_status = "done"
-
-
-if __name__ == '__main__':
-    rospy.init_node("auto_charge", anonymous=True, log_level=rospy.INFO)
-    env = EnvPoseReset()
-    rad = np.random.uniform(size=3)
-    rx = 0.05*(rad[0]-0.5) + 1.0
-    ry = 0.05*(rad[1]-0.5) + 1.5
-    rt = 0.1*(rad[2]-0.5) + 1.57
-    env.reset_robot(rx,ry,rt)
-    task = AutoChagerTask()
-    rate = rospy.Rate(10)
-    try:
-        while not rospy.is_shutdown():
-            status = task.status()
-            if status == "unknown":
-                task.prepare()
-            elif status == "prepared":
-                task.searching()
-            elif status == "ready":
-                task.plugin()
+    def _approach(self):
+        rate = rospy.Rate(10)
+        # adjust robot (plug) orientation (yaw)
+        detect = self._outlet_info()
+        while abs(detect.nx) > 0.01:
+            self.robot.move(0.0, np.sign(detect.nx)*0.2)
+            detect = self._outlet_info()
+            print(" === normal (nx,ny,nz): ({:.4f},{:.4f},{:.4f})".format(detect.nx,detect.ny,detect.nz))
             rate.sleep()
-    except rospy.ROSInterruptException:
-        pass
+        self.robot.stop()
+        # move closer based of depth info
+        detect = self._socket_info()
+        while detect.z > 1.0:
+            self.robot.move(0.5, 0.0)
+            detect = self._socket_info()
+            print(" === position (x,y,z): ({:.4f},{:.4f},{:.4f})".format(detect.x,detect.y,detect.z))
+            rate.sleep()
+        self.robot.stop()
+        # adjust plug position
+        detect = self._socket_info()
+        joints = self.robot.plug_joints()
+        self.robot.set_plug_joints(joints[0]-detect.x, joints[1]-detect.y+self.config.rsdOffsetZ)
+        # move closer based on triangulation
+        detect = self._socket_info()
+        d0,w0,h0 = detect.z, detect.r-detect.l, detect.b-detect.t
+        d = d0
+        while d > 0.4:
+            self.robot.move(0.25,0.0)
+            detect = self._socket_info()
+            w,h = detect.r-detect.l, detect.b-detect.t
+            d = (0.5*(w0/w)+0.5*(h0/h))*d0
+            print(" === estimated (d,w,h): {:.4f},{:.4f},{:.4f}".format(d, w, h))
+            rate.sleep()
+        self.robot.stop()
+        # adjust
+        detect = self._socket_info()
+        du = (detect.r+detect.l)/2-(self.robot.camRSD.width/2)
+        while abs(du) > 3:
+            self.robot.move(0.0,-np.sign(du)*0.1)
+            detect = self._socket_info()
+            du = (detect.r+detect.l)/2-(self.robot.camRSD.width/2)
+            print(" === center u distance: {:.4f}".format(du))
+            rate.sleep()
+        self.robot.stop()
+
+    def _plug_once(self,max=10):
+        def get_action(action):
+            sh,sv = 0.001, 0.001 # 1 mm, scale for horizontal and vertical move
+            act_list = [(sh,-sv),(sh,0),(sh,sv),(0,-sv),(0,sv),(-sh,-sv),(-sh,0),(-sh,sv)]
+            return act_list[action]
+
+        def insert_plug(f_max=20):
+            self.robot.lock_joints(v=True,h=True,s=True,p=True)
+            rate = rospy.Rate(10)
+            inserted = False
+            forces= self.robot.plug_forces()
+            while forces[0] > -f_max and abs(forces[1]) < 10 and abs(forces[2]+9.8) < 10:
+                self.robot.move(0.2,0.0)
+                forces = self.robot.plug_forces()
+                inserted = (self.robot.poseSensor.plug()[1] > self.config.outletY)
+                print("=== plug position y: ({:.4f})".format(self.config.outletY-self.robot.poseSensor.plug()[1]), inserted)
+                if inserted:
+                    break
+                rate.sleep()
+            self.robot.stop()
+            if not inserted: # back for reduce force
+                f = self.robot.plug_forces()
+                while f[0] <= -f_max or abs(f[1]) >= 10 or abs(f[2]+9.8) >= 10:
+                    self.robot.move(-0.2,0.0)
+                    f = self.robot.plug_forces()
+                    rate.sleep()
+                self.robot.stop()
+            self.robot.lock_joints(v=False,h=False,s=True,p=True)
+            return inserted,forces
+
+        detect = self._socket_info()
+        image = self.robot.rsd_vision(size=(64,64),type='binary',info=detect)
+        force = self.robot.plug_forces()
+        joint = self.robot.plug_joints()
+        connected, step = False, 0
+        while not connected and step < max:
+            obs = dict(image=image, force=force, joint=joint)
+            act = get_action(self.model.policy(obs))
+            self.robot.set_plug_joints(joint[0]+act[0],joint[1]+act[1])
+            connected,force = insert_plug()
+            joint = self.robot.plug_joints()
+            step += 1
+        return connected
+
+    def _plug(self):
+        def push_plug(max=100):
+            rate = rospy.Rate(10)
+            step = 0
+            while not self.bumper.connected() and step < max:
+                self.robot.lock_joints(v=True,h=True,s=True,p=True)
+                self.robot.move(0.2,0.0)
+                self.robot.lock_joints(v=False,h=False,s=True,p=True)
+                force = self.robot.plug_forces()
+                print("=== push plug (x,y,z): ({:.4f},{:.4f},{:.4f})".format(force[0],force[1],force[2]))
+                joint = self.robot.plug_joints()
+                act = [-np.sign(force[1])*0.001,-np.sign(force[2])*0.001]
+                self.robot.set_plug_joints(joint[0]+act[0],joint[1]+act[1])
+                rate.sleep()
+                step += 1
+            return self.bumper.connected()
+
+        connected = self._plug_once()
+        retry = 0
+        while not connected and retry < 3: # retry
+            self.robot.move(-1.0,0.0)
+            rospy.sleep(3)
+            rate = rospy.Rate(10)
+            detect = self._socket_info()
+            du = (detect.r+detect.l)/2-(self.robot.camRSD.width/2)
+            while abs(du) > 3:
+                self.robot.move(0.0,-np.sign(du)*0.1)
+                detect = self._socket_info()
+                du = (detect.r+detect.l)/2-(self.robot.camRSD.width/2)
+                print(" === center u distance: {:.4f}".format(du))
+                rate.sleep()
+            self.robot.stop()
+            connected = self._plug_once()
+            retry += 1
+        if not connected:
+            print("=== plugging, not connected.")
+            return
+        else:
+            success = push_plug()
+            print("=== plugging ", success)

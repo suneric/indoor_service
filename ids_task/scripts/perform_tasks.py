@@ -4,6 +4,8 @@ import rospy
 import sys, os
 from robot.mrobot import MRobot
 from localization import *
+from charge_battery import *
+# from open_door import *
 import argparse
 
 def get_args():
@@ -21,8 +23,10 @@ if __name__ == "__main__":
         goal = create_goal(x=2.0,y=0.9,yaw=np.pi)
         nav.move2goal(goal)
     elif args.task == "charge":
-        goal = create_goal(x=1.63497,y=1.8,yaw=np.pi/2)
-        nav.move2goal(goal)
-        print("perfor battery charging task.")
+        charge = AutoChargeTask(robot)
+        charge.prepare()
+        nav.move2goal(create_goal(x=1.63497,y=1.8,yaw=np.pi/2))
+        charge.perform()
+        charge.finish()
     else:
         print("invalid task type.")
