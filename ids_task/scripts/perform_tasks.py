@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-import numpy as np
 import rospy
+import numpy as np
 import sys, os
 from robot.mrobot import MRobot
 from localization import *
 from charge_battery import *
-# from open_door import *
+from open_door import *
 import argparse
 
 def get_args():
@@ -19,9 +19,11 @@ if __name__ == "__main__":
     nav = AMCLNavigator(robot)
     args = get_args()
     if args.task == "open":
-        print("perform door opening task.")
-        goal = create_goal(x=2.0,y=0.9,yaw=np.pi)
-        nav.move2goal(goal)
+        open = DoorOpeningTask(robot)
+        open.prepare()
+        nav.move2goal(create_goal(x=1.5,y=0.9,yaw=np.pi))
+        open.perform()
+        open.finish()
     elif args.task == "charge":
         charge = AutoChargeTask(robot)
         charge.prepare()

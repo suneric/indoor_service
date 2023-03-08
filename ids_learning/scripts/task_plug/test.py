@@ -292,7 +292,7 @@ def run_plug_test(env, agent, policy, index, target, init_rads):
 def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--agent', type=str, default='dqn') # dqn, ppo, none
-    parser.add_argument('--policy', type=str, default='binary') # binary, greyscale, blind
+    parser.add_argument('--policy', type=str, default=None) # binary, greyscale, blind
     parser.add_argument('--iter', type=int, default=10000) # binary 6850, raw 6700
     return parser.parse_args()
 

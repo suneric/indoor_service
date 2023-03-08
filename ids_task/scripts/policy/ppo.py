@@ -5,10 +5,9 @@ from .core import *
 import os
 
 class ReplayBuffer:
-    def __init__(self, image_shape, force_dim, joint_dim, capacity, gamma=0.99,lamda=0.95):
+    def __init__(self, image_shape, force_dim, capacity, gamma=0.99,lamda=0.95):
         self.img_buf = np.zeros([capacity]+list(image_shape), dtype=np.float32)
         self.frc_buf = np.zeros((capacity, force_dim), dtype=np.float32)
-        self.jnt_buf = np.zeros((capacity, joint_dim), dtype=np.float32)
         self.act_buf = np.zeros(capacity, dtype=np.int32)
         self.rew_buf = np.zeros(capacity, dtype=np.float32)
         self.val_buf = np.zeros(capacity, dtype=np.float32) # value of (s,a), output of critic net
@@ -21,7 +20,6 @@ class ReplayBuffer:
     def store(self, obs_tuple):
         self.img_buf[self.ptr]=obs_tuple[0]["image"]
         self.frc_buf[self.ptr]=obs_tuple[0]["force"]
-        self.jnt_buf[self.ptr]=obs_tuple[0]["joint"]
         self.act_buf[self.ptr]=obs_tuple[1]
         self.rew_buf[self.ptr]=obs_tuple[2]
         self.val_buf[self.ptr]=obs_tuple[3]
@@ -50,7 +48,6 @@ class ReplayBuffer:
         data = dict(
             images=self.img_buf[s],
             forces=self.frc_buf[s],
-            joints=self.jnt_buf[s],
             actions=self.act_buf[s],
             returns=self.ret_buf[s],
             logprobs=self.logp_buf[s],
@@ -60,9 +57,9 @@ class ReplayBuffer:
         return data
 
 class PPO:
-    def __init__(self,image_shape,force_dim,joint_dim,action_dim,pi_lr=1e-4,q_lr=2e-4,clip_ratio=0.2,beta=1e-3,target_kld=0.01):
-        self.pi = vision_force_joint_actor_network(image_shape,force_dim,joint_dim,action_dim,'relu','linear')
-        self.q = vision_force_joint_critic_network(image_shape,force_dim,joint_dim,'relu')
+    def __init__(self,image_shape,force_dim,action_dim,pi_lr=1e-4,q_lr=2e-4,clip_ratio=0.2,beta=1e-3,target_kld=0.01):
+        self.pi = vision_force_actor_network(image_shape,force_dim,action_dim,'relu','linear')
+        self.q = vision_force_critic_network(image_shape,force_dim,'relu')
         self.pi_optimizer = tf.keras.optimizers.Adam(pi_lr)
         self.q_optimizer = tf.keras.optimizers.Adam(q_lr)
         self.clip_ratio = clip_ratio
@@ -72,8 +69,7 @@ class PPO:
     def policy(self, obs):
         images = tf.expand_dims(tf.convert_to_tensor(obs['image']), 0)
         forces = tf.expand_dims(tf.convert_to_tensor(obs['force']), 0)
-        joints = tf.expand_dims(tf.convert_to_tensor(obs['joint']), 0)
-        logits = self.pi([images,forces,joints])
+        logits = self.pi([images,forces])
         dist = tfp.distributions.Categorical(logits=logits)
         action = tf.squeeze(dist.sample()).numpy()
         logprob = tf.squeeze(dist.log_prob(action)).numpy()
@@ -82,25 +78,23 @@ class PPO:
     def value(self, obs):
         images = tf.expand_dims(tf.convert_to_tensor(obs['image']), 0)
         forces = tf.expand_dims(tf.convert_to_tensor(obs['force']), 0)
-        joints = tf.expand_dims(tf.convert_to_tensor(obs['joint']), 0)
-        val = self.q([images,forces,joints])
+        val = self.q([images,forces])
         return tf.squeeze(val).numpy()
 
     def learn(self, buffer, pi_iter=80, q_iter=80):
         experiences = buffer.get()
         images = experiences['images']
         forces = experiences['forces']
-        joints = experiences['joints']
         actions = experiences['actions']
         returns = experiences['returns']
         advantages = experiences['advantages']
         logprobs = experiences['logprobs']
-        self.update(images,forces,joints,actions,returns,advantages,logprobs,pi_iter,q_iter)
+        self.update(images,forces,actions,returns,advantages,logprobs,pi_iter,q_iter)
 
-    def update(self,images,forces,joints,actions,returns,advantages,old_logps,pi_iter,q_iter):
+    def update(self,images,forces,actions,returns,advantages,old_logps,pi_iter,q_iter):
         with tf.GradientTape() as tape:
             tape.watch(self.pi.trainable_variables)
-            logits=self.pi([images,forces,joints])
+            logits=self.pi([images,forces])
             logps = tfp.distributions.Categorical(logits=logits).log_prob(actions)
             ratio = tf.exp(logps - old_logps) # pi/old_pi
             clip_advs = tf.clip_by_value(ratio, 1-self.clip_ratio, 1+self.clip_ratio)*advantages
@@ -111,14 +105,14 @@ class PPO:
         pi_grad = tape.gradient(pi_loss, self.pi.trainable_variables)
         for _ in range(pi_iter):
             self.pi_optimizer.apply_gradients(zip(pi_grad, self.pi.trainable_variables))
-            logps = tfp.distributions.Categorical(logits=self.pi([images,forces,joints])).log_prob(actions)
+            logps = tfp.distributions.Categorical(logits=self.pi([images,forces])).log_prob(actions)
             approx_klds = tf.reduce_mean(old_logps-logps)
             if approx_klds > 1.5*self.target_kld:
                 break
 
         with tf.GradientTape() as tape:
             tape.watch(self.q.trainable_variables)
-            q_loss = tf.keras.losses.MSE(returns, self.q([images,forces,joints]))
+            q_loss = tf.keras.losses.MSE(returns, self.q([images,forces]))
         q_grad = tape.gradient(q_loss, self.q.trainable_variables)
         for _ in range(q_iter):
             self.q_optimizer.apply_gradients(zip(q_grad, self.q.trainable_variables))

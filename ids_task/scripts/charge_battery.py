@@ -1,11 +1,7 @@
 #!/usr/bin/env python3
 import rospy
 import numpy as np
-from ids_detection.msg import DetectionInfo
-from gazebo_msgs.msg import ModelStates, ModelState, LinkStates
-from geometry_msgs.msg import Pose, Twist, PoseWithCovarianceStamped
 from policy.dqn import DQN
-import tf.transformations as tft
 from robot.mrobot import *
 from robot.sensors import *
 import os,sys
@@ -80,52 +76,73 @@ class AutoChargeTask:
         rospy.sleep(3)
         self.robot.stop()
 
-    def _approach(self):
-        rate = rospy.Rate(10)
+    def _approach(self,target_dist=1.0,estimate_dist=0.4):
+        f = 10
+        dt = 1/f
+        rate = rospy.Rate(f)
+        kp = 0.1
         # adjust robot (plug) orientation (yaw)
         detect = self._outlet_info()
-        while abs(detect.nx) > 0.01:
-            self.robot.move(0.0, np.sign(detect.nx)*0.2)
-            detect = self._outlet_info()
-            print(" === normal (nx,ny,nz): ({:.4f},{:.4f},{:.4f})".format(detect.nx,detect.ny,detect.nz))
+        t, te, e0 = 1e-6, 0, 0
+        err = detect.nx
+        while abs(err) > 0.01:
+            vz = kp*(err + te/t + dt*(err-e0))
+            self.robot.move(0.0,vz)
             rate.sleep()
+            e0, te, t = err, te+err, t+dt
+            detect = self._outlet_info()
+            print("=== normal (nx,ny,nz): ({:.4f},{:.4f},{:.4f})".format(detect.nx,detect.ny,detect.nz))
+            err = detect.nx
         self.robot.stop()
+
         # move closer based of depth info
         detect = self._socket_info()
-        while detect.z > 1.0:
-            self.robot.move(1.0, 0.0)
-            detect = self._socket_info()
-            print(" === position (x,y,z): ({:.4f},{:.4f},{:.4f})".format(detect.x,detect.y,detect.z))
+        t, te, e0 = 1e-6, 0, 0
+        err = detect.z-target_dist
+        while err > 0:
+            vx = 2*kp*(err + te/t + dt*(err-e0))
+            self.robot.move(vx,0.0)
             rate.sleep()
+            e0, te, t = err, te+err, t+dt
+            detect = self._socket_info()
+            print("=== position (x,y,z): ({:.4f},{:.4f},{:.4f})".format(detect.x,detect.y,detect.z))
+            err = detect.z-target_dist
         self.robot.stop()
+
         # adjust plug position
         detect = self._socket_info()
         joints = self.robot.plug_joints()
         self.robot.set_plug_joints(joints[0]-detect.x, joints[1]-detect.y+self.config.rsdOffsetZ)
+
         # move closer based on triangulation
         detect = self._socket_info()
+        t, te, e0 = 1e-6, 0, 0
         d0,w0,h0 = detect.z, detect.r-detect.l, detect.b-detect.t
-        d = d0
-        while d > 0.4:
-            self.robot.move(0.5,0.0)
+        err = d0-estimate_dist
+        while err > 0:
+            vx = kp*(err + te/t + dt*(err-e0))
+            self.robot.move(vx,0.0)
+            rate.sleep()
+            e0, te, t = err, te+err, t+dt
             detect = self._socket_info()
             w,h = detect.r-detect.l, detect.b-detect.t
             d = (0.5*(w0/w)+0.5*(h0/h))*d0
-            print(" === estimated (d,w,h): {:.4f},{:.4f},{:.4f}".format(d, w, h))
-            rate.sleep()
+            print("=== estimated (d,w,h): {:.4f},{:.4f},{:.4f}".format(d, w, h))
+            err = detect.z-estimate_dist
         self.robot.stop()
+
         # adjust
         detect = self._socket_info()
         du = (detect.r+detect.l)/2-(self.robot.camRSD.width/2)
         while abs(du) > 3:
             self.robot.move(0.0,-np.sign(du)*0.2)
+            rate.sleep()
             detect = self._socket_info()
             du = (detect.r+detect.l)/2-(self.robot.camRSD.width/2)
-            print(" === center u distance: {:.4f}".format(du))
-            rate.sleep()
+            print("=== center u distance: {:.4f}".format(du))
         self.robot.stop()
 
-    def _plug_once(self,max=10):
+    def _plug_once(self,max=15):
         def get_action(action):
             sh,sv = 0.001, 0.001 # 1 mm, scale for horizontal and vertical move
             act_list = [(sh,-sv),(sh,0),(sh,sv),(0,-sv),(0,sv),(-sh,-sv),(-sh,0),(-sh,sv)]
@@ -138,19 +155,19 @@ class AutoChargeTask:
             forces= self.robot.plug_forces()
             while forces[0] > -f_max and abs(forces[1]) < 10 and abs(forces[2]+9.8) < 10:
                 self.robot.move(0.2,0.0)
+                rate.sleep()
                 forces = self.robot.plug_forces()
                 inserted = (self.robot.poseSensor.plug()[1] > self.config.outletY)
                 print("=== plug position y: ({:.4f})".format(self.config.outletY-self.robot.poseSensor.plug()[1]), inserted)
                 if inserted:
                     break
-                rate.sleep()
             self.robot.stop()
             if not inserted: # back for reduce force
                 f = self.robot.plug_forces()
                 while f[0] <= -f_max or abs(f[1]) >= 10 or abs(f[2]+9.8) >= 10:
                     self.robot.move(-0.2,0.0)
-                    f = self.robot.plug_forces()
                     rate.sleep()
+                    f = self.robot.plug_forces()
                 self.robot.stop()
             self.robot.lock_joints(v=False,h=False,s=True,p=True)
             return inserted,forces
@@ -172,27 +189,29 @@ class AutoChargeTask:
             step += 1
         return connected
 
-    def _plug(self):
+    def _plug(self, numOfTry=2):
         def push_plug(max=100):
-            rate = rospy.Rate(10)
+            rate = rospy.Rate(30)
             step = 0
-            while not self.bumper.connected() and step < max:
+            bpConnected = False
+            while not bpConnected and step < max:
                 self.robot.lock_joints(v=True,h=True,s=True,p=True)
-                self.robot.move(0.2,0.0)
+                self.robot.move(0.1,0.0)
+                rate.sleep()
                 self.robot.lock_joints(v=False,h=False,s=True,p=True)
+                bpConnected = self.bumper.connected()
                 force = self.robot.plug_forces()
                 print("=== push plug (x,y,z): ({:.4f},{:.4f},{:.4f})".format(force[0],force[1],force[2]))
                 joint = self.robot.plug_joints()
                 act = [-np.sign(force[1])*0.001,-np.sign(force[2])*0.001]
                 self.robot.set_plug_joints(joint[0]+act[0],joint[1]+act[1])
-                rate.sleep()
                 step += 1
             self.robot.stop()
-            return self.bumper.connected()
+            return bpConnected
 
         connected = self._plug_once()
         retry = 0
-        while not connected and retry < 3: # retry
+        while not connected and retry < numOfTry:
             self.robot.move(-1.0,0.0)
             rospy.sleep(3)
             rate = rospy.Rate(10)
@@ -200,10 +219,10 @@ class AutoChargeTask:
             du = (detect.r+detect.l)/2-(self.robot.camRSD.width/2)
             while abs(du) > 3:
                 self.robot.move(0.0,-np.sign(du)*0.2)
+                rate.sleep()
                 detect = self._socket_info()
                 du = (detect.r+detect.l)/2-(self.robot.camRSD.width/2)
-                print(" === center u distance: {:.4f}".format(du))
-                rate.sleep()
+                print("=== center u distance: {:.4f}".format(du))
             self.robot.stop()
             connected = self._plug_once()
             retry += 1

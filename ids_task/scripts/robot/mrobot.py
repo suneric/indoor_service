@@ -205,6 +205,12 @@ class MRobot:
         self.fdController.lock_hook(s)
         self.fdController.lock_plug(p)
 
+    def release_hook(self):
+        self.fdController.move_hook_to(0.0)
+
+    def retrieve_hook(self):
+        self.fdController.move_hook_to(1.57)
+
     def robot_pose(self):
         return self.poseSensor.robot()
 
