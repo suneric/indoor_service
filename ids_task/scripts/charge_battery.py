@@ -21,7 +21,7 @@ class AutoChargeTask:
         self.bumper = BumpSensor()
 
     def _load_plug_model(self):
-        model_path = os.path.join(sys.path[0],"./policy/socket_plug/binary/q_net/10000")
+        model_path = os.path.join(sys.path[0],"./policy/socket_plug/binary/q_net/9900")
         print("load model from", model_path)
         self.model = DQN((64,64,1),3,2,8,gamma=0.99,lr=2e-4,update_freq=500)
         self.model.load(model_path)
@@ -65,7 +65,20 @@ class AutoChargeTask:
 
     def perform(self):
         self._approach()
-        self._plug()
+        if self._plug():
+            self._charging()
+
+    def _charging(self):
+        self.robot.stop()
+        rate = rospy.Rate(1)
+        p = 0
+        while p < 100:
+            p += 10
+            print("=== charging battery {:.1f}%".format(p))
+            rate.sleep()
+        self.robot.move(-1.0,0.0)
+        rospy.sleep(3)
+        self.robot.stop()
 
     def _approach(self):
         rate = rospy.Rate(10)
@@ -80,7 +93,7 @@ class AutoChargeTask:
         # move closer based of depth info
         detect = self._socket_info()
         while detect.z > 1.0:
-            self.robot.move(0.5, 0.0)
+            self.robot.move(1.0, 0.0)
             detect = self._socket_info()
             print(" === position (x,y,z): ({:.4f},{:.4f},{:.4f})".format(detect.x,detect.y,detect.z))
             rate.sleep()
@@ -94,7 +107,7 @@ class AutoChargeTask:
         d0,w0,h0 = detect.z, detect.r-detect.l, detect.b-detect.t
         d = d0
         while d > 0.4:
-            self.robot.move(0.25,0.0)
+            self.robot.move(0.5,0.0)
             detect = self._socket_info()
             w,h = detect.r-detect.l, detect.b-detect.t
             d = (0.5*(w0/w)+0.5*(h0/h))*d0
@@ -105,7 +118,7 @@ class AutoChargeTask:
         detect = self._socket_info()
         du = (detect.r+detect.l)/2-(self.robot.camRSD.width/2)
         while abs(du) > 3:
-            self.robot.move(0.0,-np.sign(du)*0.1)
+            self.robot.move(0.0,-np.sign(du)*0.2)
             detect = self._socket_info()
             du = (detect.r+detect.l)/2-(self.robot.camRSD.width/2)
             print(" === center u distance: {:.4f}".format(du))
@@ -142,17 +155,20 @@ class AutoChargeTask:
             self.robot.lock_joints(v=False,h=False,s=True,p=True)
             return inserted,forces
 
+        sj = self.robot.plug_joints()
         detect = self._socket_info()
         image = self.robot.rsd_vision(size=(64,64),type='binary',info=detect)
         force = self.robot.plug_forces()
-        joint = self.robot.plug_joints()
+        cj = self.robot.plug_joints()
+        joint = (cj[0]-sj[0],cj[1])
         connected, step = False, 0
         while not connected and step < max:
             obs = dict(image=image, force=force, joint=joint)
             act = get_action(self.model.policy(obs))
-            self.robot.set_plug_joints(joint[0]+act[0],joint[1]+act[1])
+            self.robot.set_plug_joints(cj[0]+act[0],cj[1]+act[1])
             connected,force = insert_plug()
-            joint = self.robot.plug_joints()
+            cj = self.robot.plug_joints()
+            joint = (cj[0]-sj[0],cj[1])
             step += 1
         return connected
 
@@ -171,6 +187,7 @@ class AutoChargeTask:
                 self.robot.set_plug_joints(joint[0]+act[0],joint[1]+act[1])
                 rate.sleep()
                 step += 1
+            self.robot.stop()
             return self.bumper.connected()
 
         connected = self._plug_once()
@@ -182,7 +199,7 @@ class AutoChargeTask:
             detect = self._socket_info()
             du = (detect.r+detect.l)/2-(self.robot.camRSD.width/2)
             while abs(du) > 3:
-                self.robot.move(0.0,-np.sign(du)*0.1)
+                self.robot.move(0.0,-np.sign(du)*0.2)
                 detect = self._socket_info()
                 du = (detect.r+detect.l)/2-(self.robot.camRSD.width/2)
                 print(" === center u distance: {:.4f}".format(du))
@@ -192,7 +209,8 @@ class AutoChargeTask:
             retry += 1
         if not connected:
             print("=== plugging, not connected.")
-            return
+            return False
         else:
             success = push_plug()
-            print("=== plugging ", success)
+            print("=== plug connected.", success)
+            return success
