@@ -35,6 +35,8 @@ class AMCLNavigator:
         # move to goal by using pid control
         self.goal = goal
         goalPose = self.eular_pose(goal)
+        currPose = self.eular_pose(self.pose)
+        print("=== current pose ({:.4f},{:.4f},{:.4f}).".format(currPose[0],currPose[1],currPose[2]))
         print("=== navigate to ({:.4f},{:.4f},{:.4f}).".format(goalPose[0],goalPose[1],goalPose[2]))
         kp, ka = 5.0, 5*np.pi
         f = 10

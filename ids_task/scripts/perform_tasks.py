@@ -19,15 +19,15 @@ if __name__ == "__main__":
     nav = AMCLNavigator(robot)
     args = get_args()
     if args.task == "open":
-        open = DoorOpeningTask(robot)
+        open = DoorOpeningTask(robot,nav,(1.5,0.9,np.pi))
         open.prepare()
-        nav.move2goal(create_goal(x=1.5,y=0.9,yaw=np.pi))
+        open.move2goal()
         open.perform()
         open.finish()
     elif args.task == "charge":
-        charge = AutoChargeTask(robot)
+        charge = AutoChargeTask(robot,nav,(1.63497,1.8,np.pi/2))
         charge.prepare()
-        nav.move2goal(create_goal(x=1.63497,y=1.8,yaw=np.pi/2))
+        charge.move2goal()
         charge.perform()
         charge.finish()
     else:

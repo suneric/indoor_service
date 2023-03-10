@@ -196,8 +196,8 @@ class MRobot:
         return (hpos,vpos)
 
     def set_plug_joints(self, hpos, vpos):
-        self.fdController.move_hslider_to(hpos)
         self.fdController.move_vslider_to(vpos)
+        self.fdController.move_hslider_to(hpos)
 
     def lock_joints(self,v=True,h=True,s=True,p=True):
         self.fdController.lock_vslider(v)

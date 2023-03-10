@@ -4,10 +4,11 @@ import numpy as np
 from policy.dqn import DQN
 from robot.mrobot import *
 from robot.sensors import *
+from localization import *
 import os,sys
 
 class AutoChargeTask:
-    def __init__(self, robot):
+    def __init__(self, robot, navigator, goal):
         self.robot = robot
         self.config = RobotConfig()
         self.socketIdx = 0
@@ -15,6 +16,8 @@ class AutoChargeTask:
         self.outletDetector = ObjectDetector(topic='detection',type=3)
         self._load_plug_model()
         self.bumper = BumpSensor()
+        self.nav = navigator
+        self.goal = goal
 
     def _load_plug_model(self):
         model_path = os.path.join(sys.path[0],"./policy/socket_plug/binary/q_net/9900")
@@ -58,6 +61,10 @@ class AutoChargeTask:
         self.robot.stop()
         self.robot.lock_joints(v=False,h=False,s=False,p=False)
         print("=== charging completed.")
+
+    def move2goal(self):
+        goalPose = create_goal(x=self.goal[0],y=self.goal[1],yaw=self.goal[2])
+        self.nav.move2goal(goalPose)
 
     def perform(self):
         self._approach()
