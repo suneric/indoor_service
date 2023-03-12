@@ -51,28 +51,44 @@ class DoorOpeningTask:
             return
         self._traverse()
 
-    def _approach(self):
-        rate = rospy.Rate(10)
+    def _approach(self, target_dist=1.0):
+        f = 10
+        dt = 1/f
+        rate = rospy.Rate(f)
+        kp = 0.1
+        # adjust robot orientation (yaw)
         detect = self._handle_info()
-        # adjust orientation of the base
-        while abs(detect.nx) > 0.01:
-            self.robot.move(0.0, np.sign(detect.nx)*0.2)
+        t, te, e0 = 1e-6, 0, 0
+        err = detect.nx
+        while abs(err) > 0.01:
+            vz = kp*(err + te/t + dt*(err-e0))
+            self.robot.move(0.0,vz)
             rate.sleep()
+            e0, te, t = err, te+err, t+dt
             detect = self._handle_info()
             print("=== normal (nx,ny,nz): ({:.4f},{:.4f},{:.4f})".format(detect.nx,detect.ny,detect.nz))
+            err = detect.nx
         self.robot.stop()
+
         # move closer based of depth info
         detect = self._handle_info()
-        while detect.z > 1.0:
-            self.robot.move(1.0, 0.0)
+        t, te, e0 = 1e-6, 0, 0
+        err = detect.z-target_dist
+        while err > 0:
+            vx = 2*kp*(err + te/t + dt*(err-e0))
+            self.robot.move(vx,0.0)
             rate.sleep()
+            e0, te, t = err, te+err, t+dt
             detect = self._handle_info()
             print("=== position (x,y,z): ({:.4f},{:.4f},{:.4f})".format(detect.x,detect.y,detect.z))
+            err = detect.z-target_dist
         self.robot.stop()
+
         # adjust plug position
         detect = self._handle_info()
         joints = self.robot.plug_joints()
         self.robot.set_plug_joints(joints[0]-detect.x, joints[1]-detect.y+self.config.rsdOffsetZ+0.07)
+
         # move closer until touch the door
         forces= self.robot.plug_forces()
         while forces[0] > -20:
@@ -120,6 +136,7 @@ class DoorOpeningTask:
         if abs(forces[1]) > 5:
             joint = self.robot.plug_joints()
             self.robot.set_plug_joints(0.13,joint[1]+0.2)
+            rospy.sleep(2)
             print("=== door is unlatched.")
             return True
         else:
@@ -161,13 +178,13 @@ class DoorOpeningTask:
     def _traverse(self):
         curr = self.nav.eular_pose(self.nav.pose)
         rate = rospy.Rate(10)
-        while abs(curr[2]) > 0.1*np.pi:
+        while abs(curr[2]) > (1/100)*np.pi:
             print("=== robot orientation {:.4f}".format(curr[2]))
             self.robot.move(0.0,2*np.pi)
             rate.sleep()
             curr = self.nav.eular_pose(self.nav.pose)
         self.robot.move(-2.0,0.0)
-        rospy.sleep(7)
+        rospy.sleep(10)
         self.robot.stop()
         self.robot.retrieve_hook()
         self.robot.set_plug_joints(0.0,0.8)

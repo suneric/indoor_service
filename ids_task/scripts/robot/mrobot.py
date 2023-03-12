@@ -143,7 +143,7 @@ class RobotDriver:
 class RobotConfig:
     rsdOffsetX = 0.2642
     rsdOffsetZ = 0.0725
-    outletY = 2.99
+    outletY = 2.992
 
 """
 MobileRobot

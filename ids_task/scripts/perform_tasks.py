@@ -16,10 +16,10 @@ def get_args():
 if __name__ == "__main__":
     rospy.init_node("indoor_service", anonymous=True, log_level=rospy.INFO)
     robot = MRobot()
-    nav = AMCLNavigator(robot)
+    nav = BasicNavigator(robot)
     args = get_args()
     if args.task == "open":
-        open = DoorOpeningTask(robot,nav,(1.5,0.9,np.pi))
+        open = DoorOpeningTask(robot,nav,(1.5,0.85,np.pi))
         open.prepare()
         open.move2goal()
         open.perform()

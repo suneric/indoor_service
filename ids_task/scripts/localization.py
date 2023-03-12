@@ -5,6 +5,7 @@ from robot.mrobot import RobotDriver
 from actionlib_msgs.msg import GoalStatus
 from move_base_msgs.msg import MoveBaseAction, MoveBaseGoal
 from geometry_msgs.msg import Pose, PoseWithCovarianceStamped
+from gazebo_msgs.msg import ModelStates
 import tf.transformations as tft
 import actionlib
 
@@ -20,33 +21,32 @@ def create_goal(x,y,yaw):
     goal.orientation.w = rq[3]
     return goal
 
-class AMCLNavigator:
+"""
+Base class of Navigator
+"""
+class Navigator:
     def __init__(self, robot):
+        self.robot = robot
         self.goal = None
         self.pose = None
-        self.robot = robot
-        self.sub = rospy.Subscriber('/amcl_pose', PoseWithCovarianceStamped, self.pose_cb)
-        self.check_ready()
 
-    def pose_cb(self, data):
-        self.pose = data.pose.pose
-
-    def move2goal(self,goal,tol_p=0.025,tol_a=0.01):
+    def move2goal(self,goal,tol_p=0.02,tol_a=0.01):
         # move to goal by using pid control
         self.goal = goal
         goalPose = self.eular_pose(goal)
         currPose = self.eular_pose(self.pose)
         print("=== current pose ({:.4f},{:.4f},{:.4f}).".format(currPose[0],currPose[1],currPose[2]))
         print("=== navigate to ({:.4f},{:.4f},{:.4f}).".format(goalPose[0],goalPose[1],goalPose[2]))
-        kp, ka = 5.0, 5*np.pi
+        kp, ka = 2.0, 2*np.pi
         f = 10
         dt = 1/f
         rate = rospy.Rate(f)
         print("=== turn to goal.")
         t, iea, ea0 = 1e-6, 0, 0
         err_p, err_a = self.linear_dist(goalPose)
-        while abs(err_a) > tol_a:
-            vz = ka*(err_a + iea/t + dt*(err_a-ea0))
+        while abs(err_a) > (1/2)*tol_a:
+            print("=== angular err:", err_a)
+            vz = 2*ka*(err_a + iea/t + dt*(err_a-ea0))
             self.robot.move(0,vz)
             rate.sleep()
             ep0 = err_a
@@ -57,8 +57,9 @@ class AMCLNavigator:
         t, iep, iea, ep0, ea0 = 1e-6, 0, 0, 0, 0
         err_p, err_a = self.linear_dist(goalPose)
         while err_p > tol_p:
+            print("=== linear, angular err:", err_p, err_a)
             vx = kp*(err_p + iep/t + dt*(err_p-ep0))
-            vz = ka*(err_a + iea/t + dt*(err_a-ea0))
+            vz = (1/100)*ka*(err_a + iea/t + dt*(err_a-ea0))
             self.robot.move(vx,vz)
             rate.sleep()
             ep0, ea0 = err_p, err_a
@@ -69,7 +70,8 @@ class AMCLNavigator:
         err_a = self.angluer_dist(self.eular_pose(self.pose)[2],goalPose[2])
         t, iea, ea0 = 1e-6, 0, 0
         while abs(err_a) > tol_a:
-            vz = ka*(err_a + iea/t + dt*(err_a-ea0))
+            print("=== angular err:", err_a)
+            vz = 2*ka*(err_a + iea/t + dt*(err_a-ea0))
             self.robot.move(0,vz)
             rate.sleep()
             ea0 = err_a
@@ -100,6 +102,40 @@ class AMCLNavigator:
         q = tft.euler_from_quaternion([q.x,q.y,q.z,q.w])
         return (p.x,p.y,q[2])
 
+"""
+Basic Navigator using Gazebo information of robot position
+"""
+class BasicNavigator(Navigator):
+    def __init__(self, robot):
+        super().__init__(robot)
+        self.sub = rospy.Subscriber('/gazebo/model_states', ModelStates, self.pose_cb)
+        self.check_ready()
+
+    def pose_cb(self, data):
+        self.pose = data.pose[data.name.index('mrobot')]
+
+    def check_ready(self):
+        rospy.logdebug("Waiting for /gazebo/model_states to be READY...")
+        data = None
+        while data is None and not rospy.is_shutdown():
+            try:
+                data = rospy.wait_for_message('/gazebo/model_states', ModelStates, timeout=5.0)
+                rospy.logdebug("Current /gazebo/model_states  READY=>")
+            except:
+                rospy.logerr("Current /gazebo/model_states not ready yet, retrying for getting /gazebo/model_states ")
+
+"""
+Navigator based on AMCL
+"""
+class AMCLNavigator(Navigator):
+    def __init__(self, robot):
+        super().__init__(robot)
+        self.sub = rospy.Subscriber('/amcl_pose', PoseWithCovarianceStamped, self.pose_cb)
+        self.check_ready()
+
+    def pose_cb(self, data):
+        self.pose = data.pose.pose
+
     def check_ready(self):
         rospy.logdebug("Waiting for amcl to be READY...")
         data = None
@@ -110,10 +146,12 @@ class AMCLNavigator:
             except:
                 rospy.logerr("Current amcl not ready yet, retrying for getting amcl")
 
-
-class Navigator:
-    def __init__(self):
-        self.goal = None
+"""
+Navigator based on move_base
+"""
+class MoveBaseNavigator(Navigator):
+    def __init__(self, robot):
+        super().__init__(robot)
         self.client = actionlib.SimpleActionClient('move_base', MoveBaseAction)
         self.client.wait_for_server()
         self.reached = False
@@ -147,7 +185,7 @@ class Navigator:
         print("goal ({:.4f},{:.4f},{:.4f})".format(gp.x,gp.y,gq[2]))
         print("current ({:.4f},{:.4f},{:.4f})".format(p.x,p.y,q[2]))
 
-    def move2goal(self, goal):
+    def move2goal(self,goal,tol_p=0.025,tol_a=0.01):
         print("move to goal...")
         self.goal = goal
         self.last_time = rospy.Time.now()
