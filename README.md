@@ -16,3 +16,7 @@ This is a simulation of a mobile robot for performing indoor service, including 
 1. ids_gazebo
 2. ids_description
 3. ids_control
+4. ids_detection
+5. ids_joy
+6. ids_learning
+7. ids_task
