@@ -61,9 +61,9 @@ if __name__ == '__main__':
                 detections = detect_object(detector)
                 for msg in detections:
                     pub.publish(msg)
-                draw_prediction(sensor,detections,names)
+                # draw_prediction(sensor,detections,names)
             rate.sleep()
     except rospy.ROSInterruptException:
         pass
-    cv2.destroyAllWindows()
+    # cv2.destroyAllWindows()
     os.kill(os.getpid(), signal.SIGTERM)

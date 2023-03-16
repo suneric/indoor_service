@@ -14,7 +14,7 @@ def get_args():
     return parser.parse_args()
 
 if __name__ == "__main__":
-    rospy.init_node("indoor_service", anonymous=True, log_level=rospy.INFO)
+    rospy.init_node("simulation", anonymous=True, log_level=rospy.INFO)
     robot = MRobot()
     nav = BasicNavigator(robot)
     args = get_args()

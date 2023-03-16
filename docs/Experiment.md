@@ -18,7 +18,7 @@ A [Jazzy Elite ES](https://www.pridemobility.com/jazzy-power-chairs/jazzy-elite-
 |Load Cell Processor|Raspberry Pi|ubuntu-desktop|192.168.1.15|Ubuntu 20.04|Noetic|No|
 |Vision Processor|Jetson Nano|nano|192.168.1.17|Ubuntu 18.04|Melodic|No|
 
-## Master Computer (192.168.1.7)
+## Master Computer (ip: 192.168.1.7)
 ### Configuration
 Edit '/etc/hosts' by adding
 ```
@@ -27,18 +27,6 @@ Edit '/etc/hosts' by adding
   192.168.1.17	nano
   192.168.1.19	raspberrypi
 ```
-
-## Raspberry Pi (ip: 192.168.1.19)
-### Configuration
-- Install OS:buster (hostname: raspberrypi)
-- Install ROS Melodic
-- Install pigpio driver
-- Configure ip v4 address
-- Add hostname ```192.168.1.7 ubuntu-Alienware-Aurora-R7``` to '/etc/hosts'
-
-### Mobile Base Control
-- Download [jazzy_driver](https://github.com/suneric/jazzy_driver) to 'catkin_ws/src'
-- Create jazzy-service and start the service
 
 ## Raspberry Pi (ip: 192.168.1.15)
 ### Configuration
@@ -51,12 +39,23 @@ Edit '/etc/hosts' by adding
 - Download [motor_driver](https://github.com/suneric/motor_driver) to 'catkin_ws/src'
 - Install can-util and python3-can
 - Create rm2006-service and start the service
+- Topics
+  - Subcriber:
+    - /robo1_cmd # plug
+    - /robo2_cmd # horizontal
+    - /robo3_cmd # vertical
+  - Publisher:
+    - /robomotor_status
 
 ### Force Sensor Control
 - Download [loadcell_process](https://github.com/suneric/loadcell_process) to 'catkin_ws/src'
 - Configure SPI interface after installation of raspi-config
 - Install BCM2835, wiringPi and GPIO
 - Create loadcell-service and start the service
+- Topics:
+  - Publisher:
+    - /loadcell1_forces # side bar
+    - /loadcell2_forces # plug container
 
 ## Jetson Nano (ip: 192.168.1.17)
 ### Configuration
@@ -69,7 +68,34 @@ Edit '/etc/hosts' by adding
 
 ### Vision Sensor Control
 - Download [camera_process](https://github.com/suneric/camera_process) to 'catkin_ws/src'
+- Download [ids_detection](https://github.com/suneric/indoor_service/tree/main/ids_detection) to 'catkin_ws/src'
 - Create camera service and start the service
+- Topics:
+  - Publisher:
+    - /camera/color/camera_info
+    - /camera/color/image_raw
+    - /camera/color/compressed
+    - /camera/depth/image_rect_raw
+    - /camera/depth/compressed
+    - /arducam/cam_info
+    - /arducam/image
+    - /arducam/image/compressed
+    - /detection
+
+## Raspberry Pi (ip: 192.168.1.19)
+### Configuration
+- Install OS:buster (hostname: raspberrypi)
+- Install ROS Melodic
+- Install pigpio driver
+- Configure ip v4 address
+- Add hostname ```192.168.1.7 ubuntu-Alienware-Aurora-R7``` to '/etc/hosts'
+
+### Mobile Base Control
+- Download [jazzy_driver](https://github.com/suneric/jazzy_driver) to 'catkin_ws/src'
+- Create jazzy-service and start the service
+- Topics
+  - Subscriber:
+    - /cmd_vel
 
 ## Start the Experiment
 - Run ```roscore``` on Master Computer

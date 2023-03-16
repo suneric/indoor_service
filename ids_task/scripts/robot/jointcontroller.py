@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 import rospy
 import numpy as np
 from std_msgs.msg import Float64
@@ -232,6 +232,7 @@ class PlugController:
 
 """
 FrameDeviceController controls all the joints on the frame
+Used for simulation only
 """
 class FrameDeviceController:
     def __init__(self):

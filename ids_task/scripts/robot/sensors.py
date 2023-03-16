@@ -1,15 +1,16 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 import rospy
 import numpy as np
 import cv2 as cv
 from cv_bridge import CvBridge, CvBridgeError
-from sensor_msgs.msg import Image, CameraInfo, PointCloud2
+from sensor_msgs.msg import Image, CameraInfo, PointCloud2, CompressedImage
 import sensor_msgs.point_cloud2 as pc2
 import skimage
 from geometry_msgs.msg import WrenchStamped
 from gazebo_msgs.msg import ContactsState, ModelStates, LinkStates
 import tf.transformations as tft
 import math
+from ids_detection.msg import DetectionInfo
 
 """
 https://en.wikipedia.org/wiki/Kalman_filter
@@ -90,12 +91,15 @@ def noise_image(image, var):
 ArduCam looks up for observing door open status
 """
 class ArduCam:
-    def __init__(self, name):
+    def __init__(self, name, compressed=False):
         print("create arducam instance...")
         self.name = name
         self.bridge=CvBridge()
         self.caminfo_sub = rospy.Subscriber('/'+name+'/camera_info', CameraInfo, self._caminfo_callback)
-        self.color_sub = rospy.Subscriber('/'+name+'/image', Image, self._color_callback)
+        if compressed:
+            self.color_sub = rospy.Subscriber('/'+name+'/image/compressed', CompressedImage, self._color_callback)
+        else:
+            self.color_sub = rospy.Subscriber('/'+name+'/image', Image, self._color_callback)
         self.cameraInfoUpdate = False
         self.cv_color = None
         self.width = 256
@@ -141,9 +145,16 @@ class ArduCam:
     def _color_callback(self, data):
         if self.cameraInfoUpdate:
             try:
-                self.cv_color = self.bridge.imgmsg_to_cv2(data, "bgr8")
+                if data._type == 'sensor_msgs/CompressedImage':
+                    self.cv_color = self._convertCompressedColorToCV2(data)
+                else:
+                    self.cv_color = self.bridge.imgmsg_to_cv2(data, "bgr8")
             except CvBridgeError as e:
                 print(e)
+
+    def _convertCompressedColorToCV2(self, colorComp):
+        rawData = np.frombuffer(colorComp.data, np.uint8)
+        return cv.imdecode(rawData, cv.IMREAD_COLOR)
 
     def check_sensor_ready(self):
         rospy.logdebug("Waiting for ardu camera to be READY...")
@@ -159,13 +170,17 @@ class ArduCam:
 Realsense D435 RGB-D camera loop forward for detecting door, door handle, wall outlet and type B socket
 """
 class RSD435:
-    def __init__(self,name):
+    def __init__(self,name, compressed = False):
         print("create realsense d435 instance...")
         self.name = name
         self.bridge=CvBridge()
         self.caminfo_sub = rospy.Subscriber('/'+name+'/color/camera_info', CameraInfo, self._caminfo_callback)
-        self.depth_sub = rospy.Subscriber('/'+name+'/depth/image_rect_raw', Image, self._depth_callback)
-        self.color_sub = rospy.Subscriber('/'+name+'/color/image_raw', Image, self._color_callback)
+        if compressed:
+            self.color_sub = rospy.Subscriber('/'+name+'/color/compressed', CompressedImage, self._color_callback)
+            self.depth_sub = rospy.Subscriber('/'+name+'/depth/compressed', CompressedImage, self._depth_callback)
+        else:
+            self.color_sub = rospy.Subscriber('/'+name+'/color/image_raw', Image, self._color_callback)
+            self.depth_sub = rospy.Subscriber('/'+name+'/depth/image_rect_raw', Image, self._depth_callback)
         self.cameraInfoUpdate = False
         self.intrinsic = None
         self.cv_color = None
@@ -230,16 +245,37 @@ class RSD435:
     def _depth_callback(self, data):
         if self.cameraInfoUpdate:
             try:
-                self.cv_depth = self.bridge.imgmsg_to_cv2(data, data.encoding) #"16UC1"
+                if data._type == 'sensor_msgs/CompressedImage':
+                    self.cv_depth = self._convertCompressedDepthToCV2(data)
+                else:
+                    self.cv_depth = self.bridge.imgmsg_to_cv2(data, data.encoding) #"16UC1"
             except CvBridgeError as e:
                 print(e)
 
     def _color_callback(self, data):
         if self.cameraInfoUpdate:
             try:
-                self.cv_color = self.bridge.imgmsg_to_cv2(data, "bgr8")
+                if data._type == 'sensor_msgs/CompressedImage':
+                    self.cv_depth = self._convertCompressedColorToCV2(data)
+                else:
+                    self.cv_color = self.bridge.imgmsg_to_cv2(data, "bgr8")
             except CvBridgeError as e:
                 print(e)
+
+    def _convertCompressedColorToCV2(self, colorComp):
+        rawData = np.frombuffer(colorComp.data, np.uint8)
+        return cv.imdecode(rawData, cv.IMREAD_COLOR)
+
+    def _convertCompressedDepthToCV2(self, depthComp):
+        fmt, type = depthComp.format.split(';')
+        fmt = fmt.strip() # remove white space
+        type = type.strip() # remove white space
+        if type != 'compressedDepth':
+            raise Exception("Compression type is not 'compressedDepth'.")
+        depthRaw = cv.imdecode(np.frombuffer(depthComp[12:], np.uint8), -1)
+        if depthRaw is None:
+            raise Exception("Could not decode compressed depth image.")
+        return depthRaw
 
     def check_sensor_ready(self):
         rospy.logdebug("Waiting for depth sensor to be READY...")
@@ -426,3 +462,35 @@ class PoseSensor():
                 rospy.logdebug("Current  /gazebo/link_states READY=>")
             except:
                 rospy.logerr("Current  /gazebo/link_states not ready yet, retrying for getting  /gazebo/link_states")
+
+"""
+ObjectDetector
+"""
+class ObjectDetector:
+    def __init__(self, topic, type, max=6):
+        self.sub = rospy.Subscriber(topic, DetectionInfo, self.detect_cb)
+        self.info = []
+        self.type = type
+        self.max_count = max
+
+    def reset(self):
+        self.info = []
+
+    def ready(self):
+        if len(self.info) < self.max_count:
+            return False
+        else:
+            print("object detector ready.")
+            return True
+
+    def detect_cb(self, data):
+        if data.type == self.type:
+            if len(self.info) == self.max_count:
+                self.info.pop(0)
+            self.info.append(data)
+
+    def get_detect_info(self):
+        detected = []
+        for info in self.info:
+            detected.append(info)
+        return detected

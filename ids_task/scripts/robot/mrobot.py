@@ -1,43 +1,11 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 import rospy
 import numpy as np
-import tf.transformations as tft
-from geometry_msgs.msg import Twist
-from gazebo_msgs.msg import ODEJointProperties, ModelState
-from gazebo_msgs.srv import SetJointProperties, SetJointPropertiesRequest
-import math
+from .driver import RobotDriver
 from .sensors import RSD435, ArduCam, FTSensor, PoseSensor
 from .jointcontroller import FrameDeviceController
-from ids_detection.msg import DetectionInfo
-
-class ObjectDetector:
-    def __init__(self, topic, type, max=6):
-        self.sub = rospy.Subscriber(topic, DetectionInfo, self.detect_cb)
-        self.info = []
-        self.type = type
-        self.max_count = max
-
-    def reset(self):
-        self.info = []
-
-    def ready(self):
-        if len(self.info) < self.max_count:
-            return False
-        else:
-            print("object detector ready.")
-            return True
-
-    def detect_cb(self, data):
-        if data.type == self.type:
-            if len(self.info) == self.max_count:
-                self.info.pop(0)
-            self.info.append(data)
-
-    def get_detect_info(self):
-        detected = []
-        for info in self.info:
-            detected.append(info)
-        return detected
+from gazebo_msgs.msg import ModelState
+import tf.transformations as tft
 
 """
 RobotPoseReset
@@ -60,96 +28,19 @@ class RobotPoseReset:
         self.pub.publish(robot)
 
 """
-RobotDriver based on /cmd_vel
+RObot Configuration
 """
-class RobotDriver:
-    def __init__(self):
-        self.vel_pub = rospy.Publisher('cmd_vel',Twist,queue_size=1)
-        self.vel = (0,0)
-        service_name = '/gazebo/set_joint_properties'
-        print("Waiting for service " + str(service_name))
-        rospy.wait_for_service(service_name)
-        print("Service Found " + str(service_name))
-        self.set_properties = rospy.ServiceProxy(service_name, SetJointProperties)
-
-    def velocity(self):
-        return self.vel
-
-    def set_properties_cb(self,data):
-        print(data)
-
-    def drive(self,vx,vyaw):
-        msg = Twist()
-        msg.linear.x = vx
-        msg.linear.y = 0
-        msg.linear.z = 0
-        msg.angular.x = 0
-        msg.angular.y = 0
-        msg.angular.z = vyaw
-        self.vel_pub.publish(msg)
-        self.vel = (vx,vyaw)
-
-    # set hiStop and loStop works for lock a joint
-    def brake(self):
-        brake_config = ODEJointProperties()
-        brake_config.hiStop = [0.0]
-        brake_config.loStop = [0.0]
-        self.set_wheel_joint_property(brake_config)
-        print("brake")
-
-    # this does not work for unlock a joint
-    def unbrake(self):
-        unbrake_config = ODEJointProperties()
-        unbrake_config.hiStop = [1000.0]
-        unbrake_config.loStop = [0.0]
-        self.set_wheel_joint_property(unbrake_config)
-        print("unbrake")
-
-    def set_wheel_joint_property(self, config):
-        lf_wheel = SetJointPropertiesRequest()
-        lf_wheel.joint_name = 'joint_chassis_lfwheel'
-        lf_wheel.ode_joint_config = config
-        result = self.set_properties(lf_wheel)
-
-        rf_wheel = SetJointPropertiesRequest()
-        rf_wheel.joint_name = 'joint_chassis_rfwheel'
-        rf_wheel.ode_joint_config = config
-        result = self.set_properties(rf_wheel)
-
-        lr_wheel = SetJointPropertiesRequest()
-        lr_wheel.joint_name = 'joint_chassis_lrwheel'
-        lr_wheel.ode_joint_config = config
-        result = self.set_properties(lr_wheel)
-
-        rr_wheel = SetJointPropertiesRequest()
-        rr_wheel.joint_name = 'joint_chassis_rrwheel'
-        rr_wheel.ode_joint_config = config
-        result = self.set_properties(rr_wheel)
-
-    def stop(self):
-        self.drive(0,0)
-
-    def check_publisher_connection(self):
-        rate =rospy.Rate(10)
-        while self.vel_pub.get_num_connections() == 0 and not rospy.is_shutdown():
-            rospy.logdebug("no subscriber to vel_pub yet so wait and try again")
-            try:
-                rate.sleep()
-            except rospy.ROSInterruptException:
-                pass
-        rospy.logdebug("vel_pub Publisher connected")
-
-
 class RobotConfig:
     rsdOffsetX = 0.2642
     rsdOffsetZ = 0.0725
     outletY = 2.992
 
 """
-MobileRobot
+MobileRobot, used for simulation only.
 """
 class MRobot:
     def __init__(self):
+        print("create robot for simulation.")
         self.driver = RobotDriver()
         self.fdController = FrameDeviceController()
         self.camRSD = RSD435('camera')
@@ -173,7 +64,7 @@ class MRobot:
         self.robotPoseReset.reset(rx,ry,yaw)
         rospy.sleep(0.5)
         crPos = self.poseSensor.robot()
-        if math.sqrt((crPos[0]-rx)**2+(crPos[1]-ry)**2) > 0.01:
+        if np.sqrt((crPos[0]-rx)**2+(crPos[1]-ry)**2) > 0.01:
             self.robotPoseReset.reset(rx,ry,yaw)
             print("train reset robot again.")
 
