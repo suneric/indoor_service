@@ -61,9 +61,9 @@ def resize_image(image, shape=None, inter = cv.INTER_AREA):
     """
     resize image without distortion
     """
-    (h,w) = image.shape[:2]
     if shape == None:
         return image
+    (h,w) = image.shape[:2]
     # crop image before resize
     dim = None
     rh = h/shape[0]
@@ -133,8 +133,13 @@ class ArduCam:
     def image_size(self):
         return self.height, self.width
 
-    def color_image(self):
-        return self.cv_color
+    def color_image(self, resolution=None, code=None):
+        if self.cv_color is None:
+            return None
+        img = resize_image(self.cv_color,resolution)
+        if code == 'rgb':
+            img = cv.cvtColor(img, cv.COLOR_BGR2RGB)
+        return img
 
     def _caminfo_callback(self, data):
         if self.cameraInfoUpdate == False:
@@ -232,8 +237,13 @@ class RSD435:
     def depth_image(self):
         return self.cv_depth
 
-    def color_image(self):
-        return self.cv_color
+    def color_image(self, resolution=None, code=None):
+        if self.cv_color is None:
+            return None
+        img = resize_image(self.cv_color,resolution)
+        if code == 'rgb':
+            img = cv.cvtColor(img, cv.COLOR_BGR2RGB)
+        return img
 
     def _caminfo_callback(self, data):
         if self.cameraInfoUpdate == False:
@@ -256,7 +266,7 @@ class RSD435:
         if self.cameraInfoUpdate:
             try:
                 if data._type == 'sensor_msgs/CompressedImage':
-                    self.cv_depth = self._convertCompressedColorToCV2(data)
+                    self.cv_color = self._convertCompressedColorToCV2(data)
                 else:
                     self.cv_color = self.bridge.imgmsg_to_cv2(data, "bgr8")
             except CvBridgeError as e:
@@ -272,7 +282,7 @@ class RSD435:
         type = type.strip() # remove white space
         if type != 'compressedDepth':
             raise Exception("Compression type is not 'compressedDepth'.")
-        depthRaw = cv.imdecode(np.frombuffer(depthComp[12:], np.uint8), -1)
+        depthRaw = cv.imdecode(np.frombuffer(depthComp.data[12:], np.uint8), -1)
         if depthRaw is None:
             raise Exception("Could not decode compressed depth image.")
         return depthRaw
@@ -312,6 +322,12 @@ class FTSensor():
 
     def forces(self):
         return self.filtered
+
+    def profile(self, size):
+        if len(self.record) <= size:
+            return self.record
+        else:
+            return self.record[-size:]
 
     def reset(self):
         self.record = []

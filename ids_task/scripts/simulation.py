@@ -19,7 +19,7 @@ if __name__ == "__main__":
     nav = BasicNavigator(robot)
     args = get_args()
     if args.task == "open":
-        open = DoorOpeningTask(robot,nav,(1.5,0.85,np.pi))
+        open = DoorOpeningTask(robot,nav,(1.5,0.83,np.pi))
         open.prepare()
         open.move2goal()
         open.perform()

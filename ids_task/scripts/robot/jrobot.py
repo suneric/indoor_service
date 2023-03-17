@@ -25,3 +25,12 @@ class JazzyRobot:
         self.ftPlug = FTSensor('loadcell2_forces')
         self.ftHook = FTSensor('loadcell1_forces')
         self.config = RobotConfig()
+        # self.check_ready()
+
+    def check_ready(self):
+        self.driver.check_publisher_connection()
+        # self.fdController.check_publisher_connection()
+        self.camRSD.check_sensor_ready()
+        self.camARD.check_sensor_ready()
+        self.ftPlug.check_sensor_ready()
+        self.ftHook.check_sensor_ready()

@@ -50,6 +50,7 @@ class MRobot:
         self.poseSensor = PoseSensor()
         self.robotPoseReset = RobotPoseReset()
         self.config = RobotConfig()
+        self.check_ready()
 
     def check_ready(self):
         self.driver.check_publisher_connection()
@@ -58,7 +59,6 @@ class MRobot:
         self.camARD.check_sensor_ready()
         self.ftPlug.check_sensor_ready()
         self.ftHook.check_sensor_ready()
-        # self.poseSensor.check_sensor_ready()
 
     def reset_robot(self,rx,ry,yaw):
         self.robotPoseReset.reset(rx,ry,yaw)
