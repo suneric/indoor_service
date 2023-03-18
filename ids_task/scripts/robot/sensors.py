@@ -3,13 +3,14 @@ import rospy
 import numpy as np
 import cv2 as cv
 from cv_bridge import CvBridge, CvBridgeError
-from sensor_msgs.msg import Image, CameraInfo, PointCloud2, CompressedImage
 import sensor_msgs.point_cloud2 as pc2
-import skimage
+from sensor_msgs.msg import Image, CameraInfo, PointCloud2, CompressedImage
+from std_msgs.msg import Float32, Float32MultiArray, MultiArrayDimension
 from geometry_msgs.msg import WrenchStamped
 from gazebo_msgs.msg import ContactsState, ModelStates, LinkStates
 import tf.transformations as tft
 import math
+import skimage
 from ids_detection.msg import DetectionInfo
 
 """
@@ -324,10 +325,12 @@ class FTSensor():
         return self.filtered
 
     def profile(self, size):
-        if len(self.record) <= size:
-            return self.record
-        else:
-            return self.record[-size:]
+        array = np.zeros((size,3))
+        i = 0
+        while i < len(self.record) and i < size:
+            array[-i] = self.record[-i]
+            i += 1
+        return array
 
     def reset(self):
         self.record = []
@@ -350,6 +353,55 @@ class FTSensor():
                 rospy.logdebug("Current force sensor READY=>")
             except:
                 rospy.logerr("Current force sensor not ready yet, retrying for getting force /"+self.topic)
+
+"""
+Load Cell Sensor for 3 axis forces
+"""
+class LCSensor:
+    def __init__(self, topic):
+        self.topic = topic
+        self.force_sub = rospy.Subscriber('/'+self.topic, Float32MultiArray, self._force_cb)
+        self.forces = np.zeros(3)
+        self.record = []
+        self.record_temp = []
+
+    def _force_cb(self,data):
+        self.forces = data.data
+        self.record.append(self.forces)
+        self.record_temp.append(self.forces)
+
+    def forces(self):
+        return self.forces
+
+    def profile(self,size):
+        array = np.zeros((size,3))
+        i = 1
+        while i < len(self.record)+1 and i < size+1:
+            array[-i] = self.record[-i]
+            i += 1
+        return array
+
+    def reset(self):
+        self.record = []
+
+    def reset_temp(self):
+        self.record_temp = []
+
+    def temp_record(self):
+        return self.record_temp
+
+    def forces_record(self):
+        return self.record
+
+    def check_sensor_ready(self):
+        rospy.logdebug("Waiting for loadcell to be READY...")
+        data = None
+        while data is None and not rospy.is_shutdown():
+            try:
+                data = rospy.wait_for_message(self.topic, Float32MultiArray, timeout=5.0)
+                rospy.logdebug("Current loadcell READY=>")
+            except:
+                rospy.logerr("Current loadcell not ready yet, retrying for getting force /"+self.topic)
 
 """
 Contact Sensor for detecting collision between plug adapter and socket

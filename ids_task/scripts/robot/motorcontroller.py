@@ -8,7 +8,6 @@ class JointController:
         self.joint1_pub = rospy.Publisher('robo1_cmd',Int32, queue_size=1)
         self.joint2_pub = rospy.Publisher('robo2_cmd',Int32, queue_size=1)
         self.joint3_pub = rospy.Publisher('robo3_cmd',Int32, queue_size=1)
-        self.check_connections()
 
     def check_connections(self):
         rate = rospy.Rate(10)

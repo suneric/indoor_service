@@ -8,10 +8,10 @@ import time
 
 def display_sensor_info(robot,im1,im2,fx1,fx2,fy1,fy2,fz1,fz2):
     img1 = robot.camRSD.color_image(resolution=(500,500),code='rgb')
-    if img1:
+    if img1 is not None:
         axes[0,0].imshow(img1)
     img2 = robot.camARD.color_image(resolution=(500,500),code='rgb')
-    if img2:
+    if img2 is not None:
         axes[0,1].imshow(img2)
     pf1 = robot.ftPlug.profile(size=1000)
     fx1[0].set_ydata([f[0] for f in pf1])
@@ -30,22 +30,22 @@ if __name__ == '__main__':
         robot = JazzyRobot()
     else:
         robot = MRobot()
-    rospy.sleep(10)
-    # create a figure
+    # display image
     plt.ion()
     fig, axes = plt.subplots(4,2,figsize=(8,10),gridspec_kw={'height_ratios': [3, 1, 1, 1],'width_ratios': [1,1]})
     axes[0,0].set_title("RealSense View")
     axes[0,0].set_xticks([])
     axes[0,0].set_yticks([])
     img1 = robot.camRSD.color_image(resolution=(500,500),code='rgb')
-    if img1:
+    if img1 is not None:
         axes[0,0].imshow(img1)
     axes[0,1].set_title("ArduCam View")
     axes[0,1].set_xticks([])
     axes[0,1].set_yticks([])
     img2 = robot.camARD.color_image(resolution=(500,500),code='rgb')
-    if img2:
+    if img2 is not None:
         axes[0,1].imshow(img2)
+    # display forces
     pf1 = robot.ftPlug.profile(size=1000)
     axes[1,0].set_title("Plug Forces")
     fx1 = axes[1,0].plot([f[0] for f in pf1])
@@ -75,7 +75,7 @@ if __name__ == '__main__':
     axes[3,1].yaxis.set_label_position("right")
     axes[3,1].yaxis.tick_right()
 
-    rate = rospy.Rate(30)
+    rate = rospy.Rate(10)
     try:
         start = time.time()
         while not rospy.is_shutdown():
