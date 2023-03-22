@@ -3,14 +3,16 @@ import rospy
 import numpy as np
 from robot.jrobot import JazzyRobot
 from robot.mrobot import MRobot
+from robot.sensors import ObjectDetector
 import matplotlib.pyplot as plt
 import time
 
-def display_sensor_info(robot,im1,im2,fx1,fx2,fy1,fy2,fz1,fz2):
-    img1 = robot.camRSD.color_image(resolution=(500,500),code='rgb')
+
+def display_sensor_info(robot,detector,im1,im2,fx1,fx2,fy1,fy2,fz1,fz2):
+    img1 = robot.camRSD.color_image(resolution=(200,200),code='rgb',detector=detector)
     if img1 is not None:
         axes[0,0].imshow(img1)
-    img2 = robot.camARD.color_image(resolution=(500,500),code='rgb')
+    img2 = robot.camARD.color_image(resolution=(200,200),code='rgb')
     if img2 is not None:
         axes[0,1].imshow(img2)
     pf1 = robot.ftPlug.profile(size=1000)
@@ -36,13 +38,13 @@ if __name__ == '__main__':
     axes[0,0].set_title("RealSense View")
     axes[0,0].set_xticks([])
     axes[0,0].set_yticks([])
-    img1 = robot.camRSD.color_image(resolution=(500,500),code='rgb')
+    img1 = robot.camRSD.color_image(resolution=(500,500),code='rgb',detector=None)
     if img1 is not None:
         axes[0,0].imshow(img1)
     axes[0,1].set_title("ArduCam View")
     axes[0,1].set_xticks([])
     axes[0,1].set_yticks([])
-    img2 = robot.camARD.color_image(resolution=(500,500),code='rgb')
+    img2 = robot.camARD.color_image(resolution=(100,100),code='rgb')
     if img2 is not None:
         axes[0,1].imshow(img2)
     # display forces
@@ -75,13 +77,17 @@ if __name__ == '__main__':
     axes[3,1].yaxis.set_label_position("right")
     axes[3,1].yaxis.tick_right()
 
+    detector = ObjectDetector(topic='detection')
+    while not detector.ready():
+        rospy.sleep(1)
+
     rate = rospy.Rate(10)
     try:
         start = time.time()
         while not rospy.is_shutdown():
             t = time.time()
             fig.suptitle("Sensor Information {:.2f} s".format(t-start))
-            display_sensor_info(robot,axes[0,0],axes[0,1],fx1,fx2,fy1,fy2,fz1,fz2)
+            display_sensor_info(robot,detector,axes[0,0],axes[0,1],fx1,fx2,fy1,fy2,fz1,fz2)
             fig.canvas.draw()
             fig.canvas.flush_events()
             rate.sleep()

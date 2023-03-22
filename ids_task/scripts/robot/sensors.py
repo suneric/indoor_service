@@ -96,7 +96,7 @@ class ArduCam:
         print("create arducam instance...")
         self.name = name
         self.bridge=CvBridge()
-        self.caminfo_sub = rospy.Subscriber('/'+name+'/camera_info', CameraInfo, self._caminfo_callback)
+        self.caminfo_sub = rospy.Subscriber('/'+name+'/cam_info', CameraInfo, self._caminfo_callback)
         if compressed:
             self.color_sub = rospy.Subscriber('/'+name+'/image/compressed', CompressedImage, self._color_callback)
         else:
@@ -238,9 +238,16 @@ class RSD435:
     def depth_image(self):
         return self.cv_depth
 
-    def color_image(self, resolution=None, code=None):
+    def color_image(self, resolution=None, code=None, detector=None):
         if self.cv_color is None:
             return None
+        img = self.cv_color
+        if detector:
+            info = detector.info[-1]
+            label = detector.names[int(info.type)]
+            l,t,r,b = int(info.l),int(info.t),int(info.r),int(info.b)
+            cv.rectangle(img, (l,t), (r,b), (0,255,0), 2)
+            cv.putText(img, label, (l-10,t-10), cv.FONT_HERSHEY_SIMPLEX, 0.5, (0,255,0), 1)
         img = resize_image(self.cv_color,resolution)
         if code == 'rgb':
             img = cv.cvtColor(img, cv.COLOR_BGR2RGB)
@@ -535,11 +542,12 @@ class PoseSensor():
 ObjectDetector
 """
 class ObjectDetector:
-    def __init__(self, topic, type, max=6):
+    def __init__(self, topic, type=None, max=6):
         self.sub = rospy.Subscriber(topic, DetectionInfo, self.detect_cb)
         self.info = []
         self.type = type
         self.max_count = max
+        self.names = ["door","door handle","human","outlet","socket"]
 
     def reset(self):
         self.info = []
@@ -552,9 +560,9 @@ class ObjectDetector:
             return True
 
     def detect_cb(self, data):
-        if data.type == self.type:
-            if len(self.info) == self.max_count:
-                self.info.pop(0)
+        if len(self.info) == self.max_count:
+            self.info.pop(0)
+        if self.type is None or self.type == data.type:
             self.info.append(data)
 
     def get_detect_info(self):
