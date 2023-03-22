@@ -19,8 +19,8 @@ class JazzyRobot:
         self.fdController = JointController()
         self.camRSD = RSD435(name='camera', compressed=True)
         self.camARD = ArduCam(name='arducam', compressed=True)
-        self.ftPlug = LCSensor('loadcell2_forces')
-        self.ftHook = LCSensor('loadcell1_forces')
+        self.ftPlug = LCSensor('loadcell1_forces')
+        self.ftHook = LCSensor('loadcell2_forces')
         self.config = RobotConfig()
         # self.check_ready()
 
