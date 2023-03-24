@@ -2,18 +2,19 @@
 
 <robot xmlns:xacro="https://www.ros.org/wiki/xacro" >
     <xacro:property name="PI" value="3.1415926535897931"/>
+    <xacro:property name="mu" value="0.98"/>
+    <xacro:property name="mu2" value="0.98"/>
     <xacro:property name="jazzy_m" value="40" />
     <xacro:property name="wheel_m" value="0.5"/>
-    <xacro:property name="wheel_r" value="0.11"/>
+    <xacro:property name="wheel_r" value="0.075"/>
     <xacro:property name="wheel_l" value="0.0762"/>
-    <xacro:property name="caster_m" value="0.5"/>
-    <xacro:property name="frame_m" value="2"/>
-    <xacro:property name="vslider_m" value="2"/>
-    <xacro:property name="hslider_m" value="1"/>
-    <xacro:property name="plug_m" value="0.5"/>
-    <xacro:property name="battery_m" value="50"/>
-    <xacro:property name="hook_m" value="0.2"/>
-    <xacro:property name="tip_m" value="0.1"/>
+    <xacro:property name="wheelbase" value="0.5" /> <!--base on the wheel diameter and chassis_x-->
+    <xacro:property name="track" value="0.475" /> <!--base on the wheel width and chassis_y-->
+    <xacro:property name="battery_m" value="40"/>
+    <xacro:property name="bumper_x" value="0.04" />
+    <xacro:property name="bumper_y" value="0.46" />
+    <xacro:property name="bumper_z" value="0.125" />
+    <xacro:property name="bumper_m" value="1" />
 
     <xacro:macro name="jazzy_base_macro">
       <link name="link_jazzy">
@@ -35,6 +36,32 @@
           <inertia ixx="${jazzy_m*(0.4*0.4*0.15*0.15)}" ixy="0" ixz="0" iyy="${jazzy_m*(0.6*0.6*0.15*0.15)}" iyz="0" izz="${jazzy_m*(0.6*0.6*0.4*0.4)}"/>
         </inertial>
       </link>
+      <!--bumper-->
+      <joint name="joint_chassis_fbumper" type="fixed">
+        <origin xyz="0.25 0 0.0375" rpy="0 0 0"/>
+        <parent link="link_jazzy"/>
+        <child link="link_fbumper"/>
+      </joint>
+
+      <link name="link_fbumper">
+        <visual>
+          <origin xyz="${bumper_x/2} 0 0" rpy="0 0 0" />
+          <geometry>
+            <box size="${bumper_x} ${bumper_y} ${bumper_z}"/>
+          </geometry>
+        </visual>
+        <collision>
+          <origin xyz="${bumper_x/2} 0 0" rpy="0 0 0" />
+          <geometry>
+            <box size="${bumper_x} ${bumper_y} ${bumper_z}"/>
+          </geometry>
+        </collision>
+        <inertial>
+          <mass value="${bumper_m}"/>
+          <origin rpy="0 0 0" xyz="0 0 0"/>
+          <inertia ixx="${(1/12)*bumper_m*(bumper_y*bumper_y+bumper_z*bumper_z)}" ixy="0" ixz="0" iyy="${(1/12)*bumper_m*(bumper_z*bumper_z+bumper_x*bumper_x)}" iyz="0" izz="${(1/12)*bumper_m*(bumper_x*bumper_x+bumper_y*bumper_y)}"/>
+        </inertial>
+      </link>
       <!--battery-->
       <joint name="joint_jazzy_battery" type="fixed">
         <origin xyz="0 0 0" rpy="0 0 0" />
@@ -43,31 +70,31 @@
       </joint>
       <link name="link_battery">
         <visual>
-          <origin rpy="0 0 0" xyz="-0.15 0 0.155"/>
+          <origin rpy="0 0 0" xyz="-0.1 0 0.4"/>
           <geometry>
-            <box size="0.2 0.2 0.01"/>
+            <box size="0.4 0.25 0.5"/>
           </geometry>
         </visual>
         <collision>
-          <origin rpy="0 0 0" xyz="-0.15 0 0.155" />
+          <origin rpy="0 0 0" xyz="-0.1 0 0.25" />
           <geometry>
-            <box size="0.2 0.2 0.01"/>
+            <box size="0.4 0.25 0.5"/>
           </geometry>
         </collision>
         <inertial>
           <mass value="${battery_m}"/>
-          <origin rpy="0 0 0" xyz="-0.15 0 0.155"/>
-          <inertia ixx="${(1/12)*battery_m*(0.2*0.2+0.01*0.01)}" ixy="0" ixz="0" iyy="${(1/12)*battery_m*(0.2*0.2+0.01*0.01)}" iyz="0" izz="${(1/12)*battery_m*(0.2*0.2*0.2*0.2)}"/>
+          <origin rpy="0 0 0" xyz="-0.1 0 0.25"/>
+          <inertia ixx="${(1/12)*battery_m*(0.25*0.25+0.5*0.5)}" ixy="0" ixz="0" iyy="${(1/12)*battery_m*(0.4*0.4+0.5*0.5)}" iyz="0" izz="${(1/12)*battery_m*(0.4*0.4+0.25*0.25)}"/>
         </inertial>
       </link>
-      <!--left wheel-->
-      <joint name="joint_jazzy_lwheel" type="continuous">
-        <origin xyz="0.11 0.24 0.04" rpy="0 0 0" />
+      <!--left rear wheel-->
+      <joint name="joint_chassis_lrwheel" type="continuous">
+        <origin xyz="${-wheelbase/2-0.125} ${track/2} 0" rpy="0 0 0" />
         <parent link="link_jazzy"/>
-        <child link="link_lwheel"/>
+        <child link="link_lrwheel"/>
         <axis xyz="0 1 0" rpy="0 0 0" />
       </joint>
-      <link name="link_lwheel">
+      <link name="link_lrwheel">
         <visual>
           <origin rpy="${PI/2} 0 0" xyz="0 0 0"/>
           <geometry>
@@ -84,130 +111,143 @@
           <mass value="${wheel_m}"/>
           <origin rpy="${PI/2} 0 0" xyz="0 0 0"/>
           <inertia ixx="${(1/12)*wheel_m*(3*wheel_r*wheel_r+wheel_l*wheel_l)}" ixy="0" ixz="0" iyy="${(1/12)*wheel_m*(3*wheel_r*wheel_r+wheel_l*wheel_l)}" iyz="0" izz="${(1/2)*wheel_m*wheel_r*wheel_r}"/>
-        </inertial>
-      </link>
-      <!--right wheel-->
-      <joint name="joint_jazzy_rwheel" type="continuous">
-        <origin xyz="0.11 -0.24 0.04" rpy="0 0 0" />
-        <parent link="link_jazzy"/>
-        <child link="link_rwheel"/>
-        <axis xyz="0 1 0" rpy="0 0 0" />
-      </joint>
-      <link name="link_rwheel">
-        <visual>
-          <origin rpy="${PI/2} 0 0" xyz="0 0 0"/>
-          <geometry>
-            <cylinder length="${wheel_l}" radius="${wheel_r}"/>
-          </geometry>
-        </visual>
-        <collision>
-          <origin rpy="${PI/2} 0 0" xyz="0 0 0" />
-          <geometry>
-            <cylinder length="${wheel_l}" radius="${wheel_r}"/>
-          </geometry>
-        </collision>
-        <inertial>
-          <mass value="${wheel_m}"/>
-          <origin rpy="${PI/2} 0 0" xyz="0 0 0"/>
-          <inertia ixx="${(1/12)*wheel_m*(3*wheel_r*wheel_r+wheel_l*wheel_l)}" ixy="0" ixz="0" iyy="${(1/12)*wheel_m*(3*wheel_r*wheel_r+wheel_l*wheel_l)}" iyz="0" izz="${(1/2)*wheel_m*wheel_r*wheel_r}"/>
-        </inertial>
-      </link>
-      <!--left caster-->
-      <joint name="joint_jazzy_lcaster" type="fixed">
-        <origin rpy="0 0 0" xyz="0 0 0"/>
-        <parent link="link_jazzy"/>
-        <child link="link_lcaster"/>
-      </joint>
-      <link name="link_lcaster">
-        <visual>
-          <origin rpy="0 0 0" xyz="-0.355 0.175 -0.04"/>
-          <geometry>
-            <sphere radius="0.04"/>
-          </geometry>
-        </visual>
-        <collision>
-          <origin rpy=" 0 0 0" xyz="-0.355 0.175 -0.04"/>
-          <geometry>
-            <sphere radius="0.04"/>
-          </geometry>
-        </collision>
-        <inertial>
-          <mass value="${caster_m}"/>
-          <origin rpy="0 0 0" xyz="-0.355 0.20 -0.04"/>
-          <inertia ixx="${caster_m*4.9e-4}" ixy="0" ixz="0" iyy="${caster_m*4.9e-4}" iyz="0" izz="${caster_m*4.9e-4}"/>
-        </inertial>
-      </link>
-      <!--right caster-->
-      <joint name="joint_jazzy_rcaster" type="fixed">
-        <origin rpy="0 0 0" xyz="0 0 0"/>
-        <parent link="link_jazzy"/>
-        <child link="link_rcaster"/>
-      </joint>
-      <link name="link_rcaster">
-        <visual>
-          <origin rpy="0 0 0" xyz="-0.355 -0.175 -0.04"/>
-          <geometry>
-            <sphere radius="0.04"/>
-          </geometry>
-        </visual>
-        <collision>
-          <origin rpy=" 0 0 0" xyz="-0.355 -0.175 -0.04"/>
-          <geometry>
-            <sphere radius="0.04"/>
-          </geometry>
-        </collision>
-        <inertial>
-          <mass value="${caster_m}"/>
-          <origin rpy="0 0 0" xyz="-0.355 -0.20 -0.04"/>
-          <inertia ixx="${caster_m*4.9e-4}" ixy="0" ixz="0" iyy="${caster_m*4.9e-4}" iyz="0" izz="${caster_m*4.9e-4}"/>
         </inertial>
       </link>
 
-      <!-- differential_drive_controller -->
+      <!--right rear wheel-->
+      <joint name="joint_chassis_rrwheel" type="continuous">
+        <origin xyz="${-wheelbase/2-0.125} -${track/2} 0" rpy="0 0 0" />
+        <parent link="link_jazzy"/>
+        <child link="link_rrwheel"/>
+        <axis xyz="0 1 0" rpy="0 0 0" />
+      </joint>
+      <link name="link_rrwheel">
+        <visual>
+          <origin rpy="${PI/2} 0 0" xyz="0 0 0"/>
+          <geometry>
+            <cylinder length="${wheel_l}" radius="${wheel_r}"/>
+          </geometry>
+        </visual>
+        <collision>
+          <origin rpy="${PI/2} 0 0" xyz="0 0 0" />
+          <geometry>
+            <cylinder length="${wheel_l}" radius="${wheel_r}"/>
+          </geometry>
+        </collision>
+        <inertial>
+          <mass value="${wheel_m}"/>
+          <origin rpy="${PI/2} 0 0" xyz="0 0 0"/>
+          <inertia ixx="${(1/12)*wheel_m*(3*wheel_r*wheel_r+wheel_l*wheel_l)}" ixy="0" ixz="0" iyy="${(1/12)*wheel_m*(3*wheel_r*wheel_r+wheel_l*wheel_l)}" iyz="0" izz="${(1/2)*wheel_m*wheel_r*wheel_r}"/>
+        </inertial>
+      </link>
+
+      <!--left front wheel-->
+      <joint name="joint_chassis_lfwheel" type="continuous">
+        <origin xyz="${wheelbase/2-0.125} ${track/2} 0" rpy="0 0 0" />
+        <parent link="link_jazzy"/>
+        <child link="link_lfwheel"/>
+        <axis xyz="0 1 0" rpy="0 0 0" />
+      </joint>
+      <link name="link_lfwheel">
+        <visual>
+          <origin rpy="${PI/2} 0 0" xyz="0 0 0"/>
+          <geometry>
+            <cylinder length="${wheel_l}" radius="${wheel_r}"/>
+          </geometry>
+        </visual>
+        <collision>
+          <origin rpy="${PI/2} 0 0" xyz="0 0 0" />
+          <geometry>
+            <cylinder length="${wheel_l}" radius="${wheel_r}"/>
+          </geometry>
+        </collision>
+        <inertial>
+          <mass value="${wheel_m}"/>
+          <origin rpy="${PI/2} 0 0" xyz="0 0 0"/>
+          <inertia ixx="${(1/12)*wheel_m*(3*wheel_r*wheel_r+wheel_l*wheel_l)}" ixy="0" ixz="0" iyy="${(1/12)*wheel_m*(3*wheel_r*wheel_r+wheel_l*wheel_l)}" iyz="0" izz="${(1/2)*wheel_m*wheel_r*wheel_r}"/>
+        </inertial>
+      </link>
+
+      <!--right front wheel-->
+      <joint name="joint_chassis_rfwheel" type="continuous">
+        <origin xyz="${wheelbase/2-0.125} -${track/2} 0" rpy="0 0 0" />
+        <parent link="link_jazzy"/>
+        <child link="link_rfwheel"/>
+        <axis xyz="0 1 0" rpy="0 0 0" />
+      </joint>
+      <link name="link_rfwheel">
+        <visual>
+          <origin rpy="${PI/2} 0 0" xyz="0 0 0"/>
+          <geometry>
+            <cylinder length="${wheel_l}" radius="${wheel_r}"/>
+          </geometry>
+        </visual>
+        <collision>
+          <origin rpy="${PI/2} 0 0" xyz="0 0 0" />
+          <geometry>
+            <cylinder length="${wheel_l}" radius="${wheel_r}"/>
+          </geometry>
+        </collision>
+        <inertial>
+          <mass value="${wheel_m}"/>
+          <origin rpy="${PI/2} 0 0" xyz="0 0 0"/>
+          <inertia ixx="${(1/12)*wheel_m*(3*wheel_r*wheel_r+wheel_l*wheel_l)}" ixy="0" ixz="0" iyy="${(1/12)*wheel_m*(3*wheel_r*wheel_r+wheel_l*wheel_l)}" iyz="0" izz="${(1/2)*wheel_m*wheel_r*wheel_r}"/>
+        </inertial>
+      </link>
+
       <gazebo>
-        <plugin name="differential_drive_controller" filename="libgazebo_ros_diff_drive.so">
-          <updateRate>100</updateRate>
-          <leftJoint>joint_jazzy_lwheel</leftJoint>
-          <rightJoint>joint_jazzy_rwheel</rightJoint>
-          <wheelSeparation>0.48</wheelSeparation>
-          <wheelDiameter>0.22</wheelDiameter>
-          <wheelAcceleration>0.0</wheelAcceleration>
-          <wheelTorque>300</wheelTorque>
+        <plugin name="skid_steer_drive_controller" filename="libgazebo_ros_skid_steer_drive.so">
+          <updateRate>50.0</updateRate>
+          <robotNamespace>$(arg ns)</robotNamespace>
+          <leftFrontJoint>joint_chassis_lfwheel</leftFrontJoint>
+          <rightFrontJoint>joint_chassis_rfwheel</rightFrontJoint>
+          <leftRearJoint>joint_chassis_lrwheel</leftRearJoint>
+          <rightRearJoint>joint_chassis_rrwheel</rightRearJoint>
+          <wheelSeparation>${wheelbase}</wheelSeparation>
+          <wheelDiameter>2*${wheel_r}</wheelDiameter>
+          <torque>30</torque>
+          <topicName>cmd_vel</topicName>
           <commandTopic>cmd_vel</commandTopic>
           <odometryTopic>odom</odometryTopic>
+          <covariance_x>0.0001</covariance_x>
+          <covariance_y>0.0001</covariance_y>
+          <covariance_yaw>0.0001</covariance_yaw>
+          <robotBaseFrame>link_chassis</robotBaseFrame>
           <odometryFrame>odom</odometryFrame>
-          <robotBaseFrame>link_jazzy</robotBaseFrame>
-          <odometrySource>1</odometrySource>
-          <publishWheelTF>true</publishWheelTF>
-          <publishOdom>true</publishOdom>
-          <publishOdomTF>1</publishOdomTF>
-          <publishTf>1</publishTf>
-          <publishWheelJointState>false</publishWheelJointState>
-          <legacyMode>false</legacyMode>
-          <rosDebugLevel>na</rosDebugLevel>
+          <broadcastTF>true</broadcastTF>
         </plugin>
       </gazebo>
 
-      <!--materials-->
       <gazebo reference="link_jazzy">
         <material>Gazebo/Grey</material>
       </gazebo>
-      <gazebo reference="link_lwheel">
-        <mu1>0.98</mu1>
-        <mu2>0.98</mu2>
-        <material>Gazebo/Black</material>
+
+      <gazebo reference="link_fbumper">
+        <material>Gazebo/DarkGrey</material>
       </gazebo>
-      <gazebo reference="link_rwheel">
-        <mu1>0.98</mu1>
-        <mu2>0.98</mu2>
-        <material>Gazebo/Black</material>
-      </gazebo>
-      <gazebo reference="link_lcaster">
-        <material>Gazebo/Black</material>
-      </gazebo>
-      <gazebo reference="link_rcaster">
+
+      <gazebo reference="link_lrwheel">
+        <mu1>${mu}</mu1>
+        <mu2>${mu2}</mu2>
         <material>Gazebo/Black</material>
       </gazebo>
 
+      <gazebo reference="link_rrwheel">
+        <mu1>${mu}</mu1>
+        <mu2>${mu2}</mu2>
+        <material>Gazebo/Black</material>
+      </gazebo>
+
+      <gazebo reference="link_lfwheel">
+        <mu1>${mu}</mu1>
+        <mu2>${mu2}</mu2>
+        <material>Gazebo/Black</material>
+      </gazebo>
+
+      <gazebo reference="link_rfwheel">
+        <mu1>${mu}</mu1>
+        <mu2>${mu2}</mu2>
+        <material>Gazebo/Black</material>
+      </gazebo>
     </xacro:macro>
 </robot>

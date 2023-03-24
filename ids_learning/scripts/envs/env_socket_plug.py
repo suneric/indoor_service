@@ -152,7 +152,7 @@ class SocketPlugEnv(GymGazeboEnv):
     def reset_robot(self):
         self.robot.stop()
         rx = self.goal[0]
-        ry = self.goal[1]-0.5
+        ry = self.goal[1]-0.65
         rt = 0.5*np.pi
         rh = self.goal[2]+PIN_OFFSET_Z-VSLIDER_BASE_H
         # add uncertainty
