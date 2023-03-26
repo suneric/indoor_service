@@ -242,7 +242,7 @@ class RSD435:
         if self.cv_color is None:
             return None
         img = self.cv_color
-        if detector:
+        if detector and detector.ready():
             info = detector.info[-1]
             label = detector.names[int(info.type)]
             l,t,r,b = int(info.l),int(info.t),int(info.r),int(info.b)
@@ -556,7 +556,7 @@ class ObjectDetector:
         if len(self.info) < self.max_count:
             return False
         else:
-            print("object detector ready.")
+            # print("object detector ready.")
             return True
 
     def detect_cb(self, data):

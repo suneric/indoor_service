@@ -78,8 +78,8 @@ if __name__ == '__main__':
     axes[3,1].yaxis.tick_right()
 
     detector = ObjectDetector(topic='detection')
-    while not detector.ready():
-        rospy.sleep(1)
+    # while not detector.ready():
+    #     rospy.sleep(1)
 
     rate = rospy.Rate(10)
     try:

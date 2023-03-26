@@ -16,7 +16,7 @@ A [Jazzy Elite ES](https://www.pridemobility.com/jazzy-power-chairs/jazzy-elite-
 |Mobile Driver|Raspberry Pi|raspberrypi|192.168.1.19|Pi|Melodic|No|
 |Motor Driver|Raspberry Pi|ubuntu-desktop|192.168.1.15|Ubuntu 20.04|Noetic|No|
 |Load Cell Processor|Raspberry Pi|ubuntu-desktop|192.168.1.15|Ubuntu 20.04|Noetic|No|
-|Vision Processor|Jetson Nano|nano|192.168.1.17|Ubuntu 18.04|Melodic|No|
+|Vision Processor|Jetson|ubuntu-jetson|192.168.1.17|Ubuntu 18.04|Melodic|No|
 
 ## Master Computer (ip: 192.168.1.7)
 ### Configuration
@@ -24,7 +24,7 @@ Edit '/etc/hosts' by adding
 ```
   127.0.1.1	ubuntu-Alienware-Aurora-R7
   192.168.1.15  ubuntu-desktop
-  192.168.1.17	nano
+  192.168.1.17	ubuntu-jetson
   192.168.1.19	raspberrypi
 ```
 
