@@ -232,7 +232,7 @@ class SocketPlugEnv(GymGazeboEnv):
         kp = 0.1
         # adjust robot (plug) orientation (yaw)
         detect = self.socketDetector.get_detect_info()[-1]
-        print("=== normal (nx,ny,nz): ({:.4f},{:.4f},{:.4f})".format(detect.nx,detect.ny,detect.nz))
+        # print("=== normal (nx,ny,nz): ({:.4f},{:.4f},{:.4f})".format(detect.nx,detect.ny,detect.nz))
         t, te, e0 = 1e-6, 0, 0
         err = detect.nx
         while abs(err) > 0.01:
@@ -241,6 +241,19 @@ class SocketPlugEnv(GymGazeboEnv):
             rate.sleep()
             e0, te, t = err, te+err, t+dt
             detect = self.socketDetector.get_detect_info()[-1]
-            print("=== normal (nx,ny,nz): ({:.4f},{:.4f},{:.4f})".format(detect.nx,detect.ny,detect.nz))
+            # print("=== normal (nx,ny,nz): ({:.4f},{:.4f},{:.4f})".format(detect.nx,detect.ny,detect.nz))
             err = detect.nx
         self.robot.stop()
+        print("=== normal (nx,ny,nz): ({:.4f},{:.4f},{:.4f})".format(detect.nx,detect.ny,detect.nz))
+
+        detect = self.socketDetector.get_detect_info()[-1]
+        du = (detect.r+detect.l)/2-(self.robot.camRSD.width/2)
+        # print("=== center u distance: {:.4f}".format(du))
+        while abs(du) > 3:
+            self.robot.move(0.0,-np.sign(du)*0.2)
+            rate.sleep()
+            detect = self.socketDetector.get_detect_info()[-1]
+            du = (detect.r+detect.l)/2-(self.robot.camRSD.width/2)
+            # print("=== center u distance: {:.4f}".format(du))
+        self.robot.stop()
+        print("=== center u distance: {:.4f}".format(du))
