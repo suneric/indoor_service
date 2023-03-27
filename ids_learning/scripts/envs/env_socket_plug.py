@@ -249,7 +249,7 @@ class SocketPlugEnv(GymGazeboEnv):
         detect = self.socketDetector.get_detect_info()[-1]
         du = (detect.r+detect.l)/2-(self.robot.camRSD.width/2)
         # print("=== center u distance: {:.4f}".format(du))
-        while abs(du) > 3:
+        while abs(du) > 1:
             self.robot.move(0.0,-np.sign(du)*0.2)
             rate.sleep()
             detect = self.socketDetector.get_detect_info()[-1]

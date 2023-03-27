@@ -250,7 +250,7 @@ class SocketPlugTest:
         else:
             return self.model.policy(obs)
 
-    def run(self, init_rad, offset_dist=0.5):
+    def run(self, init_rad, offset_dist=0.65):
         positions = []
         self.env.set_init_random(init_rad,offset_dist)
         obs, info = self.env.reset()
@@ -304,7 +304,7 @@ if __name__ == '__main__':
     rads = np.random.uniform(size=(target_count,try_count,4))
     policy_list = []
     if args.policy is None:
-        policy_list = ['binary', 'greyscale', 'blind']
+        policy_list = ['binary', 'greyscale']
     else:
         policy_list = [args.policy]
 
