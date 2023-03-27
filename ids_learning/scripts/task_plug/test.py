@@ -250,9 +250,9 @@ class SocketPlugTest:
         else:
             return self.model.policy(obs)
 
-    def run(self, init_rad):
+    def run(self, init_rad, offset_dist=0.5):
         positions = []
-        self.env.set_init_random(init_rad)
+        self.env.set_init_random(init_rad,offset_dist)
         obs, info = self.env.reset()
         init = info["plug"]
         positions.append(init)

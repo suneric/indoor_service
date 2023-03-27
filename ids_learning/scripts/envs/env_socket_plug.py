@@ -73,8 +73,9 @@ class SocketPlugEnv(GymGazeboEnv):
             init=self.init_position
         )
 
-    def set_init_random(self,rad):
+    def set_init_random(self,rad,offset=0.5):
         self.init_random = rad
+        self.offset_dist = offset
 
     def set_goal(self,idx):
         self.goal_index = idx
@@ -152,7 +153,7 @@ class SocketPlugEnv(GymGazeboEnv):
     def reset_robot(self):
         self.robot.stop()
         rx = self.goal[0]
-        ry = self.goal[1]-0.65
+        ry = self.goal[1]-self.offset_dist
         rt = 0.5*np.pi
         rh = self.goal[2]+PIN_OFFSET_Z-VSLIDER_BASE_H
         # add uncertainty
@@ -173,6 +174,7 @@ class SocketPlugEnv(GymGazeboEnv):
             self.robot.move(-0.01,0.0)
             rospy.sleep(0.01)
         self.robot.stop()
+        self.align_normal()
         # save initial pose
         rPos = self.robot.robot_pose()
         bPos = self.robot.plug_pose()
@@ -222,3 +224,23 @@ class SocketPlugEnv(GymGazeboEnv):
             return infoList[0]
         else:
             return infoList[idx]
+
+    def align_normal(self):
+        f = 10
+        dt = 1/f
+        rate = rospy.Rate(f)
+        kp = 0.1
+        # adjust robot (plug) orientation (yaw)
+        detect = self.socketDetector.get_detect_info()[-1]
+        print("=== normal (nx,ny,nz): ({:.4f},{:.4f},{:.4f})".format(detect.nx,detect.ny,detect.nz))
+        t, te, e0 = 1e-6, 0, 0
+        err = detect.nx
+        while abs(err) > 0.01:
+            vz = kp*(err + te/t + dt*(err-e0))
+            self.robot.move(0.0,vz)
+            rate.sleep()
+            e0, te, t = err, te+err, t+dt
+            detect = self.socketDetector.get_detect_info()[-1]
+            print("=== normal (nx,ny,nz): ({:.4f},{:.4f},{:.4f})".format(detect.nx,detect.ny,detect.nz))
+            err = detect.nx
+        self.robot.stop()

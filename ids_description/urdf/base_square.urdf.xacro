@@ -236,20 +236,20 @@
 
     <!--baterry-->
     <joint name="joint_base_battery" type="fixed">
-      <origin xyz="0 0 ${base_z/2}" rpy="0 0 0"/>
+      <origin xyz="-0.1 0 ${base_z+battery_l/2}" rpy="0 0 0"/>
       <parent link="link_base"/>
       <child link="link_battery"/>
     </joint>
 
     <link name="link_battery">
       <visual>
-        <origin xyz="-0.15 0 0.08" rpy="0 0 0" />
+        <origin xyz="0 0 0" rpy="0 0 0" />
         <geometry>
           <box size="${battery_l} ${battery_l} ${battery_l}"/>
         </geometry>
       </visual>
       <collision>
-        <origin xyz="-0.15 0 0.08" rpy="0 0 0" />
+        <origin xyz="0 0 0" rpy="0 0 0" />
         <geometry>
           <box size="${battery_l} ${battery_l} ${battery_l}"/>
         </geometry>
