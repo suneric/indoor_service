@@ -5,10 +5,10 @@
   <xacro:arg name="tf_prefix" default=""/>
 
   <!--mobile base-->
-  <!-- <xacro:include filename="$(find ids_description)/urdf/base_square.urdf.xacro" />
-  <xacro:fourwheeler_base_macro/> -->
-
   <xacro:include filename="$(find ids_description)/urdf/base_square.urdf.xacro" />
+  <xacro:fourwheeler_base_macro/>
+
+  <!-- <xacro:include filename="$(find ids_description)/urdf/base_square.urdf.xacro" />
     <xacro:property name="mu" value="0.98"/>
     <xacro:property name="mu2" value="0.98"/>
     <xacro:property name="chassis_x" value="0.7"/>
@@ -23,7 +23,7 @@
     <xacro:property name="bumper_y" value="0.52" />
     <xacro:property name="battery_m" value="20" />
     <xacro:property name="battery_l" value="0.5" />
-  <xacro:fourwheeler_base_macro/>
+  <xacro:fourwheeler_base_macro/> -->
 
   <!-- <xacro:include filename="$(find ids_description)/urdf/base_jazzy.urdf.xacro" />
   <xacro:jazzy_base_macro/> -->
