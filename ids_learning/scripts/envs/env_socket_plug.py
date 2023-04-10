@@ -174,7 +174,7 @@ class SocketPlugEnv(GymGazeboEnv):
             self.robot.move(-0.01,0.0)
             rospy.sleep(0.01)
         self.robot.stop()
-        self.align_normal()
+        # self.align_normal()
         # save initial pose
         rPos = self.robot.robot_pose()
         bPos = self.robot.plug_pose()

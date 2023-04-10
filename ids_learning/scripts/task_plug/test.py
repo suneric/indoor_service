@@ -234,7 +234,7 @@ class SocketPlugTest:
         self.load_model(agent,policy,index)
 
     def load_model(self,agent,policy,index):
-        if agent == 'dqn':
+        if agent == 'dqn' and policy != 'random':
             model_path = os.path.join(sys.path[0],"../policy/socket_plug/")+policy+"/q_net/"+str(index)
             print("load model from", model_path)
             self.model = DQN((64,64,1),3,2,8,gamma=0.99,lr=2e-4,update_freq=500)
@@ -245,7 +245,7 @@ class SocketPlugTest:
 
 
     def action(self,obs):
-        if self.agent is None:
+        if self.agent is None or self.policy == 'random':
             return np.random.randint(self.env.action_space.n)
         else:
             return self.model.policy(obs)
@@ -271,6 +271,8 @@ RUN a single plug test for a policy on a target
 """
 def run_plug_test(env, agent, policy, index, target, init_rads):
     print("run plug test", agent, policy, index, target)
+    if policy == 'blind':
+        index = 9450
     data_dir = os.path.join(sys.path[0],'data',policy+'_'+str(target))
     if not os.path.exists(data_dir):
         os.mkdir(data_dir)
@@ -304,7 +306,7 @@ if __name__ == '__main__':
     rads = np.random.uniform(size=(target_count,try_count,4))
     policy_list = []
     if args.policy is None:
-        policy_list = ['binary', 'greyscale']
+        policy_list = ['binary', 'greyscale', 'blind', 'random']
     else:
         policy_list = [args.policy]
 

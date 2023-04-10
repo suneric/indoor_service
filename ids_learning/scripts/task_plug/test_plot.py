@@ -31,12 +31,14 @@ def smoothExponential(data, weight):
     return smoothed
 
 def draw_socket(ax):
-    ax.set_xlim([-0.01,0.01]) # mm
-    ax.set_ylim([-0.01,0.01]) # mm
+    ax.set_xlim([-0.01,0.01])
+    ax.set_ylim([-0.01,0.01])
     ax.set_xticks([-0.01,-0.005,0,0.005,0.01])
     ax.set_yticks([-0.01,-0.005,0,0.005,0.01])
-    ax.set_xlabel("X (m)")
-    ax.set_ylabel("Z (m)")
+    ax.set_xticklabels([-10,-5,0,5,10])
+    ax.set_yticklabels([-10,-5,0,5,10])
+    ax.set_xlabel("X (mm)")
+    ax.set_ylabel("Y (mm)")
     ax.add_patch(Circle([0,0],0.0025,facecolor='lightgrey'))
     ax.add_patch(Rectangle((-0.0025,-0.003),0.005,0.003,facecolor='lightgrey'))
     ax.add_patch(Circle([0,0],0.001,edgecolor='green',linewidth=2,fill=False))
@@ -142,7 +144,8 @@ if __name__ == "__main__":
             if args.type == 0:
                 ax.set(aspect=1)
                 position = pd.read_csv(os.path.join(data_dir,"positions_"+str(args.case)+".csv")).to_numpy()
-                ax.set_title("Plug's Trajectory on Wall Outlet")
+                print(position)
+                ax.set_title("Plug's Path on Wall Outlet")
                 draw_socket(ax)
                 ax.plot(position[:,0]-GOAL[0],position[:,2]-GOAL[2], color="k", linestyle='--', linewidth=3)
                 ax.scatter(position[0,0]-GOAL[0],position[0,2]-GOAL[2], s=80, facecolors='w', edgecolors='k')
@@ -160,30 +163,36 @@ if __name__ == "__main__":
                 ax.legend(["X","Y","Z"],loc="lower right")
             else:
                 ax.set(aspect=1)
-                random_dir = os.path.join(sys.path[0],'data/training_env/random_'+str(target))
-                raw_dir = os.path.join(sys.path[0],'data/training_env/raw_'+str(target))
-                binary_dir = os.path.join(sys.path[0],'data/training_env/binary_'+str(target))
+                random_dir = os.path.join(sys.path[0],'data/random_'+str(target))
+                blind_dir = os.path.join(sys.path[0],'data/blind_'+str(target))
+                raw_dir = os.path.join(sys.path[0],'data/greyscale_'+str(target))
+                binary_dir = os.path.join(sys.path[0],'data/binary_'+str(target))
                 pos_random = pd.read_csv(os.path.join(random_dir,"positions_"+str(args.case)+".csv")).to_numpy()
+                pos_blind = pd.read_csv(os.path.join(blind_dir,"positions_"+str(args.case)+".csv")).to_numpy()
                 pos_raw = pd.read_csv(os.path.join(raw_dir,"positions_"+str(args.case)+".csv")).to_numpy()
                 pos_binary = pd.read_csv(os.path.join(binary_dir,"positions_"+str(args.case)+".csv")).to_numpy()
 
                 dist = np.sqrt((pos_random[0,0]-GOAL[0])**2+(pos_random[0,2]-GOAL[2])**2)
-                print(dist, trajectory_len(pos_random), trajectory_len(pos_raw), trajectory_len(pos_binary))
+                print(dist, trajectory_len(pos_random), trajectory_len(pos_blind), trajectory_len(pos_raw), trajectory_len(pos_binary))
 
-                ax.set_title("Plug's Trajectories on Wall Outlet")
+                ax.set_title("Plug's Path on Wall Outlet's Plane")
                 draw_socket(ax)
                 l1 = ax.plot(pos_random[:,0]-GOAL[0],pos_random[:,2]-GOAL[2], color="k", linestyle='--', linewidth=2, label="random action")
                 l4 = ax.scatter(pos_random[0,0]-GOAL[0],pos_random[0,2]-GOAL[2], s=80, facecolors='w', edgecolors='k')
                 ax.scatter(pos_random[1:-1,0]-GOAL[0],pos_random[1:-1,2]-GOAL[2], s=30, facecolors='k', edgecolors='k')
                 ax.scatter(pos_random[-1,0]-GOAL[0],pos_random[-1,2]-GOAL[2], s=80, facecolors='k', edgecolors='k')
 
-                l2 = ax.plot(pos_raw[:,0]-GOAL[0],pos_raw[:,2]-GOAL[2], color="b", linestyle='--', linewidth=2,label="grey-scale image")
+                l2 = ax.plot(pos_blind[:,0]-GOAL[0],pos_blind[:,2]-GOAL[2], color="r", linestyle='--', linewidth=2, label="no vision")
+                ax.scatter(pos_blind[1:-1,0]-GOAL[0],pos_blind[1:-1,2]-GOAL[2], s=30, facecolors='r', edgecolors='r')
+                ax.scatter(pos_blind[-1,0]-GOAL[0],pos_blind[-1,2]-GOAL[2], s=80, facecolors='r', edgecolors='r')
+
+                l3 = ax.plot(pos_raw[:,0]-GOAL[0],pos_raw[:,2]-GOAL[2], color="b", linestyle='--', linewidth=2,label="greyscale image")
                 ax.scatter(pos_raw[1:-1,0]-GOAL[0],pos_raw[1:-1,2]-GOAL[2], s=30, facecolors='b', edgecolors='b')
                 ax.scatter(pos_raw[-1,0]-GOAL[0],pos_raw[-1,2]-GOAL[2], s=80, facecolors='b', edgecolors='b')
 
-                l3 = ax.plot(pos_binary[:,0]-GOAL[0],pos_binary[:,2]-GOAL[2], color="c", linestyle='--', linewidth=2, label="binary image")
+                l4 = ax.plot(pos_binary[:,0]-GOAL[0],pos_binary[:,2]-GOAL[2], color="c", linestyle='--', linewidth=2, label="binary image")
                 ax.scatter(pos_binary[1:-1,0]-GOAL[0],pos_binary[1:-1,2]-GOAL[2], s=30, facecolors='c', edgecolors='c')
                 ax.scatter(pos_binary[-1,0]-GOAL[0],pos_binary[-1,2]-GOAL[2], s=80, facecolors='c', edgecolors='c')
-                ax.legend(loc="upper left")
+                ax.legend(loc="lower right")
 
     plt.show()
