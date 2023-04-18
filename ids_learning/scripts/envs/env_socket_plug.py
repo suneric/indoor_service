@@ -2,9 +2,10 @@
 import numpy as np
 import rospy
 import os
-from .gym_gazebo_env import GymGazeboEnv
+from .gym_gazebo import GymGazeboEnv
 from gym.envs.registration import register
-from .mrobot import MRobot, ObjectDetector
+from .mrobot import MRobot
+from .sensors import ObjectDetector
 from gym.spaces import Box, Discrete
 import math
 import cv2 as cv
@@ -55,10 +56,10 @@ class SocketPlugEnv(GymGazeboEnv):
         self.prev_dist = 0.0
         self.curr_dist = 0.0
         self.vision_type = None
+        self.offset_dist = 0.5
 
     def _check_all_systems_ready(self):
         self.robot.check_ready()
-        print("System READY")
 
     def _get_observation(self):
         cv.imshow('observation', self.obs_image)

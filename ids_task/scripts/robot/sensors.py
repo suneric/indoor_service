@@ -96,7 +96,7 @@ class ArduCam:
         print("create arducam instance...")
         self.name = name
         self.bridge=CvBridge()
-        self.caminfo_sub = rospy.Subscriber('/'+name+'/cam_info', CameraInfo, self._caminfo_callback)
+        self.caminfo_sub = rospy.Subscriber('/'+name+'/camera_info', CameraInfo, self._caminfo_callback)
         if compressed:
             self.color_sub = rospy.Subscriber('/'+name+'/image/compressed', CompressedImage, self._color_callback)
         else:
