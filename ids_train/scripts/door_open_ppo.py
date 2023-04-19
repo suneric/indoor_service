@@ -18,6 +18,7 @@ from env.env_door_open import DoorOpenEnv
 https://www.tensorflow.org/guide/gpu#limiting_gpu_memory_growth
 Limiting GPU memory growth
 """
+os.environ['TF_GPU_ALLOCATOR'] = 'cuda_malloc_async'
 gpu_devices = tf.config.experimental.list_physical_devices('GPU')
 for device in gpu_devices:
     tf.config.experimental.set_memory_growth(device, True)

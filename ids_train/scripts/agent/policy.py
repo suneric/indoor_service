@@ -71,12 +71,12 @@ class ReplayBuffer:
         adv_mean, adv_std = np.mean(self.adv_buf), np.std(self.adv_buf)
         self.adv_buf = (self.adv_buf-adv_mean) / adv_std
         batch = (
-            tf.convert_to_tensor(self.img_seq_buf if self.recurrent else self.img_buf),
-            tf.convert_to_tensor(self.frc_seq_buf if self.recurrent else self.frc_buf),
-            tf.convert_to_tensor(self.act_buf),
-            tf.convert_to_tensor(self.ret_buf),
-            tf.convert_to_tensor(self.adv_buf),
-            tf.convert_to_tensor(self.logp_buf),
+            self.img_seq_buf if self.recurrent else self.img_buf,
+            self.frc_seq_buf if self.recurrent else self.frc_buf,
+            self.act_buf,
+            self.ret_buf,
+            self.adv_buf,
+            self.logp_buf,
             )
         self.ptr, self.idx = 0, 0
         self.reset()
@@ -134,13 +134,23 @@ class PPO:
         q_grad = tape.gradient(q_loss, self.q.trainable_variables)
         self.q_optimizer.apply_gradients(zip(q_grad, self.q.trainable_variables))
 
-    def learn(self, buffer, pi_iter=80, q_iter=80):
-        (images,forces,actions,returns,advantages,logprobs) = buffer.sample()
+    def learn(self, buffer, pi_iter=80, q_iter=80, batch_size=32):
+        (image_buf,force_buf,action_buf,return_buf,advantage_buf,logprob_buf) = buffer.sample()
         for _ in range(pi_iter):
+            idxs = np.random.choice(buffer.size,batch_size)
+            images = tf.convert_to_tensor(image_buf[idxs])
+            forces = tf.convert_to_tensor(force_buf[idxs])
+            actions = tf.convert_to_tensor(action_buf[idxs])
+            logprobs = tf.convert_to_tensor(logprob_buf[idxs])
+            advantages = tf.convert_to_tensor(advantage_buf[idxs])
             kl = self.update_policy(images,forces,actions,logprobs,advantages)
             if kl > 1.5*self.target_kl:
                 break
         for _ in range(q_iter):
+            idxs = np.random.choice(buffer.size,batch_size)
+            images = tf.convert_to_tensor(image_buf[idxs])
+            forces = tf.convert_to_tensor(force_buf[idxs])
+            returns = tf.convert_to_tensor(return_buf[idxs])
             self.update_value_function(images,forces,returns)
 
     def save(self, actor_path, critic_path):
