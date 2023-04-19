@@ -68,15 +68,16 @@ class ReplayBuffer:
         """
         Get all data of the buffer and normalize the advantages
         """
-        adv_mean, adv_std = np.mean(self.adv_buf), np.std(self.adv_buf)
-        self.adv_buf = (self.adv_buf-adv_mean) / adv_std
+        s = slice(0,self.ptr)
+        adv_mean, adv_std = np.mean(self.adv_buf[s]), np.std(self.adv_buf[s])
+        self.adv_buf[s] = (self.adv_buf[s]-adv_mean) / adv_std
         batch = (
-            self.img_seq_buf if self.recurrent else self.img_buf,
-            self.frc_seq_buf if self.recurrent else self.frc_buf,
-            self.act_buf,
-            self.ret_buf,
-            self.adv_buf,
-            self.logp_buf,
+            self.img_seq_buf[s] if self.recurrent else self.img_buf[s],
+            self.frc_seq_buf[s] if self.recurrent else self.frc_buf[s],
+            self.act_buf[s],
+            self.ret_buf[s],
+            self.adv_buf[s],
+            self.logp_buf[s],
             )
         self.ptr, self.idx = 0, 0
         self.reset()
@@ -130,9 +131,10 @@ class PPO:
 
     def learn(self, buffer, pi_iter=80, q_iter=80, batch_size=32):
         print("training epoches {}:{}, batch size {}".format(pi_iter,q_iter,batch_size))
+        buffer_size = buffer.ptr
         (image_buf,force_buf,action_buf,return_buf,advantage_buf,logprob_buf) = buffer.sample()
         for _ in range(pi_iter):
-            idxs = np.random.choice(buffer.size,batch_size)
+            idxs = np.random.choice(buffer_size,batch_size)
             images = tf.convert_to_tensor(image_buf[idxs])
             forces = tf.convert_to_tensor(force_buf[idxs])
             actions = tf.convert_to_tensor(action_buf[idxs])
@@ -142,7 +144,7 @@ class PPO:
             # if kld > self.target_kld:
             #     break
         for _ in range(q_iter):
-            idxs = np.random.choice(buffer.size,batch_size)
+            idxs = np.random.choice(buffer_size,batch_size)
             images = tf.convert_to_tensor(image_buf[idxs])
             forces = tf.convert_to_tensor(force_buf[idxs])
             returns = tf.convert_to_tensor(return_buf[idxs])

@@ -58,7 +58,8 @@ def ppo_train(env, num_episodes, train_freq, max_steps):
     model_dir = os.path.join(sys.path[0],'../saved_models/door_open/ppo',datetime.now().strftime("%Y-%m-%d-%H-%M"))
     summaryWriter = tf.summary.create_file_writer(model_dir)
 
-    buffer = ReplayBuffer(train_freq,image_shape,force_dim,gamma=0.99,lamda=0.97)
+    buffer_capacity = train_freq+max_steps
+    buffer = ReplayBuffer(buffer_capacity,image_shape,force_dim,gamma=0.99,lamda=0.97)
     actor = actor_network(image_shape,force_dim,action_dim,'relu','linear')
     critic = critic_network(image_shape,force_dim,'relu')
     agent = PPO(actor,critic,actor_lr=3e-4,critic_lr=1e-3,clip_ratio=0.2,beta=1e-3,target_kld=1e-2)
@@ -66,7 +67,7 @@ def ppo_train(env, num_episodes, train_freq, max_steps):
     ep_returns, t, success_counter = [], 0, 0
     for ep in range(num_episodes):
         obs, done, ep_ret, step = env.reset(), False, 0, 0
-        while step < max_steps:
+        while not done and step < max_steps:
             obs_img, obs_frc = obs['image'], obs['force']
             act, logp = agent.policy(obs_img,obs_frc)
             val = agent.value(obs_img,obs_frc)
@@ -76,19 +77,19 @@ def ppo_train(env, num_episodes, train_freq, max_steps):
             ep_ret += rew
             t += 1
             step += 1
-            if done or (t % train_freq == 0):
-                last_value = 0 if done else agent.value(obs['image'], obs['force'])
-                buffer.end_trajectry(last_value)
-                break
 
-        if env.success:
-            success_counter += 1
+        success_counter = success_counter+1 if env.success else success_counter
+        last_value = 0 if done else agent.value(obs['image'], obs['force'])
+        buffer.end_trajectry(last_value)
         ep_returns.append(ep_ret)
         print("Episode *{}*: Return {:.4f}, Total Step {}, Success Count {} ".format(ep,ep_ret,t,success_counter))
+
         with summaryWriter.as_default():
             tf.summary.scalar('episode reward', ep_ret, step=ep)
-        if (t % train_freq == 0) or (ep+1 == num_episodes):
+
+        if buffer.ptr >= train_freq or (ep+1) == num_episodes:
             agent.learn(buffer)
+
         if (ep+1) % 50 == 0 or (ep+1==num_episodes):
             save_model(agent, model_dir, str(ep+1))
 
@@ -103,7 +104,8 @@ def recurrent_ppo_train(env, num_episodes, train_freq, seq_len, max_steps):
     model_dir = os.path.join(sys.path[0],'../saved_models/door_open/ppo',datetime.now().strftime("%Y-%m-%d-%H-%M"))
     summaryWriter = tf.summary.create_file_writer(model_dir)
 
-    buffer = ReplayBuffer(train_freq,image_shape,force_dim,gamma=0.99,lamda=0.97,seq_len=seq_len)
+    buffer_capacity = train_freq+max_steps
+    buffer = ReplayBuffer(buffer_capacity,image_shape,force_dim,gamma=0.99,lamda=0.97,seq_len=seq_len)
     actor = actor_network(image_shape,force_dim,action_dim,'relu','linear',seq_len)
     critic = critic_network(image_shape,force_dim,'relu',seq_len)
     agent = PPO(actor,critic,actor_lr=3e-4,critic_lr=1e-3,clip_ratio=0.2,beta=1e-3,target_kld=1e-2)
@@ -112,7 +114,7 @@ def recurrent_ppo_train(env, num_episodes, train_freq, seq_len, max_steps):
     for ep in range(num_episodes):
         obs, done, ep_ret, step = env.reset(), False, 0, 0
         img_seq, frc_seq = zero_obs_seq(image_shape,force_dim,seq_len)
-        while step < max_steps:
+        while not done and step < max_steps:
             obs_img, obs_frc = obs['image'], obs['force']
             img_seq.append(obs_img)
             frc_seq.append(obs_frc)
@@ -124,22 +126,22 @@ def recurrent_ppo_train(env, num_episodes, train_freq, seq_len, max_steps):
             ep_ret += rew
             t += 1
             step +=1
-            if done or (t % train_freq == 0):
-                next_img_seq, next_frc_seq = img_seq.copy(),frc_seq.copy()
-                next_img_seq.append(obs['image'])
-                next_frc_seq.append(obs['force'])
-                last_value = 0 if done else agent.value(next_img_seq,next_frc_seq)
-                buffer.end_trajectry(last_value)
-                break
 
-        if env.success:
-            success_counter += 1
+        success_counter = success_counter+1 if env.success else success_counter
+        next_img_seq, next_frc_seq = img_seq.copy(),frc_seq.copy()
+        next_img_seq.append(obs['image'])
+        next_frc_seq.append(obs['force'])
+        last_value = 0 if done else agent.value(next_img_seq,next_frc_seq)
+        buffer.end_trajectry(last_value)
         ep_returns.append(ep_ret)
         print("Episode *{}*: Return {:.4f}, Total Step {}, Success Count {} ".format(ep,ep_ret,t,success_counter))
+
         with summaryWriter.as_default():
             tf.summary.scalar('episode reward', ep_ret, step=ep)
-        if (t % train_freq == 0) or (ep+1 == num_episodes):
+
+        if buffer.ptr >= train_freq or (ep+1) == num_episodes:
             agent.learn(buffer)
+
         if (ep+1) % 50 == 0 or (ep+1==num_episodes):
             save_model(agent, model_dir, str(ep+1))
 
