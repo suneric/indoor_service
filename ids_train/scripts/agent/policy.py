@@ -83,48 +83,42 @@ class ReplayBuffer:
         return batch
 
 class PPO:
-    def __init__(self,actor,critic,actor_lr=1e-4,critic_lr=2e-4,clip_ratio=0.2,beta=1e-3,target_kl=0.01):
+    def __init__(self,actor,critic,actor_lr=1e-4,critic_lr=2e-4,clip_ratio=0.2,beta=1e-3,target_kld=0.01):
         self.pi = actor
         self.q = critic
         self.pi_optimizer = tf.keras.optimizers.Adam(actor_lr)
         self.q_optimizer = tf.keras.optimizers.Adam(critic_lr)
         self.clip_ratio = clip_ratio
-        self.target_kl = target_kl
+        self.target_kld = target_kld
         self.beta = beta
 
     def policy(self,obs_image,obs_force):
-        image = tf.expand_dims(tf.convert_to_tensor(obs_image), 0)
-        force = tf.expand_dims(tf.convert_to_tensor(obs_force), 0)
-        logits = self.pi([image,force])
-        dist = tfp.distributions.Categorical(logits=logits)
-        action = tf.squeeze(dist.sample()).numpy()
-        logprob = tf.squeeze(dist.log_prob(action)).numpy()
-        return action, logprob
+        img = tf.expand_dims(tf.convert_to_tensor(obs_image), 0)
+        frc = tf.expand_dims(tf.convert_to_tensor(obs_force), 0)
+        pmf = tfp.distributions.Categorical(logits=self.pi([img,frc])) # distribution function
+        act = tf.squeeze(pmf.sample()).numpy()
+        logp = tf.squeeze(pmf.log_prob(act)).numpy()
+        return act, logp
 
     def value(self,obs_image,obs_force):
-        image = tf.expand_dims(tf.convert_to_tensor(obs_image), 0)
-        force = tf.expand_dims(tf.convert_to_tensor(obs_force), 0)
-        val = self.q([image,force])
+        img = tf.expand_dims(tf.convert_to_tensor(obs_image), 0)
+        frc = tf.expand_dims(tf.convert_to_tensor(obs_force), 0)
+        val = self.q([img,frc])
         return tf.squeeze(val).numpy()
 
-    def update_policy(self,images,forces,actions,old_logps,advantages):
+    def update_policy(self,images,forces,actions,logps,advantages):
         with tf.GradientTape() as tape:
             tape.watch(self.pi.trainable_variables)
-            logits=self.pi([images,forces])
-            logps = tfp.distributions.Categorical(logits=logits).log_prob(actions)
-            ratio = tf.exp(logps-old_logps) # pi/old_pi
-            clip_advs = tf.clip_by_value(ratio, 1-self.clip_ratio, 1+self.clip_ratio)*advantages
-            pmf = tf.nn.softmax(logits=logits) # probability
-            ent = tf.reduce_sum(-pmf*tf.math.log(pmf),axis=-1) # entropy
-            pi_loss = -tf.reduce_mean(tf.minimum(ratio*advantages,clip_advs)) + self.beta*ent
-            #pi_loss = -tf.reduce_mean(tf.minimum(ratio*advantages,clip_advs))
+            pmf = tfp.distributions.Categorical(logits=self.pi([images,forces]))
+            new_logps = pmf.log_prob(actions)
+            ratio = tf.exp(new_logp-logps) # pi/old_pi
+            clip_adv = tf.clip_by_value(ratio, 1-self.clip_ratio, 1+self.clip_ratio)*advantages
+            obj = tf.minimum(ratio*advantages,clip_adv)+self.beta*pmf.entropy()
+            pi_loss = -tf.reduce_mean(obj)
+            approx_kld = logps-new_logps
         pi_grad = tape.gradient(pi_loss, self.pi.trainable_variables)
         self.pi_optimizer.apply_gradients(zip(pi_grad, self.pi.trainable_variables))
-        logits = self.pi([images,forces])
-        logps = tfp.distributions.Categorical(logits=logits).log_prob(actions)
-        kl = tf.reduce_mean(old_logps-logps)
-        kl = tf.reduce_sum(kl)
-        return kl
+        return tf.reduce_mean(approx_kld)
 
     def update_value_function(self,images,forces,returns):
         with tf.GradientTape() as tape:
@@ -134,7 +128,7 @@ class PPO:
         q_grad = tape.gradient(q_loss, self.q.trainable_variables)
         self.q_optimizer.apply_gradients(zip(q_grad, self.q.trainable_variables))
 
-    def learn(self, buffer, pi_iter=80, q_iter=80, batch_size=32):
+    def learn(self, buffer, pi_iter=80, q_iter=80, batch_size=64):
         (image_buf,force_buf,action_buf,return_buf,advantage_buf,logprob_buf) = buffer.sample()
         for _ in range(pi_iter):
             idxs = np.random.choice(buffer.size,batch_size)
@@ -143,8 +137,8 @@ class PPO:
             actions = tf.convert_to_tensor(action_buf[idxs])
             logprobs = tf.convert_to_tensor(logprob_buf[idxs])
             advantages = tf.convert_to_tensor(advantage_buf[idxs])
-            kl = self.update_policy(images,forces,actions,logprobs,advantages)
-            if kl > 1.5*self.target_kl:
+            kld = self.update_policy(images,forces,actions,logprobs,advantages)
+            if kld > self.target_kld:
                 break
         for _ in range(q_iter):
             idxs = np.random.choice(buffer.size,batch_size)

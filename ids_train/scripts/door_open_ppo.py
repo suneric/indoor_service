@@ -38,6 +38,7 @@ def smoothExponential(data, weight):
 def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--max_ep', type=int, default=2000)
+    parser.add_argument('--max_step', type=int, default=60)
     parser.add_argument('--train_freq', type=int ,default=300)
     parser.add_argument('--seq_len', type=int,default=None)
     return parser.parse_args()
@@ -48,7 +49,7 @@ def save_model(agent, model_dir, name):
     agent.save(logits_net_path, val_net_path)
     print("save {} weights so far to {}".format(name,model_dir))
 
-def ppo_train(env, num_episodes, train_freq):
+def ppo_train(env, num_episodes, train_freq, max_steps):
     image_shape = env.observation_space[0]
     force_dim = env.observation_space[1]
     action_dim = env.action_space.n
@@ -60,12 +61,12 @@ def ppo_train(env, num_episodes, train_freq):
     buffer = ReplayBuffer(train_freq,image_shape,force_dim,gamma=0.99,lamda=0.97)
     actor = actor_network(image_shape,force_dim,action_dim,'relu','linear')
     critic = critic_network(image_shape,force_dim,'relu')
-    agent = PPO(actor,critic,actor_lr=3e-4,critic_lr=1e-3,clip_ratio=0.2,beta=1e-3,target_kl=0.01)
+    agent = PPO(actor,critic,actor_lr=3e-4,critic_lr=1e-3,clip_ratio=0.2,beta=1e-3,target_kld=0.01)
 
     ep_returns, t, success_counter = [], 0, 0
     for ep in range(num_episodes):
-        obs, done, ep_ret = env.reset(), False, 0
-        while True:
+        obs, done, ep_ret, step = env.reset(), False, 0, 0
+        while step < max_steps:
             obs_img, obs_frc = obs['image'], obs['force']
             act, logp = agent.policy(obs_img,obs_frc)
             val = agent.value(obs_img,obs_frc)
@@ -74,6 +75,7 @@ def ppo_train(env, num_episodes, train_freq):
             obs = nobs
             ep_ret += rew
             t += 1
+            step += 1
             if done or (t % train_freq == 0):
                 last_value = 0 if done else agent.value(obs['image'], obs['force'])
                 buffer.end_trajectry(last_value)
@@ -92,7 +94,7 @@ def ppo_train(env, num_episodes, train_freq):
 
     return ep_returns
 
-def recurrent_ppo_train(env, num_episodes, train_freq, seq_len):
+def recurrent_ppo_train(env, num_episodes, train_freq, seq_len, max_steps):
     image_shape = env.observation_space[0]
     force_dim = env.observation_space[1]
     action_dim = env.action_space.n
@@ -104,13 +106,13 @@ def recurrent_ppo_train(env, num_episodes, train_freq, seq_len):
     buffer = ReplayBuffer(train_freq,image_shape,force_dim,gamma=0.99,lamda=0.97,seq_len=seq_len)
     actor = actor_network(image_shape,force_dim,action_dim,'relu','linear',seq_len)
     critic = critic_network(image_shape,force_dim,'relu',seq_len)
-    agent = PPO(actor,critic,actor_lr=3e-4,critic_lr=1e-3,clip_ratio=0.2,beta=1e-3,target_kl=0.01)
+    agent = PPO(actor,critic,actor_lr=3e-4,critic_lr=1e-3,clip_ratio=0.2,beta=1e-3,target_kld=0.01)
 
     ep_returns, t, success_counter = [], 0, 0
     for ep in range(num_episodes):
-        obs, done, ep_ret = env.reset(), False, 0
+        obs, done, ep_ret, step = env.reset(), False, 0, 0
         img_seq, frc_seq = zero_obs_seq(image_shape,force_dim,seq_len)
-        while True:
+        while step < max_steps:
             obs_img, obs_frc = obs['image'], obs['force']
             img_seq.append(obs_img)
             frc_seq.append(obs_frc)
@@ -121,6 +123,7 @@ def recurrent_ppo_train(env, num_episodes, train_freq, seq_len):
             obs = nobs
             ep_ret += rew
             t += 1
+            step +=1
             if done or (t % train_freq == 0):
                 next_img_seq, next_frc_seq = img_seq.copy(),frc_seq.copy()
                 next_img_seq.append(obs['image'])
@@ -149,10 +152,10 @@ if __name__=="__main__":
     ep_returns = None
     if args.seq_len is None:
         plt.title("ppo training")
-        ep_returns = ppo_train(env, args.max_ep, args.train_freq)
+        ep_returns = ppo_train(env, args.max_ep, args.train_freq, args.max_step)
     else:
         plt.title("recurrent ppo training")
-        ep_returns = recurrent_ppo_train(env, args.max_ep, args.train_freq, args.seq_len)
+        ep_returns = recurrent_ppo_train(env, args.max_ep, args.train_freq, args.seq_len, args.max_step)
     env.close()
     plt.plot(ep_returns, 'k--', linewidth=1)
     plt.plot(smoothExponential(ep_returns,0.95), 'g-', linewidth=2)
