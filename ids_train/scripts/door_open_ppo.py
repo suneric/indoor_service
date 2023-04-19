@@ -61,7 +61,7 @@ def ppo_train(env, num_episodes, train_freq, max_steps):
     buffer = ReplayBuffer(train_freq,image_shape,force_dim,gamma=0.99,lamda=0.97)
     actor = actor_network(image_shape,force_dim,action_dim,'relu','linear')
     critic = critic_network(image_shape,force_dim,'relu')
-    agent = PPO(actor,critic,actor_lr=3e-4,critic_lr=1e-3,clip_ratio=0.2,beta=1e-3,target_kld=0.01)
+    agent = PPO(actor,critic,actor_lr=3e-4,critic_lr=1e-3,clip_ratio=0.2,beta=1e-3,target_kld=1e-2)
 
     ep_returns, t, success_counter = [], 0, 0
     for ep in range(num_episodes):
@@ -106,7 +106,7 @@ def recurrent_ppo_train(env, num_episodes, train_freq, seq_len, max_steps):
     buffer = ReplayBuffer(train_freq,image_shape,force_dim,gamma=0.99,lamda=0.97,seq_len=seq_len)
     actor = actor_network(image_shape,force_dim,action_dim,'relu','linear',seq_len)
     critic = critic_network(image_shape,force_dim,'relu',seq_len)
-    agent = PPO(actor,critic,actor_lr=3e-4,critic_lr=1e-3,clip_ratio=0.2,beta=1e-3,target_kld=0.01)
+    agent = PPO(actor,critic,actor_lr=3e-4,critic_lr=1e-3,clip_ratio=0.2,beta=1e-3,target_kld=1e-2)
 
     ep_returns, t, success_counter = [], 0, 0
     for ep in range(num_episodes):

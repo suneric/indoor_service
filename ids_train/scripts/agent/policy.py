@@ -106,16 +106,16 @@ class PPO:
         val = self.q([img,frc])
         return tf.squeeze(val).numpy()
 
-    def update_policy(self,images,forces,actions,logps,advantages):
+    def update_policy(self,images,forces,actions,old_logps,advantages):
         with tf.GradientTape() as tape:
             tape.watch(self.pi.trainable_variables)
             pmf = tfp.distributions.Categorical(logits=self.pi([images,forces]))
-            new_logps = pmf.log_prob(actions)
-            ratio = tf.exp(new_logp-logps) # pi/old_pi
+            logps = pmf.log_prob(actions)
+            ratio = tf.exp(logps-old_logps) # pi/old_pi
             clip_adv = tf.clip_by_value(ratio, 1-self.clip_ratio, 1+self.clip_ratio)*advantages
             obj = tf.minimum(ratio*advantages,clip_adv)+self.beta*pmf.entropy()
             pi_loss = -tf.reduce_mean(obj)
-            approx_kld = logps-new_logps
+            approx_kld = old_logps-logps
         pi_grad = tape.gradient(pi_loss, self.pi.trainable_variables)
         self.pi_optimizer.apply_gradients(zip(pi_grad, self.pi.trainable_variables))
         return tf.reduce_mean(approx_kld)
@@ -128,7 +128,8 @@ class PPO:
         q_grad = tape.gradient(q_loss, self.q.trainable_variables)
         self.q_optimizer.apply_gradients(zip(q_grad, self.q.trainable_variables))
 
-    def learn(self, buffer, pi_iter=80, q_iter=80, batch_size=64):
+    def learn(self, buffer, pi_iter=80, q_iter=80, batch_size=32):
+        print("training epoches {}:{}, batch size {}".format(pi_iter,q_iter,batch_size))
         (image_buf,force_buf,action_buf,return_buf,advantage_buf,logprob_buf) = buffer.sample()
         for _ in range(pi_iter):
             idxs = np.random.choice(buffer.size,batch_size)
@@ -138,8 +139,8 @@ class PPO:
             logprobs = tf.convert_to_tensor(logprob_buf[idxs])
             advantages = tf.convert_to_tensor(advantage_buf[idxs])
             kld = self.update_policy(images,forces,actions,logprobs,advantages)
-            if kld > self.target_kld:
-                break
+            # if kld > self.target_kld:
+            #     break
         for _ in range(q_iter):
             idxs = np.random.choice(buffer.size,batch_size)
             images = tf.convert_to_tensor(image_buf[idxs])
