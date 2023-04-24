@@ -1,38 +1,39 @@
 #!/usr/bin/env python
-import numpy as np
-import rospy
 import os
-from .gym_gazebo import GymGazeboEnv
+import math
+import rospy
+import cv2 as cv
+import numpy as np
+from gym.spaces import Box, Discrete
 from gym.envs.registration import register
 import tf.transformations as tft
-import math
+from .gym_gazebo import GymGazeboEnv
 from .mrobot import MRobot
 from .sensors import PoseSensor
-from gym.spaces import Box, Discrete
-import cv2 as cv
 
 register(
   id='DoorOpen-v0',
   entry_point='envs.door_open_env:DoorOpenEnv')
 
 class DoorOpenEnv(GymGazeboEnv):
-    def __init__(self, continuous = False, door_length=0.9):
+    def __init__(self, continuous = False, door_length=0.9, force_scale=0.01):
         super(DoorOpenEnv, self).__init__(
             start_init_physics_parameters=False,
             reset_world_or_sim="WORLD"
         )
-        self.door_length = door_length
-        self.robot = MRobot()
-        self.poseSensor = PoseSensor()
         self.continuous = continuous
-        self.success = False
-        self.fail = False
-        self.safe = True
+        self.door_length = door_length
+        self.force_scale = force_scale
+        self.observation_space = ((64,64,1),3) # image and force
         if self.continuous:
             self.action_space = Box(-2.0,2.0,(2,),dtype=np.float32)
         else:
             self.action_space = Discrete(8)
-        self.observation_space = ((64,64,1),3) # image and force
+        self.robot = MRobot()
+        self.poseSensor = PoseSensor()
+        self.success = False
+        self.fail = False
+        self.safe = True
         self.obs_image = None
         self.obs_force = None
         self.prev_angle = 0
@@ -61,7 +62,7 @@ class DoorOpenEnv(GymGazeboEnv):
         self.prev_angle = self.poseSensor.door_angle()
         self.curr_angle = self.poseSensor.door_angle()
         self.obs_image = self.robot.ard_vision(size=(64,64),type='greyscale')
-        self.obs_force = self.robot.hook_forces()
+        self.obs_force = self.robot.hook_forces(scale=self.force_scale)
 
     def _take_action(self, action):
         self.robot.ftHook.reset_temp()
@@ -70,7 +71,7 @@ class DoorOpenEnv(GymGazeboEnv):
         rospy.sleep(1)
         self.curr_angle = self.poseSensor.door_angle()
         self.obs_image = self.robot.ard_vision(size=(64,64),type='greyscale')
-        self.obs_force = self.robot.hook_forces()
+        self.obs_force = self.robot.hook_forces(scale=self.force_scale)
         self.success = self.curr_angle > 0.45*math.pi # 81 degree
         self.fail = self.is_failed()
         self.safe = self.is_safe(self.robot.ftHook.temp_record())

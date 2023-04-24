@@ -11,7 +11,7 @@ from collections import deque
 
 from agent.model import actor_network, critic_network
 from agent.policy import PPO, ReplayBuffer, zero_obs_seq
-from env.env_door_open import DoorOpenEnv
+from env.env_auto_charge import AutoChargeEnv
 
 
 """
@@ -150,7 +150,8 @@ def recurrent_ppo_train(env, num_episodes, train_freq, seq_len, max_steps):
 if __name__=="__main__":
     args = get_args()
     rospy.init_node('ppo_train', anonymous=True)
-    env = DoorOpenEnv(continuous=False)
+    env = AutoChargeEnv(continuous=False)
+    env.set_vision_type('binary')
     ep_returns = None
     if args.seq_len is None:
         plt.title("ppo training")
