@@ -106,10 +106,10 @@ class MRobot:
         return self.poseSensor.plug()
 
     def plug_forces(self, scale = 1.0):
-        return self.ftPlug.forces()*scale
+        return np.array(self.ftPlug.forces())*scale
 
     def hook_forces(self, scale = 1.0):
-        return self.ftHook.forces()*scale
+        return np.array(self.ftHook.forces())*scale
 
     def rsd_vision(self,size=(64,64),type=None,info=None):
         if type == 'binary':

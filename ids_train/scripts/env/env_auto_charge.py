@@ -19,12 +19,12 @@ PIN_OFFSET_Z = 0.00636 # the circular pin offset in z to the center of the plug
 socket holes (goal) in x-y-z
 """
 # goalList = [(1.63497,2.992,0.35454),(1.63497,2.992,0.31551)] # NEMA-R15
-# goalList = [(1.63497,2.992,0.35454),(1.63497,2.992,0.31551), # NEMA-R15
-#             (2.43497,2.992,0.35454),(2.43497,2.992,0.31551)] # NEMA-R20
-goalList = [(0.83497,2.992,0.35454),(0.83497,2.992,0.31551), # all 8 cases
-            (1.63497,2.992,0.35454),(1.63497,2.992,0.31551),
-            (2.43497,2.992,0.35454),(2.43497,2.992,0.31551),
-            (3.23497,2.992,0.35454),(3.23497,2.992,0.31551)]
+goalList = [(1.63497,2.992,0.35454),(1.63497,2.992,0.31551), # NEMA-R15
+            (2.43497,2.992,0.35454),(2.43497,2.992,0.31551)] # NEMA-R20
+# goalList = [(0.83497,2.992,0.35454),(0.83497,2.992,0.31551), # all 8 cases
+#             (1.63497,2.992,0.35454),(1.63497,2.992,0.31551),
+#             (2.43497,2.992,0.35454),(2.43497,2.992,0.31551),
+#             (3.23497,2.992,0.35454),(3.23497,2.992,0.31551)]
 
 register(
   id='SocketPlugEnv-v0',
@@ -124,8 +124,8 @@ class AutoChargeEnv(GymGazeboEnv):
         elif self.fail:
             reward = -100
         else:
-            dist2goal_change = self.curr_dist - self.prev_dist
-            reward = -1000*dist2goal_change - 0.3
+            dist2goal_change = self.prev_dist-self.curr_dist
+            reward = 1000*dist2goal_change - 0.3
             self.prev_dist = self.curr_dist
         return reward
 
