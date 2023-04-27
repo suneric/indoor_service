@@ -9,8 +9,8 @@ import matplotlib.pyplot as plt
 import argparse
 from collections import deque
 
-from agent.model import actor_network, critic_network
-from agent.policy import PPO, ReplayBuffer, zero_obs_seq
+from agent.model1 import actor_network, critic_network
+from agent.policy1 import PPO, ReplayBuffer
 from env.env_auto_charge import AutoChargeEnv
 
 
@@ -40,7 +40,6 @@ def get_args():
     parser.add_argument('--max_ep', type=int, default=2000)
     parser.add_argument('--max_step', type=int, default=60)
     parser.add_argument('--train_freq', type=int ,default=300)
-    parser.add_argument('--seq_len', type=int,default=None)
     return parser.parse_args()
 
 def save_model(agent, model_dir, name):
@@ -52,86 +51,35 @@ def save_model(agent, model_dir, name):
 def ppo_train(env, num_episodes, train_freq, max_steps):
     image_shape = env.observation_space[0]
     force_dim = env.observation_space[1]
+    joint_dim = env.observation_space[2]
     action_dim = env.action_space.n
     print("create door open environment for ppo", image_shape, force_dim, action_dim)
 
-    model_dir = os.path.join(sys.path[0],'../saved_models/door_open/ppo',datetime.now().strftime("%Y-%m-%d-%H-%M"))
+    model_dir = os.path.join(sys.path[0],'../saved_models/auto_charge/ppo',datetime.now().strftime("%Y-%m-%d-%H-%M"))
     summaryWriter = tf.summary.create_file_writer(model_dir)
 
     buffer_capacity = train_freq+max_steps
-    buffer = ReplayBuffer(buffer_capacity,image_shape,force_dim,gamma=0.99,lamda=0.97)
-    actor = actor_network(image_shape,force_dim,action_dim,'relu','linear')
-    critic = critic_network(image_shape,force_dim,'relu')
+    buffer = ReplayBuffer(buffer_capacity,image_shape,force_dim,joint_dim,gamma=0.99,lamda=0.97)
+    actor = actor_network(image_shape,force_dim,joint_dim,action_dim,'relu','linear')
+    critic = critic_network(image_shape,force_dim,joint_dim,'relu')
     agent = PPO(actor,critic,actor_lr=3e-4,critic_lr=1e-3,clip_ratio=0.2,beta=1e-3,target_kld=1e-2)
 
     ep_returns, t, success_counter = [], 0, 0
     for ep in range(num_episodes):
         obs, done, ep_ret, step = env.reset(), False, 0, 0
         while not done and step < max_steps:
-            obs_img, obs_frc = obs['image'], obs['force']
-            act, logp = agent.policy(obs_img,obs_frc)
-            val = agent.value(obs_img,obs_frc)
+            obs_img, obs_frc, obs_jnt = obs['image'], obs['force'], obs['joint']
+            act, logp = agent.policy(obs_img,obs_frc,obs_jnt)
+            val = agent.value(obs_img,obs_frc,obs_jnt)
             nobs, rew, done, info = env.step(act)
-            buffer.add_sample(obs_img,obs_frc,act,rew,val,logp)
+            buffer.add_sample(obs_img,obs_frc,obs_jnt,act,rew,val,logp)
             obs = nobs
             ep_ret += rew
             t += 1
             step += 1
 
         success_counter = success_counter+1 if env.success else success_counter
-        last_value = 0 if done else agent.value(obs['image'], obs['force'])
-        buffer.end_trajectry(last_value)
-        ep_returns.append(ep_ret)
-        print("Episode *{}*: Return {:.4f}, Total Step {}, Success Count {} ".format(ep,ep_ret,t,success_counter))
-
-        with summaryWriter.as_default():
-            tf.summary.scalar('episode reward', ep_ret, step=ep)
-
-        if buffer.ptr >= train_freq or (ep+1) == num_episodes:
-            agent.learn(buffer)
-
-        if (ep+1) % 50 == 0 or (ep+1==num_episodes):
-            save_model(agent, model_dir, str(ep+1))
-
-    return ep_returns
-
-def recurrent_ppo_train(env, num_episodes, train_freq, seq_len, max_steps):
-    image_shape = env.observation_space[0]
-    force_dim = env.observation_space[1]
-    action_dim = env.action_space.n
-    print("create door open environment for recurrent ppo", image_shape, force_dim, action_dim)
-
-    model_dir = os.path.join(sys.path[0],'../saved_models/door_open/ppo',datetime.now().strftime("%Y-%m-%d-%H-%M"))
-    summaryWriter = tf.summary.create_file_writer(model_dir)
-
-    buffer_capacity = train_freq+max_steps
-    buffer = ReplayBuffer(buffer_capacity,image_shape,force_dim,gamma=0.99,lamda=0.97,seq_len=seq_len)
-    actor = actor_network(image_shape,force_dim,action_dim,'relu','linear',seq_len)
-    critic = critic_network(image_shape,force_dim,'relu',seq_len)
-    agent = PPO(actor,critic,actor_lr=3e-4,critic_lr=1e-3,clip_ratio=0.2,beta=1e-3,target_kld=1e-2)
-
-    ep_returns, t, success_counter = [], 0, 0
-    for ep in range(num_episodes):
-        obs, done, ep_ret, step = env.reset(), False, 0, 0
-        img_seq, frc_seq = zero_obs_seq(image_shape,force_dim,seq_len)
-        while not done and step < max_steps:
-            obs_img, obs_frc = obs['image'], obs['force']
-            img_seq.append(obs_img)
-            frc_seq.append(obs_frc)
-            act, logp = agent.policy(img_seq,frc_seq)
-            val = agent.value(img_seq,frc_seq)
-            nobs, rew, done, info = env.step(act)
-            buffer.add_sample(obs_img,obs_frc,act,rew,val,logp)
-            obs = nobs
-            ep_ret += rew
-            t += 1
-            step +=1
-
-        success_counter = success_counter+1 if env.success else success_counter
-        next_img_seq, next_frc_seq = img_seq.copy(),frc_seq.copy()
-        next_img_seq.append(obs['image'])
-        next_frc_seq.append(obs['force'])
-        last_value = 0 if done else agent.value(next_img_seq,next_frc_seq)
+        last_value = 0 if done else agent.value(obs['image'], obs['force'], obs['joint'])
         buffer.end_trajectry(last_value)
         ep_returns.append(ep_ret)
         print("Episode *{}*: Return {:.4f}, Total Step {}, Success Count {} ".format(ep,ep_ret,t,success_counter))
@@ -150,16 +98,13 @@ def recurrent_ppo_train(env, num_episodes, train_freq, seq_len, max_steps):
 if __name__=="__main__":
     args = get_args()
     rospy.init_node('ppo_train', anonymous=True)
+
     env = AutoChargeEnv(continuous=False)
     env.set_vision_type('binary')
-    ep_returns = None
-    if args.seq_len is None:
-        plt.title("ppo training")
-        ep_returns = ppo_train(env, args.max_ep, args.train_freq, args.max_step)
-    else:
-        plt.title("recurrent ppo training")
-        ep_returns = recurrent_ppo_train(env, args.max_ep, args.train_freq, args.seq_len, args.max_step)
+    ep_returns = ppo_train(env, args.max_ep, args.train_freq, args.max_step)
     env.close()
+
+    plt.title("ppo training")
     plt.plot(ep_returns, 'k--', linewidth=1)
     plt.plot(smoothExponential(ep_returns,0.99), 'g-', linewidth=2)
     plt.xlabel('Episode')

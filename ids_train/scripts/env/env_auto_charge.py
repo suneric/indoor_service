@@ -31,15 +31,14 @@ register(
   entry_point='envs.socket_plug_env:SocketPlugEnv')
 
 class AutoChargeEnv(GymGazeboEnv):
-    def __init__(self, continuous = True, force_scale=0.01):
+    def __init__(self, continuous = True, force_scale=1.0):
         super(AutoChargeEnv, self).__init__(
             start_init_physics_parameters=False,
             reset_world_or_sim='WORLD'
         )
         self.continuous = continuous
         self.force_scale = force_scale
-        # self.observation_space = ((64,64,1),3,2) # image,force,joint
-        self.observation_space = ((64,64,1),3) # image,force
+        self.observation_space = ((64,64,1),3,2) # image,force,joint
         if self.continuous:
             self.action_space = Box(-5.0,5.0,(2,),dtype=np.float32)
         else:
@@ -55,6 +54,7 @@ class AutoChargeEnv(GymGazeboEnv):
         self.goal_index = None
         self.init_random = None
         self.init_position = None
+        self.init_joint = None
         self.prev_dist = 0.0
         self.curr_dist = 0.0
         self.vision_type = None
@@ -101,7 +101,11 @@ class AutoChargeEnv(GymGazeboEnv):
             socketInfo = self.get_socket_info(idx%2)
         self.obs_image = self.robot.rsd_vision(size=(64,64),type=self.vision_type,info=socketInfo)
         self.obs_force = self.robot.plug_forces(scale=self.force_scale)
-        self.obs_joint = self.robot.plug_joints()
+        self.obs_joint = self.get_joints(self.robot.plug_joints())
+
+    def get_joints(self, current):
+        init = self.init_joint
+        return (current[0]-init[0], current[1]-init[1])
 
     def _take_action(self, action):
         act = self.get_action(action)
@@ -112,7 +116,7 @@ class AutoChargeEnv(GymGazeboEnv):
         self.fail = dist2 > 0.02 # limit exploration area r < 2 cm
         if not self.success and not self.fail:
             self.obs_force = self.plug()*self.force_scale
-            self.obs_joint = self.robot.plug_joints()
+            self.obs_joint = self.get_joints(self.robot.plug_joints())
 
     def _is_done(self):
         return self.success or self.fail
@@ -182,6 +186,7 @@ class AutoChargeEnv(GymGazeboEnv):
         rPos = self.robot.robot_pose()
         bPos = self.robot.plug_pose()
         self.init_position = (rPos[0],rPos[1],rPos[2],bPos[0],bPos[1],bPos[2],bPos[3])
+        self.init_joint = self.robot.plug_joints()
         self.robot.reset_ft_sensors()
 
     def dist2goal(self):
