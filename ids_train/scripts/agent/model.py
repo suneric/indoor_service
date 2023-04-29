@@ -11,7 +11,6 @@ def conv_network(image_shape):
     h = layers.Conv2D(filters=32,kernel_size=(3,3),strides=2,padding='same',activation='relu')(input)
     h = layers.MaxPool2D((2,2))(h)
     h = layers.Conv2D(filters=16,kernel_size=(3,3),strides=2,padding='same',activation='relu')(h)
-    h = layers.MaxPool2D((2,2))(h)
     h = layers.Conv2D(filters=8,kernel_size=(3,3),strides=2,padding='same',activation='relu')(h)
     h = layers.Flatten()(h)
     h = layers.Dense(32,activation='relu')(h)
@@ -21,7 +20,7 @@ def conv_network(image_shape):
     return model
 
 
-class Sampling(keras.layers.Layer):
+class Sampling(layers.Layer):
     """Use (mean,log_var) to sample z, the vector encoding a digit."""
     def call(self, inputs):
         z_mean, z_log_var = inputs
@@ -38,7 +37,6 @@ def fv_encoder(image_shape, force_dim, latent_dim):
     vh = layers.Conv2D(filters=32,kernel_size=(3,3),strides=2,padding='same',activation='relu')(v_input)
     vh = layers.MaxPool2D((2,2))(vh)
     vh = layers.Conv2D(filters=16,kernel_size=(3,3),strides=2,padding='same',activation='relu')(vh)
-    vh = layers.MaxPool2D((2,2))(vh)
     vh = layers.Conv2D(filters=8,kernel_size=(3,3),strides=2,padding='same',activation='relu')(vh)
     vh = layers.Flatten()(vh)
     v_output = layers.Dense(32,activation='relu')(vh)
@@ -61,20 +59,19 @@ force-vision fusion decoder
 """
 def fv_decoder(latent_dim):
     z_input = keras.Input(shape=(latent_dim,))
-    h = layers.Dense(32,activation='relu')(input)
-    h = layers.Dense(8*8*32+16, activation='relu')(h)
-    vh = layers.Lambda(lambda x: x[:,0:8*8*32])(h) # split layer
-    vh = layers.Reshape((8,8,32))(vh)
+    h = layers.Dense(32,activation='relu')(z_input)
+    h = layers.Dense(4*4*8+16, activation='relu')(h)
+    vh = layers.Lambda(lambda x: x[:,0:4*4*8])(h) # split layer
+    vh = layers.Reshape((4,4,8))(vh)
     vh = layers.Conv2DTranspose(filters=8,kernel_size=3,strides=2,padding='same',activation='relu')(vh)
-    vh = layers.UpSampling2D((2,2))(vh)
     vh = layers.Conv2DTranspose(filters=16,kernel_size=3,strides=2,padding='same',activation='relu')(vh)
     vh = layers.UpSampling2D((2,2))(vh)
     vh = layers.Conv2DTranspose(filters=32,kernel_size=3,strides=2,padding='same',activation='relu')(vh)
     v_output = layers.Conv2DTranspose(filters=1,kernel_size=3,padding='same',activation='sigmoid')(vh)
 
-    fh = layers.Lambda(lambda x: x[:,8*8*32:])(h) # split layer
+    fh = layers.Lambda(lambda x: x[:,4*4*8:])(h) # split layer
     fh = layers.Dense(32,activation='relu')(fh)
-    f_output = layers.Dense(3, activation='linear')(fh)
+    f_output = layers.Dense(3, activation='tanh')(fh)
 
     model = keras.Model(inputs=z_input,outputs=[v_output,f_output],name='decoder')
     print(model.summary())
@@ -83,25 +80,25 @@ def fv_decoder(latent_dim):
 """
 z actor network
 """
-def z_actor_network(z_dim, output_dim):
+def latent_actor_network(z_dim, output_dim):
     z_input = keras.Input(shape=(z_dim,))
     h = layers.Dense(64, activation='relu')(z_input)
     h = layers.Dense(64, activation='relu')(h)
     output = layers.Dense(output_dim, activation='linear')(h)
     model = keras.Model(inputs=z_input,outputs=output)
-    print(model.summary)
+    print(model.summary())
     return model
 
 """
 z critic network
 """
-def z_critic_network(z_dim):
+def latent_critic_network(z_dim):
     z_input = keras.Input(shape=(z_dim,))
     h = layers.Dense(64, activation='relu')(z_input)
     h = layers.Dense(64, activation='relu')(h)
     output = layers.Dense(1, activation='linear')(h)
     model = keras.Model(inputs=z_input,outputs=output)
-    print(model.summary)
+    print(model.summary())
     return model
 
 """
@@ -112,7 +109,6 @@ def fv_actor_network(image_shape,force_dim,output_dim):
     vh = layers.Conv2D(32,(3,3), padding='same', activation='relu')(v_input)
     vh = layers.MaxPool2D((2,2))(vh)
     vh = layers.Conv2D(16, (3,3), padding='same', activation='relu')(vh)
-    vh = layers.MaxPool2D((2,2))(vh)
     vh = layers.Conv2D(8, (3,3), padding='same', activation='relu')(vh)
     vh = layers.Flatten()(vh)
     v_output = layers.Dense(32, activation='relu')(vh)
@@ -136,7 +132,6 @@ def fv_critic_network(image_shape,force_dim):
     vh = layers.Conv2D(32,(3,3), padding='same', activation='relu')(v_input)
     vh = layers.MaxPool2D((2,2))(vh)
     vh = layers.Conv2D(16, (3,3), padding='same', activation='relu')(vh)
-    vh = layers.MaxPool2D((2,2))(vh)
     vh = layers.Conv2D(8, (3,3), padding='same', activation='relu')(vh)
     vh = layers.Flatten()(vh)
     v_output = layers.Dense(32, activation='relu')(vh)
@@ -160,7 +155,6 @@ def fv_recurrent_actor_network(image_shape,force_dim,output_dim,seq_len):
     vh = layers.ConvLSTM2D(32,kernel_size=(3,3),padding='same',activation='relu',return_sequences=True)(v_input)
     vh = layers.MaxPool3D((1,2,2))(vh)
     vh = layers.ConvLSTM2D(16,kernel_size=(3,3),padding='same',activation='relu',return_sequences=True)(vh)
-    vh = layers.MaxPool3D((1,2,2))(vh)
     vh = layers.ConvLSTM2D(8,kernel_size=(3,3),padding='same',activation='relu',return_sequences=False)(vh)
     vh = layers.Flatten()(vh)
     v_output = layers.Dense(32, activation='relu')(vh)
@@ -184,7 +178,6 @@ def fv_recurrent_critic_network(image_shape,force_dim,seq_len=None):
     vh = layers.ConvLSTM2D(32,kernel_size=(3,3),padding='same',activation='relu',return_sequences=True)(v_input)
     vh = layers.MaxPool3D((1,2,2))(vh)
     vh = layers.ConvLSTM2D(16,kernel_size=(3,3),padding='same',activation='relu',return_sequences=True)(vh)
-    vh = layers.MaxPool3D((1,2,2))(vh)
     vh = layers.ConvLSTM2D(8,kernel_size=(3,3),padding='same',activation='relu',return_sequences=False)(vh)
     vh = layers.Flatten()(vh)
     v_output = layers.Dense(32, activation='relu')(vh)
@@ -208,7 +201,6 @@ def jfv_actor_network(image_shape,force_dim,joint_dim,output_dim):
     vh = layers.Conv2D(32,(3,3), padding='same', activation='relu')(v_input)
     vh = layers.MaxPool2D((2,2))(vh)
     vh = layers.Conv2D(16, (3,3), padding='same', activation='relu')(vh)
-    vh = layers.MaxPool2D((2,2))(vh)
     vh = layers.Conv2D(8, (3,3), padding='same', activation='relu')(vh)
     vh = layers.Flatten()(vh)
     v_output = layers.Dense(32, activation='relu')(vh)
@@ -233,7 +225,6 @@ def jfv_critic_network(image_shape, force_dim, joint_dim):
     vh = layers.Conv2D(32,(3,3), padding='same', activation='relu')(v_input)
     vh = layers.MaxPool2D((2,2))(vh)
     vh = layers.Conv2D(16, (3,3), padding='same', activation='relu')(vh)
-    vh = layers.MaxPool2D((2,2))(vh)
     vh = layers.Conv2D(8, (3,3), padding='same', activation='relu')(vh)
     vh = layers.Flatten()(vh)
     v_output = layers.Dense(32, activation='relu')(vh)

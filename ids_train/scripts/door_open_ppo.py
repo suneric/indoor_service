@@ -10,7 +10,7 @@ import argparse
 
 from agent.core import *
 from agent.model import *
-from agent.ppo import FVPPO
+from agent.ppo import FVPPO, LatentPPO
 from agent.vae import FVVAE
 from env.env_door_open import DoorOpenEnv
 
@@ -37,6 +37,7 @@ def smoothExponential(data, weight):
 
 def get_args():
     parser = argparse.ArgumentParser()
+    parser.add_argument('--policy', type=str, default='ppo') # ppo, rppo, lppo, lrppo
     parser.add_argument('--max_ep', type=int, default=2000)
     parser.add_argument('--max_step', type=int, default=60)
     parser.add_argument('--train_freq', type=int ,default=300)
@@ -149,17 +150,70 @@ def recurrent_ppo_train(env, num_episodes, train_freq, seq_len, max_steps):
 
     return ep_returns
 
+def latent_ppo_train(env,num_episodes,train_freq,max_steps):
+    image_shape = env.observation_space[0]
+    force_dim = env.observation_space[1]
+    action_dim = env.action_space.n
+    print("create door open environment for ppo", image_shape, force_dim, action_dim)
+
+    model_dir = os.path.join(sys.path[0],'../saved_models/door_open/ppo',datetime.now().strftime("%Y-%m-%d-%H-%M"))
+    summaryWriter = tf.summary.create_file_writer(model_dir)
+
+    latent_dim = 4
+    vae = FVVAE(image_shape, force_dim, latent_dim)
+    buffer_capacity = train_freq+max_steps
+    buffer = FVReplayBuffer(buffer_capacity,image_shape,force_dim,gamma=0.99,lamda=0.97)
+    actor = latent_actor_network(latent_dim,action_dim)
+    critic = latent_critic_network(latent_dim)
+    agent = LatentPPO(vae,actor,critic,actor_lr=3e-4,critic_lr=1e-3,clip_ratio=0.2,beta=1e-3,target_kld=1e-2)
+
+    ep_returns, t, success_counter = [], 0, 0
+    for ep in range(num_episodes):
+        obs, done, ep_ret, step = env.reset(), False, 0, 0
+        while not done and step < max_steps:
+            obs_img, obs_frc = obs['image'], obs['force']
+            act, logp = agent.policy(obs_img,obs_frc)
+            val = agent.value(obs_img,obs_frc)
+            nobs, rew, done, info = env.step(act)
+            buffer.add_sample(obs_img,obs_frc,act,rew,val,logp)
+            obs = nobs
+            ep_ret += rew
+            t += 1
+            step += 1
+
+        success_counter = success_counter+1 if env.success else success_counter
+        last_value = 0 if done else agent.value(obs['image'], obs['force'])
+        buffer.end_trajectry(last_value)
+        ep_returns.append(ep_ret)
+        print("Episode *{}*: Return {:.4f}, Total Step {}, Success Count {} ".format(ep,ep_ret,t,success_counter))
+
+        with summaryWriter.as_default():
+            tf.summary.scalar('episode reward', ep_ret, step=ep)
+
+        if buffer.ptr >= train_freq or (ep+1) == num_episodes:
+            data, size = buffer.sample()
+            agent.learn(data,size=size)
+
+        if (ep+1) % 50 == 0 or (ep+1==num_episodes):
+            save_model(agent, model_dir, str(ep+1))
+
+    return ep_returns
+
+
 if __name__=="__main__":
     args = get_args()
     rospy.init_node('ppo_train', anonymous=True)
     env = DoorOpenEnv(continuous=False)
     ep_returns = None
-    if args.seq_len is None:
+    if args.policy == 'ppo':
         plt.title("ppo training")
         ep_returns = ppo_train(env, args.max_ep, args.train_freq, args.max_step)
-    else:
+    elif args.policy == 'rppo':
         plt.title("recurrent ppo training")
         ep_returns = recurrent_ppo_train(env, args.max_ep, args.train_freq, args.seq_len, args.max_step)
+    elif args.policy == 'lppo':
+        plt.title("recurrent ppo training")
+        ep_returns = latent_ppo_train(env, args.max_ep, args.train_freq, args.max_step)
     env.close()
     plt.plot(ep_returns, 'k--', linewidth=1)
     plt.plot(smoothExponential(ep_returns,0.99), 'g-', linewidth=2)

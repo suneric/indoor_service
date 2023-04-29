@@ -31,7 +31,7 @@ register(
   entry_point='envs.socket_plug_env:SocketPlugEnv')
 
 class AutoChargeEnv(GymGazeboEnv):
-    def __init__(self, continuous = True, force_scale=1.0):
+    def __init__(self, continuous = True, force_scale=0.01):
         super(AutoChargeEnv, self).__init__(
             start_init_physics_parameters=False,
             reset_world_or_sim='WORLD'
@@ -128,7 +128,7 @@ class AutoChargeEnv(GymGazeboEnv):
         elif self.fail:
             reward = -100
         else:
-            dist2goal_change = (self.prev_dist-self.curr_dist)*(100/0.01) # scale to 10 mm  
+            dist2goal_change = (self.prev_dist-self.curr_dist)*(100/0.01) # scale to 10 mm
             reward = dist2goal_change - 1
             self.prev_dist = self.curr_dist
         return reward

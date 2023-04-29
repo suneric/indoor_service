@@ -17,19 +17,21 @@ class FVVAE(keras.Model):
 
     def train_step(self,images,forces):
         with tf.GradientTape() as tape:
-            mean, logv, z = self.encoder([images,forces])
-            y_images, y_forces = self.decoder(z)
-            image_loss = tf.reduce_sum(keras.losses.MSE(images,y_images), axis=(1,2))
-            force_loss = keras.losses.MSE(forces,y_forces)
-            reconstruction_loss = tf.reduce_mean(image_loss) + tf.reduce_mean(force_loss)
-            kl_loss = tf.reduce_sum(-0.5*(1+logv-tf.square(mean)-tf.exp(logv)), axis=1)
-            kl_loss = tf.reduce_mean(kl_loss)
-            total_loss = reconstruction_loss + kl_loss
+            z_mean, z_log_var, z = self.encoder([images,forces])
+            r_images, r_forces = self.decoder(z)
+            # reconstruction image and force
+            image_loss = tf.reduce_sum(keras.losses.MSE(images,r_images), axis=(1,2))
+            force_loss = keras.losses.MSE(forces,r_forces)
+            rc_loss = tf.reduce_mean(image_loss) + tf.reduce_mean(force_loss)
+            # augmented kl loss per dim
+            kl_loss = -0.5*(1+z_log_var-tf.square(z_mean)-tf.exp(z_log_var))
+            kl_loss = tf.reduce_mean(tf.reduce_sum(kl_loss, axis=1))
+            total_loss = rc_loss + kl_loss
         grads = tape.gradient(total_loss, self.trainable_weights)
         self.optimizer.apply_gradients(zip(grads,self.trainable_weights))
         return {
             "loss": total_loss,
-            "reconstruction_loss": reconstruction_loss,
+            "reconstruction_loss": rc_loss,
             "kl_loss": kl_loss,
         }
 

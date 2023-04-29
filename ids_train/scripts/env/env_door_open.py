@@ -16,7 +16,7 @@ register(
   entry_point='envs.door_open_env:DoorOpenEnv')
 
 class DoorOpenEnv(GymGazeboEnv):
-    def __init__(self, continuous = False, door_length=0.9, force_scale=1.0):
+    def __init__(self, continuous = False, door_length=0.9, force_scale=0.01):
         super(DoorOpenEnv, self).__init__(
             start_init_physics_parameters=False,
             reset_world_or_sim="WORLD"

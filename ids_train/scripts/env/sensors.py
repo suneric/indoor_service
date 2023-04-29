@@ -111,7 +111,7 @@ class ArduCam:
         if noise_var is not None:
             img = noise_image(img, noise_var)
         img = resize_image(img,resolution)
-        img = np.array(img)/255 - 0.5
+        img = np.array(img)/255 #- 0.5
         img = img.reshape((resolution[0],resolution[1],3))
         return img
 
@@ -121,7 +121,7 @@ class ArduCam:
             img = noise_image(img, noise_var)
         img = resize_image(img,resolution)
         img = cv.cvtColor(img,cv.COLOR_BGR2GRAY)
-        img = np.array(img)/255 - 0.5
+        img = np.array(img)/255 #- 0.5
         img = img.reshape((resolution[0],resolution[1],1))
         return img
 
@@ -199,7 +199,7 @@ class RSD435:
         if noise_var is not None:
             img = noise_image(img, noise_var)
         img = resize_image(img,resolution)
-        img = np.array(img)/255 - 0.5
+        img = np.array(img)/255 #- 0.5
         img = img.reshape((resolution[0],resolution[1],3))
         return img
 
@@ -209,7 +209,7 @@ class RSD435:
             img = noise_image(img, noise_var)
         img = resize_image(img,resolution)
         img = cv.cvtColor(img,cv.COLOR_BGR2GRAY)
-        img = np.array(img)/255 - 0.5
+        img = np.array(img)/255 #- 0.5
         img = img.reshape((resolution[0],resolution[1],1))
         return img
 
@@ -225,7 +225,7 @@ class RSD435:
         img = np.zeros((self.height,self.width),dtype=np.float32)
         img[int(t):int(b),int(l):int(r)] = 255
         img = resize_image(img,resolution)
-        img = np.array(img)/255 - 0.5
+        img = np.array(img)/255 #- 0.5
         img = img.reshape((resolution[0],resolution[1],1))
         return img
 
