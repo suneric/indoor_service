@@ -7,13 +7,12 @@ import tensorflow as tf
 from datetime import datetime
 import matplotlib.pyplot as plt
 import argparse
-from collections import deque
 
-from agent.model import actor_network, critic_network
-from agent.policy import PPO, ReplayBuffer, zero_obs_seq
-from agent.vae import ConvVAE
+from agent.core import *
+from agent.model import *
+from agent.ppo import FVPPO
+from agent.vae import FVVAE
 from env.env_door_open import DoorOpenEnv
-
 
 """
 https://www.tensorflow.org/guide/gpu#limiting_gpu_memory_growth
@@ -60,13 +59,10 @@ def ppo_train(env, num_episodes, train_freq, max_steps):
     summaryWriter = tf.summary.create_file_writer(model_dir)
 
     buffer_capacity = train_freq+max_steps
-    buffer = ReplayBuffer(buffer_capacity,image_shape,force_dim,gamma=0.99,lamda=0.97)
-    actor = actor_network(image_shape,force_dim,action_dim,'relu','linear')
-    critic = critic_network(image_shape,force_dim,'relu')
-    agent = PPO(actor,critic,actor_lr=3e-4,critic_lr=1e-3,clip_ratio=0.2,beta=1e-3,target_kld=1e-2)
-
-    latent_dim = 10
-    vae = ConvVAE(image_shape, force_dim, latent_dim)
+    buffer = FVReplayBuffer(buffer_capacity,image_shape,force_dim,gamma=0.99,lamda=0.97)
+    actor = fv_actor_network(image_shape,force_dim,action_dim)
+    critic = fv_critic_network(image_shape,force_dim)
+    agent = FVPPO(actor,critic,actor_lr=3e-4,critic_lr=1e-3,clip_ratio=0.2,beta=1e-3,target_kld=1e-2)
 
     ep_returns, t, success_counter = [], 0, 0
     for ep in range(num_episodes):
@@ -93,7 +89,6 @@ def ppo_train(env, num_episodes, train_freq, max_steps):
 
         if buffer.ptr >= train_freq or (ep+1) == num_episodes:
             data, size = buffer.sample()
-            vae.learn(data,size=size)
             agent.learn(data,size=size)
 
         if (ep+1) % 50 == 0 or (ep+1==num_episodes):
@@ -111,10 +106,10 @@ def recurrent_ppo_train(env, num_episodes, train_freq, seq_len, max_steps):
     summaryWriter = tf.summary.create_file_writer(model_dir)
 
     buffer_capacity = train_freq+max_steps
-    buffer = ReplayBuffer(buffer_capacity,image_shape,force_dim,gamma=0.99,lamda=0.97,seq_len=seq_len)
-    actor = actor_network(image_shape,force_dim,action_dim,'relu','linear',seq_len)
-    critic = critic_network(image_shape,force_dim,'relu',seq_len)
-    agent = PPO(actor,critic,actor_lr=3e-4,critic_lr=1e-3,clip_ratio=0.2,beta=1e-3,target_kld=1e-2)
+    buffer = FVReplayBuffer(buffer_capacity,image_shape,force_dim,gamma=0.99,lamda=0.97,seq_len=seq_len)
+    actor = fv_recurrent_actor_network(image_shape,force_dim,action_dim,seq_len)
+    critic = fv_recurrent_critic_network(image_shape,force_dim,seq_len)
+    agent = FVPPO(actor,critic,actor_lr=3e-4,critic_lr=1e-3,clip_ratio=0.2,beta=1e-3,target_kld=1e-2)
 
     ep_returns, t, success_counter = [], 0, 0
     for ep in range(num_episodes):
@@ -146,7 +141,8 @@ def recurrent_ppo_train(env, num_episodes, train_freq, seq_len, max_steps):
             tf.summary.scalar('episode reward', ep_ret, step=ep)
 
         if buffer.ptr >= train_freq or (ep+1) == num_episodes:
-            agent.learn(buffer)
+            data, size = buffer.sample()
+            agent.learn(data,size=size)
 
         if (ep+1) % 50 == 0 or (ep+1==num_episodes):
             save_model(agent, model_dir, str(ep+1))

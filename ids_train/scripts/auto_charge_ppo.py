@@ -7,12 +7,11 @@ import tensorflow as tf
 from datetime import datetime
 import matplotlib.pyplot as plt
 import argparse
-from collections import deque
 
-from agent.model1 import actor_network, critic_network
-from agent.policy1 import PPO, ReplayBuffer
+from agent.core import JFVReplayBuffer
+from agent.model import jfv_actor_network, jfv_critic_network
+from agent.ppo import JFVPPO
 from env.env_auto_charge import AutoChargeEnv
-
 
 """
 https://www.tensorflow.org/guide/gpu#limiting_gpu_memory_growth
@@ -59,10 +58,10 @@ def ppo_train(env, num_episodes, train_freq, max_steps):
     summaryWriter = tf.summary.create_file_writer(model_dir)
 
     buffer_capacity = train_freq+max_steps
-    buffer = ReplayBuffer(buffer_capacity,image_shape,force_dim,joint_dim,gamma=0.99,lamda=0.97)
-    actor = actor_network(image_shape,force_dim,joint_dim,action_dim,'relu','linear')
-    critic = critic_network(image_shape,force_dim,joint_dim,'relu')
-    agent = PPO(actor,critic,actor_lr=3e-4,critic_lr=1e-3,clip_ratio=0.2,beta=1e-3,target_kld=1e-2)
+    buffer = JFVReplayBuffer(buffer_capacity,image_shape,force_dim,joint_dim,gamma=0.99,lamda=0.97)
+    actor = jfv_actor_network(image_shape,force_dim,joint_dim,action_dim)
+    critic = jfv_critic_network(image_shape,force_dim,joint_dim)
+    agent = JFVPPO(actor,critic,actor_lr=3e-4,critic_lr=1e-3,clip_ratio=0.2,beta=1e-3,target_kld=0.1)
 
     ep_returns, t, success_counter = [], 0, 0
     for ep in range(num_episodes):
@@ -88,7 +87,8 @@ def ppo_train(env, num_episodes, train_freq, max_steps):
             tf.summary.scalar('episode reward', ep_ret, step=ep)
 
         if buffer.ptr >= train_freq or (ep+1) == num_episodes:
-            agent.learn(buffer)
+            data, size = buffer.sample()
+            agent.learn(data,size=size)
 
         if (ep+1) % 50 == 0 or (ep+1==num_episodes):
             save_model(agent, model_dir, str(ep+1))
