@@ -128,8 +128,8 @@ class AutoChargeEnv(GymGazeboEnv):
         elif self.fail:
             reward = -100
         else:
-            dist2goal_change = self.prev_dist-self.curr_dist
-            reward = 1000*dist2goal_change - 0.3
+            dist2goal_change = (self.prev_dist-self.curr_dist)*(100/0.01) # scale to 10 mm  
+            reward = dist2goal_change - 1
             self.prev_dist = self.curr_dist
         return reward
 
@@ -146,7 +146,7 @@ class AutoChargeEnv(GymGazeboEnv):
                 break
             rospy.sleep(0.01)
         self.robot.stop()
-        self.curr_dist = dist2
+        _, self.curr_dist = self.dist2goal()
         # back for reduce force
         f = self.robot.plug_forces()
         while f[0] <= -f_max or abs(f[1]) >= 10 or abs(f[2]+9.8) >= 10:

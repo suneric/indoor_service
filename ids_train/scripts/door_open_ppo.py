@@ -11,6 +11,7 @@ from collections import deque
 
 from agent.model import actor_network, critic_network
 from agent.policy import PPO, ReplayBuffer, zero_obs_seq
+from agent.vae import ConvVAE
 from env.env_door_open import DoorOpenEnv
 
 
@@ -64,6 +65,9 @@ def ppo_train(env, num_episodes, train_freq, max_steps):
     critic = critic_network(image_shape,force_dim,'relu')
     agent = PPO(actor,critic,actor_lr=3e-4,critic_lr=1e-3,clip_ratio=0.2,beta=1e-3,target_kld=1e-2)
 
+    latent_dim = 10
+    vae = ConvVAE(image_shape, force_dim, latent_dim)
+
     ep_returns, t, success_counter = [], 0, 0
     for ep in range(num_episodes):
         obs, done, ep_ret, step = env.reset(), False, 0, 0
@@ -88,7 +92,9 @@ def ppo_train(env, num_episodes, train_freq, max_steps):
             tf.summary.scalar('episode reward', ep_ret, step=ep)
 
         if buffer.ptr >= train_freq or (ep+1) == num_episodes:
-            agent.learn(buffer)
+            data, size = buffer.sample()
+            vae.learn(data,size=size)
+            agent.learn(data,size=size)
 
         if (ep+1) % 50 == 0 or (ep+1==num_episodes):
             save_model(agent, model_dir, str(ep+1))

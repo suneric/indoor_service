@@ -3,10 +3,41 @@ import tensorflow as tf
 from tensorflow import keras
 from tensorflow.keras import layers
 
-"""
-PPO policy for input combined with images and forces.
-support recurrent and normal neural network
-"""
+class Sampling(keras.layers.Layer):
+    """Use (mean,log_var) to sample z, the vector encoding a digit."""
+    def call(self, inputs):
+        mean, logv = inputs
+        batch = tf.shape(mean)[0]
+        dim = tf.shape(mean)[1]
+        eps = tf.random.normal(shape=(batch,dim))
+        return mean + tf.exp(0.5*logv)*eps
+
+def conv_encoder(image_shape, latent_dim):
+    input = keras.Input(shape=image_shape)
+    h = keras.layers.Conv2D(filters=32,kernel_size=(3,3),strides=2,padding='same',activation='relu')(input)
+    h = keras.layers.Conv2D(filters=16,kernel_size=(3,3),strides=2,padding='same',activation='relu')(h)
+    h = keras.layers.Conv2D(filters=8,kernel_size=(3,3),strides=2,padding='same',activation='relu')(h)
+    h = keras.layers.Flatten()(h)
+    h = keras.layers.Dense(32,activation='relu')(h)
+    z_mean = keras.layers.Dense(latent_dim, name='z_mean')(h)
+    z_logv = keras.layers.Dense(latent_dim,name='z_logv')(h)
+    z = Sampling()([z_mean,z_logv])
+    model = keras.Model(input,[z_mean,z_logv,z],name='encoder')
+    print(model.summary())
+    return model
+
+def conv_decoder(latent_dim):
+    input = keras.Input(shape=(latent_dim,))
+    h = keras.layers.Dense(8*8*32, activation='relu')(input)
+    h = keras.layers.Reshape((8,8,32))(h)
+    h = keras.layers.Conv2DTranspose(filters=8,kernel_size=3,strides=2,padding='same',activation='relu')(h)
+    h = keras.layers.Conv2DTranspose(filters=16,kernel_size=3,strides=2,padding='same',activation='relu')(h)
+    h = keras.layers.Conv2DTranspose(filters=32,kernel_size=3,strides=2,padding='same',activation='relu')(h)
+    output = keras.layers.Conv2DTranspose(filters=1,kernel_size=3,padding='same',activation='sigmoid')(h)
+    model = keras.Model(input,output,name='decoder')
+    print(model.summary())
+    return model
+
 
 def actor_network(image_shape,force_dim,output_dim,activation,output_activation,seq_len=None):
     vision_out, force_out = None, None

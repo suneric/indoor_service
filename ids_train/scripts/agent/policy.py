@@ -73,10 +73,11 @@ class ReplayBuffer:
         """
         Get all data of the buffer and normalize the advantages
         """
+        size = self.ptr
         s = slice(0,self.ptr)
         adv_mean, adv_std = np.mean(self.adv_buf[s]), np.std(self.adv_buf[s])
         self.adv_buf[s] = (self.adv_buf[s]-adv_mean) / adv_std
-        batch = (
+        data = (
             self.img_seq_buf[s] if self.recurrent else self.img_buf[s],
             self.frc_seq_buf[s] if self.recurrent else self.frc_buf[s],
             self.act_buf[s],
@@ -86,7 +87,7 @@ class ReplayBuffer:
             )
         self.ptr, self.idx = 0, 0
         self.reset()
-        return batch
+        return data,size
 
 class PPO:
     def __init__(self,actor,critic,actor_lr=1e-4,critic_lr=2e-4,clip_ratio=0.2,beta=1e-3,target_kld=0.01):
@@ -134,12 +135,11 @@ class PPO:
         q_grad = tape.gradient(q_loss, self.q.trainable_variables)
         self.q_optimizer.apply_gradients(zip(q_grad, self.q.trainable_variables))
 
-    def learn(self, buffer, pi_iter=80, q_iter=80, batch_size=32):
+    def learn(self, data, size, pi_iter=80, q_iter=80, batch_size=32):
         print("training epoches {}:{}, batch size {}".format(pi_iter,q_iter,batch_size))
-        buffer_size = buffer.ptr
-        (image_buf,force_buf,action_buf,return_buf,advantage_buf,logprob_buf) = buffer.sample()
+        (image_buf,force_buf,action_buf,return_buf,advantage_buf,logprob_buf) = data
         for _ in range(pi_iter):
-            idxs = np.random.choice(buffer_size,batch_size)
+            idxs = np.random.choice(size,batch_size)
             images = tf.convert_to_tensor(image_buf[idxs])
             forces = tf.convert_to_tensor(force_buf[idxs])
             actions = tf.convert_to_tensor(action_buf[idxs])
@@ -149,7 +149,7 @@ class PPO:
             # if kld > self.target_kld:
             #     break
         for _ in range(q_iter):
-            idxs = np.random.choice(buffer_size,batch_size)
+            idxs = np.random.choice(size,batch_size)
             images = tf.convert_to_tensor(image_buf[idxs])
             forces = tf.convert_to_tensor(force_buf[idxs])
             returns = tf.convert_to_tensor(return_buf[idxs])

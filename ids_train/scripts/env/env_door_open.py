@@ -86,8 +86,8 @@ class DoorOpenEnv(GymGazeboEnv):
         elif self.fail:
             reward = -100
         else:
-            angle_change = self.curr_angle - self.prev_angle
-            reward = 100*angle_change - 1
+            angle_change = (self.curr_angle-self.prev_angle)*(100/(0.5*math.pi)) # scale to pi/2
+            reward = angle_change - 1
             self.prev_angle = self.curr_angle
         return reward
 
