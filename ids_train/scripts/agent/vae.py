@@ -2,10 +2,12 @@
 reference
 https://keras.io/examples/generative/vae/
 """
+import os
 import tensorflow as tf
 import numpy as np
 from tensorflow import keras
 from agent.model import fv_decoder, fv_encoder
+import matplotlib.pyplot as plt
 
 class FVVAE(keras.Model):
     def __init__(self, image_shape, force_dim, latent_dim, lr=1e-4,**kwargs):
@@ -15,7 +17,8 @@ class FVVAE(keras.Model):
         self.decoder = fv_decoder(latent_dim)
         self.compile(optimizer=keras.optimizers.Adam(lr))
 
-    def train_step(self,images,forces):
+    def train_step(self,data):
+        images,forces = data[0]
         with tf.GradientTape() as tape:
             z_mean, z_log_var, z = self.encoder([images,forces])
             r_images, r_forces = self.decoder(z)
@@ -38,12 +41,11 @@ class FVVAE(keras.Model):
     def learn(self, data, size, epochs=100, batch_size=64):
         print("training epoches {}, batch size {}/{}".format(epochs,batch_size,size))
         (image_buf,force_buf,action_buf,return_buf,advantage_buf,logprob_buf) = data
-        #self.fit(image_buf,epochs=epochs,batch_size=batch_size)
         for epoch in range(epochs):
             idxs = np.random.choice(size,batch_size)
             images = tf.convert_to_tensor(image_buf[idxs])
             forces = tf.convert_to_tensor(force_buf[idxs])
-            info = self.train_step(images,forces)
+            info = self.train_step([images,forces])
             print("epoch {}, loss {:.4f}, reconstruction loss {:.4f}, kl loss {:.4f}".format(
                     epoch,
                     info["loss"],
@@ -63,3 +65,18 @@ class FVVAE(keras.Model):
     def load(self, encoder_path, decoder_path):
         self.encoder.load_weights(encoder_path)
         self.decoder.load_weights(decoder_path)
+
+    def plot_episode(self,ep,images,forces,path):
+        print("predict episode {}, save observation in {}".format(ep,path))
+        z_mean, z_log_var, z = self.encoder([tf.convert_to_tensor(images),tf.convert_to_tensor(forces)])
+        r_images,r_forces = self.decoder(z)
+        ep_path = os.path.join(path,"ep{}".format(ep))
+        os.mkdir(ep_path)
+        len = r_images.shape[0]
+        fig, (ax1,ax2) = plt.subplots(1,2)
+        for i in range(len):
+            ax1.imshow(images[i],cmap='gray')
+            ax2.imshow(r_images[i],cmap='gray')
+            ax1.set_title("[{:.4f},{:.4f},{:.4f}]".format(forces[i][0],forces[i][1],forces[i][2]))
+            ax2.set_title("[{:.4f},{:.4f},{:.4f}]".format(r_forces[i][0],r_forces[i][1],r_forces[i][2]))
+            plt.savefig(os.path.join(ep_path,"step{}".format(i)))

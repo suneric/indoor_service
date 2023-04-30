@@ -35,6 +35,31 @@ def zero_obs_seq(image_shape, force_dim, seq_len):
     return img_seq,frc_seq
 
 """
+ObservationBuffer
+"""
+class ObservationBuffer:
+    def __init__(self,capacity,image_shape,force_dim):
+        self.capacity = capacity
+        self.image_buf = np.zeros([self.capacity]+list(image_shape), dtype=np.float32)
+        self.force_buf = np.zeros((self.capacity, force_dim), dtype=np.float32)
+        self.angle_buf = np.zeros((self.capacity, 1),dtype=np.float32)
+        self.ptr = 0
+
+    def add_observation(self,image,force,angle):
+        self.image_buf[self.ptr] = image
+        self.force_buf[self.ptr] = force
+        self.angle_buf[self.ptr] = angle
+        self.ptr = (self.ptr+1)%self.capacity
+
+    def all_data(self):
+        s = slice(0,self.ptr)
+        return (
+            tf.convert_to_tensor(self.image_buf[s]),
+            tf.convert_to_tensor(self.force_buf[s]),
+            tf.convert_to_tensor(self.angle_buf[s]),
+        )
+
+"""
 Force Vision Buffer
 """
 class FVReplayBuffer:

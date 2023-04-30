@@ -103,7 +103,7 @@ def recurrent_ppo_train(env, num_episodes, train_freq, seq_len, max_steps):
     action_dim = env.action_space.n
     print("create door open environment for recurrent ppo", image_shape, force_dim, action_dim)
 
-    model_dir = os.path.join(sys.path[0],'../saved_models/door_open/ppo',datetime.now().strftime("%Y-%m-%d-%H-%M"))
+    model_dir = os.path.join(sys.path[0],'../saved_models/door_open/rppo',datetime.now().strftime("%Y-%m-%d-%H-%M"))
     summaryWriter = tf.summary.create_file_writer(model_dir)
 
     buffer_capacity = train_freq+max_steps
@@ -156,26 +156,34 @@ def latent_ppo_train(env,num_episodes,train_freq,max_steps):
     action_dim = env.action_space.n
     print("create door open environment for ppo", image_shape, force_dim, action_dim)
 
-    model_dir = os.path.join(sys.path[0],'../saved_models/door_open/ppo',datetime.now().strftime("%Y-%m-%d-%H-%M"))
+    model_dir = os.path.join(sys.path[0],'../saved_models/door_open/lppo',datetime.now().strftime("%Y-%m-%d-%H-%M"))
     summaryWriter = tf.summary.create_file_writer(model_dir)
 
     latent_dim = 4
     vae = FVVAE(image_shape, force_dim, latent_dim)
-    buffer_capacity = train_freq+max_steps
-    buffer = FVReplayBuffer(buffer_capacity,image_shape,force_dim,gamma=0.99,lamda=0.97)
+    obs_capacity = 5000
+    obsBuffer = ObservationBuffer(obs_capacity,image_shape,force_dim)
+    replay_capacity = train_freq+max_steps
+    replayBuffer = FVReplayBuffer(replay_capacity,image_shape,force_dim,gamma=0.99,lamda=0.97)
     actor = latent_actor_network(latent_dim,action_dim)
     critic = latent_critic_network(latent_dim)
     agent = LatentPPO(vae,actor,critic,actor_lr=3e-4,critic_lr=1e-3,clip_ratio=0.2,beta=1e-3,target_kld=1e-2)
 
     ep_returns, t, success_counter = [], 0, 0
     for ep in range(num_episodes):
+        ep_images, ep_forces = [],[]
+        predict = ep > 0 and replayBuffer.ptr == 0 # make
         obs, done, ep_ret, step = env.reset(), False, 0, 0
         while not done and step < max_steps:
             obs_img, obs_frc = obs['image'], obs['force']
+            if predict:
+                ep_images.append(obs_img)
+                ep_forces.append(obs_frc)
             act, logp = agent.policy(obs_img,obs_frc)
             val = agent.value(obs_img,obs_frc)
             nobs, rew, done, info = env.step(act)
-            buffer.add_sample(obs_img,obs_frc,act,rew,val,logp)
+            replayBuffer.add_sample(obs_img,obs_frc,act,rew,val,logp)
+            obsBuffer.add_observation(obs_img,obs_frc,info['door'][1])
             obs = nobs
             ep_ret += rew
             t += 1
@@ -183,16 +191,20 @@ def latent_ppo_train(env,num_episodes,train_freq,max_steps):
 
         success_counter = success_counter+1 if env.success else success_counter
         last_value = 0 if done else agent.value(obs['image'], obs['force'])
-        buffer.end_trajectry(last_value)
+        replayBuffer.end_trajectry(last_value)
         ep_returns.append(ep_ret)
         print("Episode *{}*: Return {:.4f}, Total Step {}, Success Count {} ".format(ep,ep_ret,t,success_counter))
 
         with summaryWriter.as_default():
             tf.summary.scalar('episode reward', ep_ret, step=ep)
 
-        if buffer.ptr >= train_freq or (ep+1) == num_episodes:
-            data, size = buffer.sample()
+        if replayBuffer.ptr >= train_freq or (ep+1) == num_episodes:
+            data, size = replayBuffer.sample()
             agent.learn(data,size=size)
+            agent.train_vae(obsBuffer)
+
+        if predict:
+            agent.make_prediction(ep+1,ep_images,ep_forces,model_dir)
 
         if (ep+1) % 50 == 0 or (ep+1==num_episodes):
             save_model(agent, model_dir, str(ep+1))
