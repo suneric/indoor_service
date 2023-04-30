@@ -58,7 +58,7 @@ class LatentPPO:
         q_grad = tape.gradient(q_loss, self.q.trainable_variables)
         self.q_optimizer.apply_gradients(zip(q_grad, self.q.trainable_variables))
 
-    def learn(self, data, size, pi_iter=100, q_iter=100, batch_size=32):
+    def learn(self, data, size, pi_iter=100, q_iter=100, batch_size=64):
         print("training epoches {}:{}, batch size {}".format(pi_iter,q_iter,batch_size))
         image_buf,force_buf,action_buf,return_buf,advantage_buf,logprob_buf = data
         for _ in range(pi_iter):
@@ -149,7 +149,7 @@ class FVPPO:
         q_grad = tape.gradient(q_loss, self.q.trainable_variables)
         self.q_optimizer.apply_gradients(zip(q_grad, self.q.trainable_variables))
 
-    def learn(self, data, size, pi_iter=80, q_iter=80, batch_size=32):
+    def learn(self, data, size, pi_iter=100, q_iter=100, batch_size=64):
         print("training epoches {}:{}, batch size {}".format(pi_iter,q_iter,batch_size))
         image_buf,force_buf,action_buf,return_buf,advantage_buf,logprob_buf = data
         for _ in range(pi_iter):
@@ -160,8 +160,8 @@ class FVPPO:
             logprobs = tf.convert_to_tensor(logprob_buf[idxs])
             advantages = tf.convert_to_tensor(advantage_buf[idxs])
             kld = self.update_policy(images,forces,actions,logprobs,advantages)
-            if kld > self.target_kld:
-                break
+            # if kld > self.target_kld:
+            #     break
 
         for _ in range(q_iter):
             idxs = np.random.choice(size,batch_size)
@@ -233,7 +233,7 @@ class JFVPPO:
         q_grad = tape.gradient(q_loss, self.q.trainable_variables)
         self.q_optimizer.apply_gradients(zip(q_grad, self.q.trainable_variables))
 
-    def learn(self, data, size, pi_iter=80, q_iter=80, batch_size=32):
+    def learn(self, data, size, pi_iter=100, q_iter=100, batch_size=64):
         print("training epoches {}:{}, batch size {}/{}".format(pi_iter,q_iter,batch_size,size))
         image_buf,force_buf,joint_buf,action_buf,return_buf,advantage_buf,logprob_buf = data
         for _ in range(pi_iter):
@@ -245,8 +245,8 @@ class JFVPPO:
             logprobs = tf.convert_to_tensor(logprob_buf[idxs])
             advantages = tf.convert_to_tensor(advantage_buf[idxs])
             kld = self.update_policy(images,forces,joints,actions,logprobs,advantages)
-            if kld > self.target_kld:
-                break
+            # if kld > self.target_kld:
+            #     break
 
         for _ in range(q_iter):
             idxs = np.random.choice(size,batch_size)
