@@ -38,35 +38,34 @@ class FVVAE(keras.Model):
             "kl_loss": kl_loss,
         }
 
-    def learn(self, data, size, epochs=100, batch_size=64):
-        print("training epoches {}, batch size {}/{}".format(epochs,batch_size,size))
-        (image_buf,force_buf,action_buf,return_buf,advantage_buf,logprob_buf) = data
-        for epoch in range(epochs):
-            idxs = np.random.choice(size,batch_size)
-            images = tf.convert_to_tensor(image_buf[idxs])
-            forces = tf.convert_to_tensor(force_buf[idxs])
-            info = self.train_step([images,forces])
-            print("epoch {}, loss {:.4f}, reconstruction loss {:.4f}, kl loss {:.4f}".format(
-                    epoch,
-                    info["loss"],
-                    info["reconstruction_loss"],
-                    info["kl_loss"]
-                    )
-                )
+    def learn(self, buffer, epochs=200, batch_size=128):
+        print("training vae, epoches {}, batch size {}".format(epochs,batch_size))
+        images,forces,_ = buffer.get_data()
+        self.fit([images,forces],epochs=epochs,batch_size=batch_size)
 
-    def save(self, encoder_path, decoder_path):
-        if not os.path.exists(os.path.dirname(encoder_path)):
-            os.makedirs(os.path.dirname(encoder_path))
-        self.encoder.save_weights(encoder_path)
-        if not os.path.exists(os.path.dirname(decoder_path)):
-            os.makedirs(os.path.dirname(decoder_path))
-        self.decoder.save_weights(decoder_path)
+    # def learn(self, data, size, epochs=100, batch_size=64):
+    #     print("training epoches {}, batch size {}/{}".format(epochs,batch_size,size))
+    #     (image_buf,force_buf,action_buf,return_buf,advantage_buf,logprob_buf) = data
+    #     for epoch in range(epochs):
+    #         idxs = np.random.choice(size,batch_size)
+    #         images = tf.convert_to_tensor(image_buf[idxs])
+    #         forces = tf.convert_to_tensor(force_buf[idxs])
+    #         info = self.train_step([images,forces])
+    #         print("epoch {}, loss {:.4f}, reconstruction loss {:.4f}, kl loss {:.4f}".format(
+    #                 epoch,
+    #                 info["loss"],
+    #                 info["reconstruction_loss"],
+    #                 info["kl_loss"]
+    #                 )
+    #             )
 
-    def load(self, encoder_path, decoder_path):
-        self.encoder.load_weights(encoder_path)
-        self.decoder.load_weights(decoder_path)
+    def encoding(self,image,force):
+        img = tf.expand_dims(tf.convert_to_tensor(image), 0)
+        frc = tf.expand_dims(tf.convert_to_tensor(force), 0)
+        z_mean,z_log_var,z = self.encoder([img,frc])
+        return tf.squeeze(z).numpy()
 
-    def plot_episode(self,ep,images,forces,path):
+    def make_prediction(self,ep,images,forces,path):
         print("predict episode {}, save observation in {}".format(ep,path))
         z_mean, z_log_var, z = self.encoder([tf.convert_to_tensor(images),tf.convert_to_tensor(forces)])
         r_images,r_forces = self.decoder(z)
@@ -80,3 +79,15 @@ class FVVAE(keras.Model):
             ax1.set_title("[{:.4f},{:.4f},{:.4f}]".format(forces[i][0],forces[i][1],forces[i][2]))
             ax2.set_title("[{:.4f},{:.4f},{:.4f}]".format(r_forces[i][0],r_forces[i][1],r_forces[i][2]))
             plt.savefig(os.path.join(ep_path,"step{}".format(i)))
+
+    def save(self, encoder_path, decoder_path):
+        if not os.path.exists(os.path.dirname(encoder_path)):
+            os.makedirs(os.path.dirname(encoder_path))
+        self.encoder.save_weights(encoder_path)
+        if not os.path.exists(os.path.dirname(decoder_path)):
+            os.makedirs(os.path.dirname(decoder_path))
+        self.decoder.save_weights(decoder_path)
+
+    def load(self, encoder_path, decoder_path):
+        self.encoder.load_weights(encoder_path)
+        self.decoder.load_weights(decoder_path)

@@ -3,9 +3,11 @@ import numpy as np
 import tensorflow as tf
 from .core import *
 
+"""
+Latent PPO with input of latent z
+"""
 class LatentPPO:
-    def __init__(self,vae,actor,critic,actor_lr=1e-4,critic_lr=2e-4,clip_ratio=0.2,beta=1e-3,target_kld=0.01):
-        self.vae = vae
+    def __init__(self,actor,critic,actor_lr=1e-4,critic_lr=2e-4,clip_ratio=0.2,beta=1e-3,target_kld=0.01):
         self.pi = actor
         self.q = critic
         self.pi_optimizer = tf.keras.optimizers.Adam(actor_lr)
@@ -14,25 +16,15 @@ class LatentPPO:
         self.target_kld = target_kld
         self.beta = beta
 
-    def policy(self,obs_image,obs_force):
-        img = tf.expand_dims(tf.convert_to_tensor(obs_image), 0)
-        frc = tf.expand_dims(tf.convert_to_tensor(obs_force), 0)
-        z_mean,z_log_var,z = self.vae.encoder([img,frc])
-        return self.latent_policy(z)
-
-    def latent_policy(self,z):
+    def policy(self,obs_z):
+        z = tf.expand_dims(tf.convert_to_tensor(obs_z), 0)
         pmf = tfp.distributions.Categorical(logits=self.pi(z)) # distribution function
         act = tf.squeeze(pmf.sample()).numpy()
         logp = tf.squeeze(pmf.log_prob(act)).numpy()
         return act, logp
 
-    def value(self,obs_image,obs_force):
-        img = tf.expand_dims(tf.convert_to_tensor(obs_image), 0)
-        frc = tf.expand_dims(tf.convert_to_tensor(obs_force), 0)
-        z_mean,z_log_var,z = self.vae.encoder([img,frc])
-        return self.latent_value(z)
-
-    def latent_value(self,z):
+    def value(self,obs_z):
+        z = tf.expand_dims(tf.convert_to_tensor(obs_z), 0)
         val = self.q(z)
         return tf.squeeze(val).numpy()
 
@@ -48,7 +40,7 @@ class LatentPPO:
             approx_kld = old_logps-logps
         pi_grad = tape.gradient(pi_loss, self.pi.trainable_variables)
         self.pi_optimizer.apply_gradients(zip(pi_grad, self.pi.trainable_variables))
-        return tf.reduce_mean(approx_kld)
+        return pi_loss, tf.reduce_mean(approx_kld)
 
     def update_value_function(self,zs,returns):
         with tf.GradientTape() as tape:
@@ -57,36 +49,29 @@ class LatentPPO:
             q_loss = tf.reduce_mean((returns-values)**2)
         q_grad = tape.gradient(q_loss, self.q.trainable_variables)
         self.q_optimizer.apply_gradients(zip(q_grad, self.q.trainable_variables))
+        return q_loss
 
-    def learn(self, data, size, pi_iter=100, q_iter=100, batch_size=64):
-        print("training epoches {}:{}, batch size {}".format(pi_iter,q_iter,batch_size))
-        image_buf,force_buf,action_buf,return_buf,advantage_buf,logprob_buf = data
+    def learn(self, buffer, pi_iter=100, q_iter=100, batch_size=64):
+        print("training latent ppo, epoches {}:{}, batch size {}".format(pi_iter,q_iter,batch_size))
+        data, size = buffer.sample()
+        z_buf,action_buf,return_buf,advantage_buf,logprob_buf = data
         for _ in range(pi_iter):
             idxs = np.random.choice(size,batch_size)
-            images = tf.convert_to_tensor(image_buf[idxs])
-            forces = tf.convert_to_tensor(force_buf[idxs])
-            z_means, z_log_vars, zs = self.vae.encoder([images,forces])
+            zs = tf.convert_to_tensor(z_buf[idxs])
             actions = tf.convert_to_tensor(action_buf[idxs])
             logprobs = tf.convert_to_tensor(logprob_buf[idxs])
             advantages = tf.convert_to_tensor(advantage_buf[idxs])
-            kld = self.update_policy(zs,actions,logprobs,advantages)
+            pi_loss, kld = self.update_policy(zs,actions,logprobs,advantages)
             # if kld > self.target_kld:
             #     break
+            print("epoch {}, actor loss {}, KL distance {}".format(_,pi_loss,kld))
 
         for _ in range(q_iter):
             idxs = np.random.choice(size,batch_size)
-            images = tf.convert_to_tensor(image_buf[idxs])
-            forces = tf.convert_to_tensor(force_buf[idxs])
-            z_means, z_log_vars, zs = self.vae.encoder([images,forces])
+            zs = tf.convert_to_tensor(z_buf[idxs])
             returns = tf.convert_to_tensor(return_buf[idxs])
-            self.update_value_function(zs,returns)
-
-    def train_vae(self, buffer, epochs=200, batch_size=128):
-        images,forces,_ = buffer.all_data()
-        self.vae.fit([images,forces],epochs=epochs,batch_size=batch_size)
-
-    def make_prediction(self,ep,images,forces,path):
-        self.vae.plot_episode(ep,images,forces,path)
+            q_loss = self.update_value_function(zs,returns)
+            print("epoch {}, critic loss {}".format(_,q_loss))
 
     def save(self, actor_path, critic_path):
         if not os.path.exists(os.path.dirname(actor_path)):
