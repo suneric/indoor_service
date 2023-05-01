@@ -188,7 +188,6 @@ def latent_ppo_train(env,num_episodes,train_freq,max_steps):
         while not done and step < max_steps:
             obs_img, obs_frc = obs['image'], obs['force']
             z = vae.encoding(obs_img, obs_frc)
-
             act, logp = agent.policy(z)
             val = agent.value(z)
             nobs, rew, done, info = env.step(act)
@@ -205,7 +204,10 @@ def latent_ppo_train(env,num_episodes,train_freq,max_steps):
                 ep_forces.append(obs_frc)
 
         success_counter = success_counter+1 if env.success else success_counter
-        last_value = 0 if done else agent.value(obs['image'], obs['force'])
+        last_value = 0
+        if not done:
+            z = vae.encoding(obs['image'], obs['force'])
+            last_value = agent.value(z)
         replayBuffer.end_trajectry(last_value)
         ep_returns.append(ep_ret)
         print("Episode *{}*: Return {:.4f}, Total Step {}, Success Count {} ".format(ep,ep_ret,t,success_counter))
