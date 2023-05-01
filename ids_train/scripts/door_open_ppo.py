@@ -51,10 +51,10 @@ def save_agent(agent, model_dir, name):
     print("save agent {} weights to {}".format(name, model_dir))
 
 def save_vae(vae, model_dir, name):
-    vae_net_path = os.path.join(model_dir,'vae_net', name)
-    vae.save(vae_net_path)
+    encoder_path = os.path.join(model_dir,'encoder', name)
+    decoder_path = os.path.join(model_dir,'decoder', name)
+    vae.save(encoder_path, decoder_path)
     print("save vae {} weights to {}".format(name, model_dir))
-
 
 def ppo_train(env, num_episodes, train_freq, max_steps):
     image_shape = env.observation_space[0]
