@@ -102,6 +102,23 @@ def latent_critic_network(z_dim):
     return model
 
 """
+z dynamics model z_t-1, a_t-1 -> z_t, r_t
+"""
+def latent_dynamics_network(z_dim,action_dim):
+    z_input = keras.Input(shape=(z_dim,))
+    a_input = keras.Input(shape=(action_dim,))
+    concat = layers.concatenate([z_input,a_input])
+    h = layers.Dense(64,activation='relu')(concat)
+    h = layers.Dense(64,activation='relu')(h)
+    z1_output = layers.Dense(32, activation='relu')(h)
+    z1_output = layers.Dense(z_dim, activation='linear')(z1_output)
+    r_output = layers.Dense(16, activation='relu')(h)
+    r_output = layers.Dense(1, activation='linear')(r_output)
+    model = keras.Model(inputs=[z_input,a_input],outputs=[z1_output,r_output],name='latent_dynamics')
+    print(model.summary())
+    return model
+
+"""
 force-vision fusion actor network
 """
 def fv_actor_network(image_shape,force_dim,output_dim):

@@ -10,7 +10,7 @@ import argparse
 
 from agent.core import *
 from agent.model import *
-from agent.ppo import FVPPO, LatentPPO
+from agent.ppo import FVPPO
 from agent.vae import FVVAE
 from env.env_door_open import DoorOpenEnv
 
@@ -49,12 +49,6 @@ def save_agent(agent, model_dir, name):
     val_net_path = os.path.join(model_dir, 'val_net', name)
     agent.save(logits_net_path, val_net_path)
     print("save agent {} weights to {}".format(name, model_dir))
-
-def save_vae(vae, model_dir, name):
-    encoder_path = os.path.join(model_dir,'encoder', name)
-    decoder_path = os.path.join(model_dir,'decoder', name)
-    vae.save(encoder_path, decoder_path)
-    print("save vae {} weights to {}".format(name, model_dir))
 
 def ppo_train(env, num_episodes, train_freq, max_steps):
     image_shape = env.observation_space[0]
@@ -156,78 +150,6 @@ def recurrent_ppo_train(env, num_episodes, train_freq, seq_len, max_steps):
 
     return ep_returns
 
-def latent_ppo_train(env,num_episodes,train_freq,max_steps):
-    image_shape = env.observation_space[0]
-    force_dim = env.observation_space[1]
-    action_dim = env.action_space.n
-    print("create door open environment for ppo", image_shape, force_dim, action_dim)
-
-    model_dir = os.path.join(sys.path[0],'../saved_models/door_open/lppo',datetime.now().strftime("%Y-%m-%d-%H-%M"))
-    summaryWriter = tf.summary.create_file_writer(model_dir)
-
-    obs_capacity = 5000 # observation buffer for storing image and force
-    obsBuffer = ObservationBuffer(obs_capacity,image_shape,force_dim)
-
-    latent_dim = 4 # VAE model for force and vision observation
-    vae = FVVAE(image_shape, force_dim, latent_dim)
-
-    replay_capacity = train_freq+max_steps # latent z replay buffer
-    replayBuffer = LatentReplayBuffer(replay_capacity,latent_dim,gamma=0.99,lamda=0.97)
-
-    actor = latent_actor_network(latent_dim,action_dim)
-    critic = latent_critic_network(latent_dim)
-    agent = LatentPPO(actor,critic,actor_lr=3e-4,critic_lr=1e-3,clip_ratio=0.2,beta=1e-3,target_kld=1e-2)
-
-    ep_returns, t, success_counter = [], 0, 0
-    for ep in range(num_episodes):
-
-        ep_images, ep_forces = [],[]
-        predict = ep > 0 and replayBuffer.ptr == 0 # make a prediction of vae
-        # perform episode
-        obs, done, ep_ret, step = env.reset(), False, 0, 0
-        while not done and step < max_steps:
-            obs_img, obs_frc = obs['image'], obs['force']
-            z = vae.encoding(obs_img, obs_frc)
-            act, logp = agent.policy(z)
-            val = agent.value(z)
-            nobs, rew, done, info = env.step(act)
-
-            replayBuffer.add_sample(z,act,rew,val,logp)
-            obsBuffer.add_observation(nobs['image'],nobs['force'],info['door'][1])
-
-            ep_ret += rew
-            obs = nobs
-            step += 1
-            t += 1
-            if predict: # save trajectory observation for prediction
-                ep_images.append(obs_img)
-                ep_forces.append(obs_frc)
-
-        success_counter = success_counter+1 if env.success else success_counter
-        last_value = 0
-        if not done:
-            z = vae.encoding(obs['image'], obs['force'])
-            last_value = agent.value(z)
-        replayBuffer.end_trajectry(last_value)
-        ep_returns.append(ep_ret)
-        print("Episode *{}*: Return {:.4f}, Total Step {}, Success Count {} ".format(ep,ep_ret,t,success_counter))
-
-        with summaryWriter.as_default():
-            tf.summary.scalar('episode reward', ep_ret, step=ep)
-
-        if replayBuffer.ptr >= train_freq or (ep+1) == num_episodes:
-            vae.learn(obsBuffer)
-            agent.learn(replayBuffer)
-
-        if predict:
-            vae.make_prediction(ep+1,ep_images,ep_forces,model_dir)
-
-        if (ep+1) % 50 == 0 or (ep+1==num_episodes):
-            save_agent(agent, model_dir, str(ep+1))
-            save_vae(vae, model_dir, str(ep+1))
-
-    return ep_returns
-
 
 if __name__=="__main__":
     args = get_args()
@@ -240,9 +162,6 @@ if __name__=="__main__":
     elif args.policy == 'rppo':
         plt.title("recurrent ppo training")
         ep_returns = recurrent_ppo_train(env, args.max_ep, args.train_freq, args.seq_len, args.max_step)
-    elif args.policy == 'lppo':
-        plt.title("latent ppo training")
-        ep_returns = latent_ppo_train(env, args.max_ep, args.train_freq, args.max_step)
     env.close()
     plt.plot(ep_returns, 'k--', linewidth=1)
     plt.plot(smoothExponential(ep_returns,0.99), 'g-', linewidth=2)
