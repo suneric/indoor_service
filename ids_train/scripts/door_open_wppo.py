@@ -46,67 +46,33 @@ def save_agent(agent, model_dir, name):
     agent.save(logits_net_path, val_net_path)
     print("save agent {} weights to {}".format(name, model_dir))
 
-def test_real(env,image,force,path,max_step=60):
-    obs_list = []
-    obs_list.append((image,force))
-    for i in range(max_step):
-        z = model.observation.encoding(image,force)
-        a, logp = model.controller.policy(z)
-        o,r,done,info = env.step(a)
-        image,force = o['image'],o['force']
-        obs_list.append((image,force))
-        if done:
-            break
-    # plot trajectory
-    steps = min(len(obs_list),5)
-    fig, axs = plt.subplots(1,steps)
-    for i in range(steps):
-        image, force = obs_list[i]
-        axs[i].imshow(image,cmap='gray')
-        # axs[i].set_title("[{:.4f},{:.4f},{:.4f}]".format(force[0],force[1],force[2]))
-        i += 2
-    plt.savefig(os.path.join(path,"real"))
+def plot_predict(model,image,force,prev_z,prev_a,filepath):
+    fig, axs = plt.subplots(1,3)
+    z = model.encode_obs(image,force)
+    r_image,r_force = model.decode_latent(z)
+    axs[0].imshow(image,cmap='gray')
+    axs[0].set_title("[{:.2f},{:.2f},{:.2f}]".format(force[0],force[1],force[2]))
+    axs[1].imshow(r_image,cmap='gray')
+    axs[1].set_title("[{:.2f},{:.2f},{:.2f}]".format(r_force[0],r_force[1],r_force[2]))
+    if prev_z is not None:
+        z1,_ = model.latent_transit(prev_z,prev_a)
+        p_image,p_force = model.decode_latent(z1)
+        axs[2].imshow(p_image,cmap='gray')
+        axs[2].set_title("[{:.2f},{:.2f},{:.2f}]".format(p_force[0],p_force[1],p_force[2]))
+    else:
+        axs[2].imshow(np.zeros((64,64)),cmap='gray')
+    plt.savefig(filepath)
+    plt.close(fig)
 
-def test_imagine(model,image,force,action_dim,path,max_step=60):
-    obs_list = []
-    obs_list.append((image,force))
-    z = model.observation.encoding(image,force)
-    for i in range(max_step):
-        a, logp = model.controller.policy(z)
-        obs_a = np.zeros(action_dim)
-        obs_a[a]=1.0
-        z,r = model.dynamics.transit(z,obs_a)
-        image, force = model.observation.decoding(z)
-        obs_list.append((image[0],force[0]))
-        done = True if (r >=100 or r <=-100) else False
-        if done:
-            break
-    # plot trajectory
-    steps = min(len(obs_list),5)
-    fig,axs = plt.subplots(1,steps)
-    for i in range(steps):
-        image,force = obs_list[i]
-        axs[i].imshow(image,cmap='gray')
-        # axs[i].set_title("[{:.4f},{:.4f},{:.4f}]".format(force[0],force[1],force[2]))
-    plt.savefig(os.path.join(path,"imagine"))
-
-def test(ep,env,model,model_dir):
+def test_model(env,model,model_dir,ep,max_step=60):
     ep_path = os.path.join(model_dir,"ep{}".format(ep))
     os.mkdir(ep_path)
-    obs = env.reset()
-    test_imagine(model,obs['image'],obs['force'],env.action_space.n,ep_path)
-    test_real(env,obs['image'],obs['force'],ep_path)
-
-
-def test_obs_vae(env,model,model_dir,max_step=60):
-    path = os.path.join(model_dir,'test_obs_vae')
-    os.mkdir(path)
-    obs, done = env.reset(), False
-    model.predict_obs(obs['image'],obs['force'],os.path.join(path,"step{}".format(0)))
+    obs, done = env.reset(),False
+    plot_predict(model,obs['image'],obs['force'],None,None,os.path.join(ep_path,"step{}".format(0)))
     for i in range(max_step):
-        act = env.action_space.sample()
-        nobs,rew,done,info = env.step(act)
-        model.predict_obs(nobs['image'],nobs['force'],os.path.join(path,"step{}".format(i+1)))
+        z,a,v,logp = model.forward(obs['image'],obs['force'])
+        nobs,rew,done,info = env.step(a)
+        plot_predict(model,nobs['image'],nobs['force'],z,a,os.path.join(ep_path,"step{}".format(i+1)))
         if done:
             break
 
@@ -122,16 +88,20 @@ if __name__=="__main__":
     action_dim = env.action_space.n
     print("create door open environment for world model", image_shape, force_dim, action_dim)
 
+    imagine_after = 1000
     latent_dim = 4
     capacity = args.train_freq+args.max_step
-    buffer = ReplayBuffer(capacity,image_shape,force_dim,action_dim)
+    buffer = ReplayBuffer(capacity,image_shape,force_dim)
     model = WorldModel(image_shape,force_dim,action_dim,latent_dim)
 
     ep_returns, t, success_counter = [], 0, 0
     for ep in range(args.max_ep):
         obs, done, ep_ret, step = env.reset(), False, 0, 0
         while not done and step < args.max_step:
-            act, logp, val = model.forward(obs['image'],obs['force'])
+            if t < imagine_after:
+                z, act, logp, val = model.forward(obs['image'],obs['force'])
+            else:
+                z, act, logp, val = model.imagine(obs['image'],obs['force'])
             nobs, rew, done, info = env.step(act)
             buffer.add_observation(obs['image'],obs['force'],nobs['image'],nobs['force'],act,rew,val,logp)
             ep_ret += rew
@@ -142,7 +112,7 @@ if __name__=="__main__":
         success_counter = success_counter+1 if env.success else success_counter
         last_value = 0
         if not done:
-            act, logp, last_value = model.forward(obs['image'],obs['force'])
+            z, act, logp, last_value = model.forward(obs['image'],obs['force'])
         buffer.end_trajectry(last_value)
 
         ep_returns.append(ep_ret)
@@ -152,10 +122,8 @@ if __name__=="__main__":
             tf.summary.scalar('episode reward', ep_ret, step=ep)
 
         if buffer.size() >= args.train_freq or (ep+1) == args.max_ep:
-            model.train(buffer)
-            # obs = env.reset()
-            # model.rollout(obs['image'],obs['force'])
-            # test(ep+1,env,model,model_dir)
+            model.train(buffer,epochs=args.train_freq)
+            test_model(env,model,model_dir,ep)
 
     env.close()
     plt.plot(ep_returns, 'k--', linewidth=1)

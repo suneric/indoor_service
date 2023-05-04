@@ -3,31 +3,14 @@ import tensorflow as tf
 from tensorflow import keras
 from tensorflow.keras import layers
 
-"""
-door angle (0,1.57) from image
-"""
-def conv_network(image_shape):
-    input = keras.Input(shape=image_shape)
-    h = layers.Conv2D(filters=32,kernel_size=(3,3),strides=2,padding='same',activation='relu')(input)
-    h = layers.MaxPool2D((2,2))(h)
-    h = layers.Conv2D(filters=16,kernel_size=(3,3),strides=2,padding='same',activation='relu')(h)
-    h = layers.Conv2D(filters=8,kernel_size=(3,3),strides=2,padding='same',activation='relu')(h)
-    h = layers.Flatten()(h)
-    h = layers.Dense(32,activation='relu')(h)
-    output = layers.Dense(1,activation='sigmoid')(h) # 0-1
-    model = keras.Model(inputs=input, outputs=output, name="conv")
-    print(model.summary())
-    return model
-
-
 class Sampling(layers.Layer):
     """Use (mean,log_var) to sample z, the vector encoding a digit."""
     def call(self, inputs):
-        z_mean, z_log_var = inputs
-        batch = tf.shape(z_mean)[0]
-        dim = tf.shape(z_mean)[1]
+        mu, sigma = inputs
+        batch = tf.shape(mu)[0]
+        dim = tf.shape(mu)[1]
         epsilon = tf.random.normal(shape=(batch,dim)) # noise
-        return z_mean + tf.exp(0.5*z_log_var) * epsilon
+        return mu + tf.exp(0.5*sigma) * epsilon
 
 """
 force-vision fusion encoder
@@ -47,10 +30,10 @@ def fv_encoder(image_shape, force_dim, latent_dim):
 
     h = layers.concatenate([v_output, f_output])
     h = layers.Dense(32,activation='relu')(h)
-    z_mean = layers.Dense(latent_dim, name='z_mean')(h)
-    z_log_var = layers.Dense(latent_dim,name='z_log_var')(h)
-    z = Sampling()([z_mean,z_log_var])
-    model = keras.Model(inputs=[v_input,f_input],outputs=[z_mean,z_log_var,z],name='encoder')
+    z_mu = layers.Dense(latent_dim, name='z_mean')(h)
+    z_sigma = layers.Dense(latent_dim,name='z_sigma')(h)
+    z = Sampling()([z_mu,z_sigma])
+    model = keras.Model(inputs=[v_input,f_input],outputs=[z_mu,z_sigma,z],name='encoder')
     print(model.summary())
     return model
 
@@ -80,10 +63,10 @@ def fv_decoder(latent_dim):
 """
 z actor network
 """
-def latent_actor_network(z_dim, output_dim):
-    z_input = keras.Input(shape=(z_dim,))
+def latent_actor_network(latent_dim, output_dim):
+    z_input = keras.Input(shape=(latent_dim,))
     h = layers.Dense(64, activation='relu')(z_input)
-    h = layers.Dense(64, activation='relu')(h)
+    h = layers.Dense(32, activation='relu')(h)
     output = layers.Dense(output_dim, activation='linear')(h)
     model = keras.Model(inputs=z_input,outputs=output)
     print(model.summary())
@@ -92,10 +75,10 @@ def latent_actor_network(z_dim, output_dim):
 """
 z critic network
 """
-def latent_critic_network(z_dim):
-    z_input = keras.Input(shape=(z_dim,))
+def latent_critic_network(latent_dim):
+    z_input = keras.Input(shape=(latent_dim,))
     h = layers.Dense(64, activation='relu')(z_input)
-    h = layers.Dense(64, activation='relu')(h)
+    h = layers.Dense(32, activation='relu')(h)
     output = layers.Dense(1, activation='linear')(h)
     model = keras.Model(inputs=z_input,outputs=output)
     print(model.summary())
@@ -104,20 +87,32 @@ def latent_critic_network(z_dim):
 """
 z dynamics model z_t-1, a_t-1 -> z_t, r_t
 """
-def latent_dynamics_network(z_dim,action_dim):
-    z_input = keras.Input(shape=(z_dim,))
+def latent_dynamics_network(latent_dim,action_dim):
+    z_input = keras.Input(shape=(latent_dim,))
     a_input = keras.Input(shape=(action_dim,))
     concat = layers.concatenate([z_input,a_input])
     h = layers.Dense(64,activation='relu')(concat)
-    h = layers.Dense(64,activation='relu')(h)
-    z1_output = layers.Dense(32, activation='relu')(h)
-    z1_output = layers.Dense(z_dim, activation='linear')(z1_output)
-    r_output = layers.Dense(16, activation='relu')(h)
-    r_output = layers.Dense(1, activation='linear')(r_output)
-    model = keras.Model(inputs=[z_input,a_input],outputs=[z1_output,r_output],name='latent_dynamics')
+    h = layers.Dense(32,activation='relu')(h)
+    z1_mu = layers.Dense(latent_dim, name='z1_mu')(h)
+    z1_sigma = layers.Dense(latent_dim,name='z1_sigma')(h)
+    z1 = Sampling()([z1_mu,z1_sigma])
+    model = keras.Model(inputs=[z_input,a_input],outputs=[z1_mu,z1_sigma,z1],name='latent_forward_dynamics')
     print(model.summary())
     return model
 
+"""
+latent reward
+"""
+def latent_reward_network(latent_dim):
+    z_input = keras.Input(shape=(latent_dim,))
+    h = layers.Dense(64, activation='relu')(z_input)
+    h = layers.Dense(32, activation='relu')(h)
+    output = layers.Dense(1, activation='linear')(h)
+    model = keras.Model(inputs=z_input,outputs=output,name='latent_reward')
+    print(model.summary())
+    return model
+
+#==============================================================================#
 """
 force-vision fusion actor network
 """
