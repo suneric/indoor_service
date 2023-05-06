@@ -4,13 +4,17 @@ from tensorflow import keras
 from tensorflow.keras import layers
 
 class Sampling(layers.Layer):
-    """Use (mean,log_var) to sample z, the vector encoding a digit."""
+    """
+    Use (mean,log_var) to sample z, the vector encoding a digit.
+    log_var = log(sigma^2) = 2*log(sigma)
+    sample = sigma*x + mean, where x belongs to normal distribution N(0,1)
+    """
     def call(self, inputs):
-        mu, sigma = inputs
-        batch = tf.shape(mu)[0]
-        dim = tf.shape(mu)[1]
+        mean, log_var = inputs
+        batch = tf.shape(mean)[0]
+        dim = tf.shape(mean)[1]
         epsilon = tf.random.normal(shape=(batch,dim)) # noise
-        return mu + tf.exp(0.5*sigma) * epsilon
+        return mean + tf.exp(0.5*log_var) * epsilon
 
 """
 force-vision fusion encoder
@@ -30,10 +34,10 @@ def fv_encoder(image_shape, force_dim, latent_dim):
 
     h = layers.concatenate([v_output, f_output])
     h = layers.Dense(32,activation='relu')(h)
-    z_mu = layers.Dense(latent_dim, name='z_mean')(h)
-    z_sigma = layers.Dense(latent_dim,name='z_sigma')(h)
-    z = Sampling()([z_mu,z_sigma])
-    model = keras.Model(inputs=[v_input,f_input],outputs=[z_mu,z_sigma,z],name='encoder')
+    mu = layers.Dense(latent_dim, name='z_mean')(h)
+    log_var = layers.Dense(latent_dim,name='z_log_var')(h)
+    z = Sampling()([mu,log_var])
+    model = keras.Model(inputs=[v_input,f_input],outputs=[mu,log_var,z],name='encoder')
     print(model.summary())
     return model
 
@@ -85,7 +89,8 @@ def latent_critic_network(latent_dim):
     return model
 
 """
-z dynamics model z_t-1, a_t-1 -> z_t, r_t
+z dynamics model z_t-1, a_t-1 -> z_t
+output z1 distribution mean and log variance
 """
 def latent_dynamics_network(latent_dim,action_dim):
     z_input = keras.Input(shape=(latent_dim,))
@@ -93,10 +98,10 @@ def latent_dynamics_network(latent_dim,action_dim):
     concat = layers.concatenate([z_input,a_input])
     h = layers.Dense(64,activation='relu')(concat)
     h = layers.Dense(32,activation='relu')(h)
-    z1_mu = layers.Dense(latent_dim, name='z1_mu')(h)
-    z1_sigma = layers.Dense(latent_dim,name='z1_sigma')(h)
-    z1 = Sampling()([z1_mu,z1_sigma])
-    model = keras.Model(inputs=[z_input,a_input],outputs=[z1_mu,z1_sigma,z1],name='latent_forward_dynamics')
+    mu = layers.Dense(latent_dim, name='z1_mu')(h)
+    log_var = layers.Dense(latent_dim,name='z1_log_var')(h)
+    z1 = Sampling()([mu,log_var])
+    model = keras.Model(inputs=[z_input,a_input],outputs=[mu,log_var,z1],name='latent_forward_dynamics')
     print(model.summary())
     return model
 

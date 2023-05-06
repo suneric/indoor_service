@@ -81,6 +81,7 @@ if __name__=="__main__":
     rospy.init_node('world_model_train', anonymous=True)
     model_dir = os.path.join(sys.path[0],'../saved_models/door_open/wm',datetime.now().strftime("%Y-%m-%d-%H-%M"))
     summaryWriter = tf.summary.create_file_writer(model_dir)
+    tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir=model_dir)
 
     env = DoorOpenEnv(continuous=False)
     image_shape = env.observation_space[0]
@@ -88,7 +89,7 @@ if __name__=="__main__":
     action_dim = env.action_space.n
     print("create door open environment for world model", image_shape, force_dim, action_dim)
 
-    imagine_after = 1000
+    imagine_after = 500
     latent_dim = 4
     capacity = args.train_freq+args.max_step
     buffer = ReplayBuffer(capacity,image_shape,force_dim)
@@ -98,10 +99,7 @@ if __name__=="__main__":
     for ep in range(args.max_ep):
         obs, done, ep_ret, step = env.reset(), False, 0, 0
         while not done and step < args.max_step:
-            if t < imagine_after:
-                z, act, logp, val = model.forward(obs['image'],obs['force'])
-            else:
-                z, act, logp, val = model.imagine(obs['image'],obs['force'])
+            z, act, logp, val = model.forward(obs['image'],obs['force'])
             nobs, rew, done, info = env.step(act)
             buffer.add_observation(obs['image'],obs['force'],nobs['image'],nobs['force'],act,rew,val,logp)
             ep_ret += rew
@@ -122,8 +120,12 @@ if __name__=="__main__":
             tf.summary.scalar('episode reward', ep_ret, step=ep)
 
         if buffer.size() >= args.train_freq or (ep+1) == args.max_ep:
-            model.train(buffer,epochs=args.train_freq)
-            test_model(env,model,model_dir,ep)
+            model.train(buffer,epochs=100,batch_size=32,verbose=0,callbacks=[tensorboard_callback])
+            if t > imagine_after:
+                obs = env.reset()
+                model.imagine_train(capacity=100,image=obs['image'],force=obs['force'])
+            test_model(env,model,model_dir,ep+1)
+            model.save(os.path.join(model_dir,"ep{}".format(ep+1)))
 
     env.close()
     plt.plot(ep_returns, 'k--', linewidth=1)
