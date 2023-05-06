@@ -8,6 +8,7 @@ from datetime import datetime
 import matplotlib.pyplot as plt
 import argparse
 
+from agent.core import *
 from env.env_door_open import DoorOpenEnv
 from agent.world_model import WorldModel, ReplayBuffer
 
@@ -34,17 +35,11 @@ def smoothExponential(data, weight):
 
 def get_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--max_ep', type=int, default=2000)
-    parser.add_argument('--max_step', type=int, default=60)
-    parser.add_argument('--train_freq', type=int ,default=300)
+    parser.add_argument('--max_ep', type=int, default=1000)
+    parser.add_argument('--max_step', type=int, default=50)
+    parser.add_argument('--train_freq', type=int ,default=200)
     parser.add_argument('--seq_len', type=int,default=None)
     return parser.parse_args()
-
-def save_agent(agent, model_dir, name):
-    logits_net_path = os.path.join(model_dir, 'logits_net', name)
-    val_net_path = os.path.join(model_dir, 'val_net', name)
-    agent.save(logits_net_path, val_net_path)
-    print("save agent {} weights to {}".format(name, model_dir))
 
 def plot_predict(model,image,force,prev_z,prev_a,filepath):
     fig, axs = plt.subplots(1,3)
@@ -76,6 +71,22 @@ def test_model(env,model,model_dir,ep,max_step=60):
         if done:
             break
 
+def test_recurrent_model(env,model,model_dir,ep,latent_dim,action_dim,seq_len,max_step=60):
+    ep_path = os.path.join(model_dir,"ep{}".format(ep))
+    os.mkdir(ep_path)
+    obs, done = env.reset(),False
+    plot_predict(model,obs['image'],obs['force'],None,None,os.path.join(ep_path,"step{}".format(0)))
+
+    z_seq, a_seq = zero_seq(latent_dim,seq_len), zero_seq(action_dim,seq_len)
+    for i in range(max_step):
+        z,a,v,logp = model.forward(obs['image'],obs['force'])
+        nobs,rew,done,info = env.step(a)
+        z_seq.append(z)
+        a_seq.append(np.identity(action_dim)[a])
+        plot_predict(model,nobs['image'],nobs['force'],np.array(z_seq.copy()),np.array(a_seq.copy()),os.path.join(ep_path,"step{}".format(i+1)))
+        if done:
+            break
+
 if __name__=="__main__":
     args = get_args()
     rospy.init_node('world_model_train', anonymous=True)
@@ -89,11 +100,11 @@ if __name__=="__main__":
     action_dim = env.action_space.n
     print("create door open environment for world model", image_shape, force_dim, action_dim)
 
-    imagine_after = 500
+    seq_len = args.seq_len
     latent_dim = 4
     capacity = args.train_freq+args.max_step
     buffer = ReplayBuffer(capacity,image_shape,force_dim)
-    model = WorldModel(image_shape,force_dim,action_dim,latent_dim)
+    model = WorldModel(image_shape,force_dim,action_dim,latent_dim,seq_len)
 
     ep_returns, t, success_counter = [], 0, 0
     for ep in range(args.max_ep):
@@ -120,11 +131,15 @@ if __name__=="__main__":
             tf.summary.scalar('episode reward', ep_ret, step=ep)
 
         if buffer.size() >= args.train_freq or (ep+1) == args.max_ep:
-            model.train(buffer,epochs=100,batch_size=32,verbose=0,callbacks=[tensorboard_callback])
-            if t > imagine_after:
+            model.train(buffer,epochs=200,batch_size=64,verbose=0,callbacks=[tensorboard_callback])
+            if seq_len is None:
                 obs = env.reset()
                 model.imagine_train(capacity=100,image=obs['image'],force=obs['force'])
-            test_model(env,model,model_dir,ep+1)
+                test_model(env,model,model_dir,ep+1,args.max_step)
+            else:
+                obs = env.reset()
+                model.imagine_train_recurrent(capacity=100,image=obs['image'],force=obs['force'])
+                test_recurrent_model(env,model,model_dir,ep+1,latent_dim,action_dim,seq_len,args.max_step)
             model.save(os.path.join(model_dir,"ep{}".format(ep+1)))
 
     env.close()

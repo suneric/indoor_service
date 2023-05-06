@@ -39,22 +39,6 @@ class FVVAE(keras.Model):
         images,forces,_ = buffer.get_data()
         self.fit([images,forces],epochs=epochs,batch_size=batch_size)
 
-    # def learn(self, data, size, epochs=100, batch_size=64):
-    #     print("training epoches {}, batch size {}/{}".format(epochs,batch_size,size))
-    #     (image_buf,force_buf,action_buf,return_buf,advantage_buf,logprob_buf) = data
-    #     for epoch in range(epochs):
-    #         idxs = np.random.choice(size,batch_size)
-    #         images = tf.convert_to_tensor(image_buf[idxs])
-    #         forces = tf.convert_to_tensor(force_buf[idxs])
-    #         info = self.train_step([images,forces])
-    #         print("epoch {}, loss {:.4f}, reconstruction loss {:.4f}, kl loss {:.4f}".format(
-    #                 epoch,
-    #                 info["loss"],
-    #                 info["reconstruction_loss"],
-    #                 info["kl_loss"]
-    #                 )
-    #             )
-
     def encoding(self,image,force):
         img = tf.expand_dims(tf.convert_to_tensor(image), 0)
         frc = tf.expand_dims(tf.convert_to_tensor(force), 0)

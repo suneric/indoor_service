@@ -8,9 +8,8 @@ from datetime import datetime
 import matplotlib.pyplot as plt
 import argparse
 
-from agent.core import *
 from agent.model import *
-from agent.ppo import FVPPO
+from agent.ppo import FVPPO, FVVAE, FVReplayBuffer
 from agent.vae import FVVAE
 from env.env_door_open import DoorOpenEnv
 

@@ -8,9 +8,8 @@ from datetime import datetime
 import matplotlib.pyplot as plt
 import argparse
 
-from agent.core import JFVReplayBuffer
 from agent.model import jfv_actor_network, jfv_critic_network
-from agent.ppo import JFVPPO
+from agent.ppo import JFVPPO, JFVReplayBuffer
 from env.env_auto_charge import AutoChargeEnv
 
 """

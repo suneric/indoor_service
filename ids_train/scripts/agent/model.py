@@ -89,7 +89,7 @@ def latent_critic_network(latent_dim):
     return model
 
 """
-z dynamics model z_t-1, a_t-1 -> z_t
+z dynamics model z_t | z_{t-1}, a_{t-1}
 output z1 distribution mean and log variance
 """
 def latent_dynamics_network(latent_dim,action_dim):
@@ -98,6 +98,23 @@ def latent_dynamics_network(latent_dim,action_dim):
     concat = layers.concatenate([z_input,a_input])
     h = layers.Dense(64,activation='relu')(concat)
     h = layers.Dense(32,activation='relu')(h)
+    mu = layers.Dense(latent_dim, name='z1_mu')(h)
+    log_var = layers.Dense(latent_dim,name='z1_log_var')(h)
+    z1 = Sampling()([mu,log_var])
+    model = keras.Model(inputs=[z_input,a_input],outputs=[mu,log_var,z1],name='latent_forward_dynamics')
+    print(model.summary())
+    return model
+
+"""
+z dynamics model z_t | z_{t-1}, a_{t-1},...,z_{t-h},a_{t-h}
+output z1 distribution mean and log variance
+"""
+def recurrent_latent_dynamics_network(latent_dim,action_dim,seq_len):
+    z_input = keras.Input(shape=(seq_len,latent_dim))
+    a_input = keras.Input(shape=(seq_len,action_dim))
+    concat = layers.concatenate([z_input,a_input])
+    h = layers.LSTM(64,activation='relu',return_sequences=True)(concat)
+    h = layers.LSTM(32,activation='relu',return_sequences=False)(h)
     mu = layers.Dense(latent_dim, name='z1_mu')(h)
     log_var = layers.Dense(latent_dim,name='z1_log_var')(h)
     z1 = Sampling()([mu,log_var])

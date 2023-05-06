@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 import argparse
 
 from agent.model import *
-from agent.latent_ppo import ObservationBuffer, LatentReplayBuffer, LatentPPO, FVVAE
+from agent.ppo_latent import ObservationBuffer, LatentReplayBuffer, LatentPPO, FVVAE
 from env.env_door_open import DoorOpenEnv
 
 """
