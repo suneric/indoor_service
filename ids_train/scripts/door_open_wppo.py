@@ -59,7 +59,7 @@ def plot_predict(model,image,force,prev_z,prev_a,filepath):
     plt.savefig(filepath)
     plt.close(fig)
 
-def test_model(env,model,model_dir,ep,max_step=60):
+def test_model(env,model,model_dir,ep,action_dim,max_step=50):
     ep_path = os.path.join(model_dir,"ep{}".format(ep))
     os.mkdir(ep_path)
     obs, done = env.reset(),False
@@ -67,11 +67,11 @@ def test_model(env,model,model_dir,ep,max_step=60):
     for i in range(max_step):
         z,a,v,logp = model.forward(obs['image'],obs['force'])
         nobs,rew,done,info = env.step(a)
-        plot_predict(model,nobs['image'],nobs['force'],z,a,os.path.join(ep_path,"step{}".format(i+1)))
+        plot_predict(model,nobs['image'],nobs['force'],z,np.identity(action_dim)[a],os.path.join(ep_path,"step{}".format(i+1)))
         if done:
             break
 
-def test_recurrent_model(env,model,model_dir,ep,latent_dim,action_dim,seq_len,max_step=60):
+def test_recurrent_model(env,model,model_dir,ep,latent_dim,action_dim,seq_len,max_step=50):
     ep_path = os.path.join(model_dir,"ep{}".format(ep))
     os.mkdir(ep_path)
     obs, done = env.reset(),False
@@ -131,11 +131,11 @@ if __name__=="__main__":
             tf.summary.scalar('episode reward', ep_ret, step=ep)
 
         if buffer.size() >= args.train_freq or (ep+1) == args.max_ep:
-            model.train(buffer,epochs=200,batch_size=64,verbose=0,callbacks=[tensorboard_callback])
+            model.train(buffer,epochs=500,batch_size=64,verbose=0,callbacks=[tensorboard_callback])
             if seq_len is None:
                 obs = env.reset()
                 model.imagine_train(capacity=100,image=obs['image'],force=obs['force'])
-                test_model(env,model,model_dir,ep+1,args.max_step)
+                test_model(env,model,model_dir,ep+1,action_dim,args.max_step)
             else:
                 obs = env.reset()
                 model.imagine_train_recurrent(capacity=100,image=obs['image'],force=obs['force'])

@@ -147,7 +147,7 @@ class ObservationVAE(keras.Model):
 Reward Model (r_t|z_t)
 """
 class RewardModel(keras.Model):
-    def __init__(self,latent_dim,lr=1e-3,**kwargs):
+    def __init__(self,latent_dim,lr=1e-4,**kwargs):
         super().__init__(**kwargs)
         self.reward = latent_reward_network(latent_dim)
         self.compile(optimizer=keras.optimizers.Adam(lr))
@@ -177,7 +177,7 @@ given mu = u, log_var = log(s^2), the KL loss is
 kl_loss = 0.5*(log_var2-log_var1) + (exp(log_var1) + (mu1-mu2)^2)/(2*exp(log_var2)) - 0.5
 """
 class LatentDynamics(keras.Model):
-    def __init__(self,latent_dim,action_dim,seq_len = None,lr=1e-3,beta=1.0,**kwargs):
+    def __init__(self,latent_dim,action_dim,seq_len = None,lr=1e-4,beta=1.0,**kwargs):
         super().__init__(**kwargs)
         self.beta = beta
         self.action_dim = action_dim
@@ -336,9 +336,9 @@ class WorldModel(keras.Model):
         size = buffer.size()
         images,forces,nimages,nforces,acts,rews,rets,advs,logps,traj_indices = buffer.get_data()
         self.obs_vae.fit((nimages,nforces),(),epochs=epochs,batch_size=batch_size,verbose=verbose,callbacks=callbacks)
-
         z_mu,z_log_var,z = self.obs_vae.encoder([images,forces])
         z1_mu,z1_log_var,z1 = self.obs_vae.encoder([nimages,nforces])
+        self.reward.fit(z1,rews,epochs=epochs,batch_size=batch_size,verbose=verbose,callbacks=callbacks)
         a = tf.convert_to_tensor(np.identity(self.action_dim)[acts.numpy()])
         if self.seq_len is None:
             self.dynamics.fit((z,a),(z1_mu,z1_log_var,z1),epochs=epochs,batch_size=batch_size,verbose=verbose,callbacks=callbacks)
@@ -364,9 +364,8 @@ class WorldModel(keras.Model):
             seq_z = tf.convert_to_tensor(seq_z)
             seq_a = tf.convert_to_tensor(seq_a)
             self.dynamics.fit((seq_z,seq_a),(z1_mu,z1_log_var,z1),epochs=epochs,batch_size=batch_size,verbose=verbose,callbacks=callbacks)
-        self.reward.fit(z1,rews,epochs=epochs,batch_size=batch_size,verbose=verbose,callbacks=callbacks)
-        self.actor.fit((z,acts,advs,logps),(),epochs=epochs,batch_size=batch_size,verbose=verbose,callbacks=callbacks)
-        self.critic.fit(z,rets,epochs=epochs,batch_size=batch_size,verbose=verbose,callbacks=callbacks)
+        self.actor.fit((z,acts,advs,logps),(),epochs=100,batch_size=batch_size,verbose=verbose,callbacks=callbacks)
+        self.critic.fit(z,rets,epochs=100,batch_size=batch_size,verbose=verbose,callbacks=callbacks)
 
     def imagine_train(self,capacity,image,force,max_step=30):
         print("imagination with capacity of {}".format(capacity))
@@ -393,7 +392,7 @@ class WorldModel(keras.Model):
         self.actor.fit((zs,acts,advs,logps),(),epochs=100,batch_size=64,verbose=0)
         self.critic.fit(zs,rets,epochs=100,batch_size=64,verbose=0)
 
-    def imagine_train_recurrent(self,capacity,image,force,max_step=25):
+    def imagine_train_recurrent(self,capacity,image,force,max_step=15):
         print("imagination with capacity of {}".format(capacity))
         buffer = ImagineBuffer(capacity,self.latent_dim)
         z0 = self.encode_obs(image,force)

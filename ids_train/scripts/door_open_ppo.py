@@ -9,8 +9,7 @@ import matplotlib.pyplot as plt
 import argparse
 
 from agent.model import *
-from agent.ppo import FVPPO, FVVAE, FVReplayBuffer
-from agent.vae import FVVAE
+from agent.ppo import FVPPO, FVReplayBuffer
 from env.env_door_open import DoorOpenEnv
 
 """
@@ -37,9 +36,9 @@ def smoothExponential(data, weight):
 def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--policy', type=str, default='ppo') # ppo, rppo, lppo, lrppo
-    parser.add_argument('--max_ep', type=int, default=2000)
-    parser.add_argument('--max_step', type=int, default=60)
-    parser.add_argument('--train_freq', type=int ,default=300)
+    parser.add_argument('--max_ep', type=int, default=1000)
+    parser.add_argument('--max_step', type=int, default=50)
+    parser.add_argument('--train_freq', type=int ,default=200)
     parser.add_argument('--seq_len', type=int,default=None)
     return parser.parse_args()
 
