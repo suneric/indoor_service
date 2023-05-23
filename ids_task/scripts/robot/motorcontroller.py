@@ -3,7 +3,7 @@ import rospy
 import numpy as np
 from std_msgs.msg import Int32
 
-class JointController:
+class MotorController:
     def __init__(self):
         self.joint1_pub = rospy.Publisher('robo1_cmd',Int32, queue_size=1)
         self.joint2_pub = rospy.Publisher('robo2_cmd',Int32, queue_size=1)

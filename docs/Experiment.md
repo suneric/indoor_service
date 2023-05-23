@@ -97,6 +97,15 @@ Edit '/etc/hosts' by adding
   - Subscriber:
     - /cmd_vel
 
-## Start the Experiment
+## Start Experiment
 - Run ```roscore``` on Master Computer
--
+- Turn on power on Jazzy to start
+- Check ```rostopic list``` on Master to make sure every component work as expected.
+  - ```/cmd_vel```, for driving jazzy base
+  - ```/camera/*```, for realsense d435 vision
+  - ```/arducam/*```, for arducam vision
+  - ```/loadcell1_forces```, for sidebar sensing
+  - ```/loadcell2_forces```, for plug sensing
+  - ```/robo*_cmd```, for driving motors
+- Start object detection ```roslaunch ids_detection object_detection simulation:=0```
+ 

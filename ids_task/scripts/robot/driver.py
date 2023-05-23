@@ -6,21 +6,22 @@ from geometry_msgs.msg import Twist
 RobotDriver based on /cmd_vel
 """
 class RobotDriver:
-    def __init__(self):
+    def __init__(self, speed_scale=1.0):
         self.vel_pub = rospy.Publisher('cmd_vel',Twist,queue_size=1)
         self.vel = (0,0)
+        self.speed_scale = speed_scale
 
     def velocity(self):
         return self.vel
 
     def drive(self,vx,vyaw):
         msg = Twist()
-        msg.linear.x = vx
+        msg.linear.x = vx*self.speed_scale
         msg.linear.y = 0
         msg.linear.z = 0
         msg.angular.x = 0
         msg.angular.y = 0
-        msg.angular.z = vyaw
+        msg.angular.z = vyaw*self.speed_scale
         self.vel_pub.publish(msg)
         self.vel = (vx,vyaw)
 

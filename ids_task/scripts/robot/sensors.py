@@ -368,17 +368,21 @@ class LCSensor:
     def __init__(self, topic):
         self.topic = topic
         self.force_sub = rospy.Subscriber('/'+self.topic, Float32MultiArray, self._force_cb)
-        self.forces = np.zeros(3)
+        self.filtered = np.zeros(3)
         self.record = []
         self.record_temp = []
 
     def _force_cb(self,data):
-        self.forces = data.data
-        self.record.append(self.forces)
-        self.record_temp.append(self.forces)
+        self.filtered = data.data # raw LC_x,LC_y,LC_z
+        if self.topic == 'loadcell1_forces': # for plug, x=LC_z, y=LC_y, z=-LC_x
+            self.filtered = [self.filtered[2],self.filtered[1],-self.filtered[0]]
+        elif self.topic == 'loadcell2_forces': # for sidebar, x=LC_z, y=-LC_y, z=LC_x
+            self.filtered = [self.filtered[2],-self.filtered[1],self.filtered[0]]
+        self.record.append(self.filtered)
+        self.record_temp.append(self.filtered)
 
     def forces(self):
-        return self.forces
+        return self.filtered
 
     def profile(self,size):
         array = np.zeros((size,3))

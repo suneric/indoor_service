@@ -9,7 +9,6 @@ import cv2
 class ObjectDetector:
     def __init__(self,dir):
         self.net = torch.hub.load('ultralytics/yolov5','custom',path=os.path.join(dir,'best.pt'))
-
     '''
     Detect walloutlet and socket
     '''
