@@ -15,6 +15,7 @@ from scipy.ndimage.filters import convolve
 from scipy.signal import convolve2d
 import torch
 from ids_detection.msg import DetectionInfo
+import warnings
 
 class SNE:
     def __init__(self, color, depth, K, W, H, scale=1.0):
@@ -157,22 +158,24 @@ class SNE:
         z = convolve2d(x,y,mode)
         return z
 
-
+"""
+Object Detector with Distance and Normal Evaluation
+"""
 class ObjectDetector:
-    def __init__(self,sensor,dir,scale=1.0,count=15):
+    def __init__(self,sensor,dir,scale=1.0,count=15,wantDepth=False):
         self.sensor = sensor
         self.net = torch.hub.load('ultralytics/yolov5','custom',path=os.path.join(dir,'best.pt'))
         self.scale = scale
         self.count = count
+        self.wantDepth = wantDepth
 
     def detect(self, type, confidence_threshold=0.5):
         if not self.sensor.ready():
             print("sensor is not ready.")
             return []
-
         img,W,H = self.sensor.cv_color, self.sensor.width, self.sensor.height
         boxes, labels = self.object_boxes(img)
-        info_list = []
+        info = []
         for i in range(len(boxes)):
             confidence = boxes[i][4]
             if confidence < confidence_threshold:
@@ -185,22 +188,25 @@ class ObjectDetector:
             if class_id != type:
                 continue
             pt3d,nm3d = self.evaluate_distance_and_normal(box,self.scale,self.count)
-            msg = DetectionInfo()
-            msg.detectable = True
-            msg.type = class_id
-            msg.c = confidence
-            msg.l = box[0]
-            msg.t = box[1]
-            msg.r = box[2]
-            msg.b = box[3]
-            msg.x = pt3d[0]
-            msg.y = pt3d[1]
-            msg.z = pt3d[2]
-            msg.nx = nm3d[0]
-            msg.ny = nm3d[1]
-            msg.nz = nm3d[2]
-            info_list.append(msg)
-        return info_list
+            info.append(self.create_msg(class_id,confidence,box,pt3d,nm3d))
+        return info
+
+    def create_msg(self,id,c,box,pt,nm):
+        msg = DetectionInfo()
+        msg.detectable = True
+        msg.type = id
+        msg.c = c
+        msg.l = box[0]
+        msg.t = box[1]
+        msg.r = box[2]
+        msg.b = box[3]
+        msg.x = pt[0] if self.wantDepth else None
+        msg.y = pt[1] if self.wantDepth else None
+        msg.z = pt[2] if self.wantDepth else None
+        msg.nx = nm[0] if self.wantDepth else None
+        msg.ny = nm[1] if self.wantDepth else None
+        msg.nz = nm[2] if self.wantDepth else None
+        return msg
 
     def object_boxes(self,img):
         results = self.net(img)
@@ -208,18 +214,22 @@ class ObjectDetector:
         return cords, labels
 
     def evaluate_distance_and_normal(self,box,scale,count):
+        if not self.wantDepth:
+            return None, None
         W,H,K = self.sensor.width,self.sensor.height,self.sensor.intrinsic
         color, depth = self.sensor.cv_color, self.sensor.cv_depth
         if color is None or depth is None:
             print("invalid color image or depth image")
             return None, None
         normal_estimator = SNE(color,depth,K,W,H,scale)
-        pcd = normal_estimator.estimate() # (H,W,6): x,y,z,nx,ny,nz
-        l, t, r, b = box[0], box[1], box[2], box[3]
-        us = np.random.randint(l,r,count)
-        vs = np.random.randint(t,b,count)
-        pt3ds = [pcd[vs[i],us[i],0:3] for i in range(count)]
-        nm3ds = [pcd[vs[i],us[i],3:6] for i in range(count)]
-        pt3d = np.mean(pt3ds,axis=0)
-        nm3d = np.mean(nm3ds,axis=0)
-        return pt3d, nm3d
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", category=RuntimeWarning)
+            pcd = normal_estimator.estimate() # (H,W,6): x,y,z,nx,ny,nz
+            l,t,r,b = box[0],box[1],box[2],box[3]
+            us = np.random.randint(l,r,count)
+            vs = np.random.randint(t,b,count)
+            pt3ds = [pcd[vs[i],us[i],0:3] for i in range(count)]
+            nm3ds = [pcd[vs[i],us[i],3:6] for i in range(count)]
+            pt3d = np.mean(pt3ds,axis=0)
+            nm3d = np.mean(nm3ds,axis=0)
+            return pt3d, nm3d

@@ -37,24 +37,24 @@ class MotorController:
 
     def move_joint1(self,data):
         msg = Int32()
-        msg.data = np.sign(data)
-        self.joint1_pub.publish(data)
+        msg.data = int(data)
+        self.joint1_pub.publish(msg)
 
     def stop_joint1(self):
         self.move_joint1(0)
 
     def move_joint2(self,data):
         msg = Int32()
-        msg.data = np.sign(data)
-        self.joint2_pub.publish(data)
+        msg.data = int(data)
+        self.joint2_pub.publish(msg)
 
     def stop_joint2(self):
         self.move_joint2(0)
 
     def move_joint3(self,data):
         msg = Int32()
-        msg.data = np.sign(data)
-        self.joint3_pub.publish(data)
+        msg.data = int(data)
+        self.joint3_pub.publish(msg)
 
     def stop_joint3(self):
         self.move_joint3(0)

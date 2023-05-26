@@ -92,19 +92,20 @@ def noise_image(image, var):
 ArduCam looks up for observing door open status
 """
 class ArduCam:
-    def __init__(self, name, compressed=False):
+    def __init__(self, name, compressed=False,flipCode=None):
         print("create arducam instance...")
         self.name = name
         self.bridge=CvBridge()
-        self.caminfo_sub = rospy.Subscriber('/'+name+'/camera_info', CameraInfo, self._caminfo_callback)
+        self.caminfo_sub = rospy.Subscriber('/'+name+'/cam_info', CameraInfo, self._caminfo_callback)
         if compressed:
             self.color_sub = rospy.Subscriber('/'+name+'/image/compressed', CompressedImage, self._color_callback)
         else:
             self.color_sub = rospy.Subscriber('/'+name+'/image', Image, self._color_callback)
         self.cameraInfoUpdate = False
         self.cv_color = None
-        self.width = 256
-        self.height = 256
+        self.width = 500
+        self.height = 500
+        self.flipCode = flipCode
 
     def image_arr(self, resolution, noise_var = None):
         img = self.cv_color
@@ -127,6 +128,19 @@ class ArduCam:
 
     def zero_arr(self, resolution):
         return np.zeros((resolution[0],resolution[1],1))
+
+    def binary_arr(self,resolution,detectInfo):
+        """
+        Generate a binary array for detected area given by the bounding box
+        """
+        t,b = detectInfo.t, detectInfo.b
+        l,r = detectInfo.l, detectInfo.r
+        img = np.zeros((self.height,self.width),dtype=np.float32)
+        img[int(t):int(b),int(l):int(r)] = 255
+        img = resize_image(img,resolution)
+        img = np.array(img)/255 - 0.5
+        img = img.reshape((resolution[0],resolution[1],1))
+        return img
 
     def ready(self):
         return self.cameraInfoUpdate and self.cv_color is not None
@@ -155,6 +169,8 @@ class ArduCam:
                     self.cv_color = self._convertCompressedColorToCV2(data)
                 else:
                     self.cv_color = self.bridge.imgmsg_to_cv2(data, "bgr8")
+                if self.flipCode is not None:
+                    self.cv_color = cv.flip(self.cv_color,self.flipCode)
             except CvBridgeError as e:
                 print(e)
 

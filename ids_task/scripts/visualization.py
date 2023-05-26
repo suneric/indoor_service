@@ -42,7 +42,7 @@ if __name__ == '__main__':
     axes[0,1].set_title("ArduCam View")
     axes[0,1].set_xticks([])
     axes[0,1].set_yticks([])
-    img2 = robot.camARD.color_image(resolution=(100,100),code='rgb')
+    img2 = robot.camARD.color_image(resolution=(500,500),code='rgb')
     if img2 is not None:
         axes[0,1].imshow(img2)
     # display forces
