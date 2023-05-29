@@ -112,7 +112,7 @@ class ArduCam:
         if noise_var is not None:
             img = noise_image(img, noise_var)
         img = resize_image(img,resolution)
-        img = np.array(img)/255 - 0.5
+        img = np.array(img)/255 #- 0.5
         img = img.reshape((resolution[0],resolution[1],3))
         return img
 
@@ -122,7 +122,7 @@ class ArduCam:
             img = noise_image(img, noise_var)
         img = resize_image(img,resolution)
         img = cv.cvtColor(img,cv.COLOR_BGR2GRAY)
-        img = np.array(img)/255 - 0.5
+        img = np.array(img)/255 #- 0.5
         img = img.reshape((resolution[0],resolution[1],1))
         return img
 
@@ -138,7 +138,7 @@ class ArduCam:
         img = np.zeros((self.height,self.width),dtype=np.float32)
         img[int(t):int(b),int(l):int(r)] = 255
         img = resize_image(img,resolution)
-        img = np.array(img)/255 - 0.5
+        img = np.array(img)/255 #- 0.5
         img = img.reshape((resolution[0],resolution[1],1))
         return img
 
@@ -215,7 +215,7 @@ class RSD435:
         if noise_var is not None:
             img = noise_image(img, noise_var)
         img = resize_image(img,resolution)
-        img = np.array(img)/255 - 0.5
+        img = np.array(img)/255 #- 0.5
         img = img.reshape((resolution[0],resolution[1],3))
         return img
 
@@ -225,7 +225,7 @@ class RSD435:
             img = noise_image(img, noise_var)
         img = resize_image(img,resolution)
         img = cv.cvtColor(img,cv.COLOR_BGR2GRAY)
-        img = np.array(img)/255 - 0.5
+        img = np.array(img)/255 #- 0.5
         img = img.reshape((resolution[0],resolution[1],1))
         return img
 
@@ -241,7 +241,7 @@ class RSD435:
         img = np.zeros((self.height,self.width),dtype=np.float32)
         img[int(t):int(b),int(l):int(r)] = 255
         img = resize_image(img,resolution)
-        img = np.array(img)/255 - 0.5
+        img = np.array(img)/255 #- 0.5
         img = img.reshape((resolution[0],resolution[1],1))
         return img
 
@@ -557,36 +557,3 @@ class PoseSensor():
                 rospy.logdebug("Current  /gazebo/link_states READY=>")
             except:
                 rospy.logerr("Current  /gazebo/link_states not ready yet, retrying for getting  /gazebo/link_states")
-
-"""
-ObjectDetector
-"""
-class ObjectDetector:
-    def __init__(self, topic, type=None, max=6):
-        self.sub = rospy.Subscriber(topic, DetectionInfo, self.detect_cb)
-        self.info = []
-        self.type = type
-        self.max_count = max
-        self.names = ["door","door handle","human","outlet","socket"]
-
-    def reset(self):
-        self.info = []
-
-    def ready(self):
-        if len(self.info) < self.max_count:
-            return False
-        else:
-            # print("object detector ready.")
-            return True
-
-    def detect_cb(self, data):
-        if len(self.info) == self.max_count:
-            self.info.pop(0)
-        if self.type is None or self.type == data.type:
-            self.info.append(data)
-
-    def get_detect_info(self):
-        detected = []
-        for info in self.info:
-            detected.append(info)
-        return detected

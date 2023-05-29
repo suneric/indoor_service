@@ -123,8 +123,10 @@ class MRobot:
         else:
             return self.camRSD.zero_arr(size) # no vision
 
-    def ard_vision(self,size=(64,64),type=None):
-        if type == 'greyscale':
+    def ard_vision(self,size=(64,64),type=None,info=None):
+        if type == 'binary':
+            return self.camARD.binary_arr(size,info) # binary vision
+        elif type == 'greyscale':
             return self.camARD.grey_arr(size) # raw vision
         elif type == 'color':
             return self.camARD.image_arr(size) # color vision

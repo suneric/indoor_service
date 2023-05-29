@@ -10,7 +10,7 @@ def display_sensor_info(robot,im1,im2,fx1,fx2,fy1,fy2,fz1,fz2):
     img1 = robot.camRSD.color_image(resolution=(200,200),code='rgb')
     if img1 is not None:
         axes[0,0].imshow(img1)
-    img2 = robot.camARD.color_image(resolution=(200,200),code='rgb')
+    img2 = robot.camARD1.color_image(resolution=(200,200),code='rgb')
     if img2 is not None:
         axes[0,1].imshow(img2)
     pf1 = robot.ftPlug.profile(size=1000)
@@ -42,7 +42,7 @@ if __name__ == '__main__':
     axes[0,1].set_title("ArduCam View")
     axes[0,1].set_xticks([])
     axes[0,1].set_yticks([])
-    img2 = robot.camARD.color_image(resolution=(500,500),code='rgb')
+    img2 = robot.camARD1.color_image(resolution=(500,500),code='rgb')
     if img2 is not None:
         axes[0,1].imshow(img2)
     # display forces

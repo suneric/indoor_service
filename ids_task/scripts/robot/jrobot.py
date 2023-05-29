@@ -10,8 +10,9 @@ import cv2
 Robot Configuration
 """
 class RobotConfig:
-    rsdOffsetX = 0.045
-    rsdOffsetZ = 0.128
+    plug2rsd_X = 0.01#0.0175 # plug offset to rsd camera center along camera's x
+    plug2rsd_Y = 0.15 # plug offset to rsd camera center along camera's y
+    plug2rsd_Z = 0.22 # plug offset to rsd camera center along camera's z
 
 class JazzyRobot:
     def __init__(self):
@@ -19,7 +20,7 @@ class JazzyRobot:
         self.driver = RobotDriver(speed_scale=1.0)
         self.fdController = MotorController()
         self.camRSD = RSD435(name='camera', compressed=True)
-        self.camARD = ArduCam(name='arducam', compressed=True,flipCode=-1) # flip vertically
+        self.camARD1 = ArduCam(name='arducam', compressed=True,flipCode=-1) # flip vertically
         self.ftPlug = LCSensor('loadcell1_forces')
         self.ftHook = LCSensor('loadcell2_forces')
         self.config = RobotConfig()
@@ -29,32 +30,9 @@ class JazzyRobot:
         self.driver.check_publisher_connection()
         # self.fdController.check_publisher_connection()
         self.camRSD.check_sensor_ready()
-        self.camARD.check_sensor_ready()
+        self.camARD1.check_sensor_ready()
         self.ftPlug.check_sensor_ready()
         self.ftHook.check_sensor_ready()
-
-    def pre_test(self,speed=0.5):
-        print("pre test jazzy robot.")
-        # drive
-        rospy.sleep(1)
-        self.driver.drive(0,speed)
-        rospy.sleep(1)
-        self.driver.stop()
-        rospy.sleep(1)
-        self.driver.drive(0,-speed)
-        rospy.sleep(1)
-        self.driver.stop()
-        # motors
-        self.fdController.move_joint1(10) # horizontal
-        rospy.sleep(1)
-        self.fdController.move_joint1(-10)
-        rospy.sleep(1)
-        self.fdController.move_joint3(10) # horizontal
-        rospy.sleep(1)
-        self.fdController.move_joint3(-10)
-        print("pre test jazzy robot completed.")
-        # print(self.plug_forces())
-        # print(self.hook_forces())
 
     def move(self,vx,vz):
         self.driver.drive(vx,vz)
@@ -83,3 +61,8 @@ class JazzyRobot:
 
     def move_plug_hor(self,data=10):
         self.fdController.move_joint1(data)
+
+    def is_safe(self, max_force=20):
+        forces = self.plug_forces()
+        abs_forces = [abs(v) for v in forces]
+        return max(abs_forces) < max_force

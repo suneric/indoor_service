@@ -39,10 +39,11 @@ if __name__=="__main__":
     args = get_args()
     rospy.init_node('dqn_train', anonymous=True)
 
+    yolo_dir = os.path.join(sys.path[0],'classifier/yolo')
     model_dir = os.path.join(sys.path[0],'../saved_models/socket_plug/dqn',datetime.now().strftime("%Y-%m-%d-%H-%M"))
     summaryWriter = tf.summary.create_file_writer(model_dir)
 
-    env = AutoChargeEnv(continuous=False)
+    env = AutoChargeEnv(continuous=False,yolo_dir=yolo_dir)
     env.set_vision_type('binary')
     # env.set_goal(1)
     image_shape = env.observation_space[0]

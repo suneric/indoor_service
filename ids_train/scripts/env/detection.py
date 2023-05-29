@@ -17,25 +17,6 @@ import torch
 from ids_detection.msg import DetectionInfo
 import warnings
 
-"""
-Draw image with detected bounding boxes
-"""
-def display_detection(sensor,detect,idx):
-    names = ["door","lever","human","outlet","socket"]
-    img = sensor.color_image()
-    for i in range(len(detect)):
-        info = detect[i]
-        label = names[int(info.type)]
-        l,t,r,b = int(info.l),int(info.t),int(info.r),int(info.b)
-        clr = (255,0,0) if i==idx else (0,255,0)
-        cv.rectangle(img, (l,t), (r,b), clr, 2)
-        cv.putText(img, label, (l-10,t-10), cv.FONT_HERSHEY_SIMPLEX, 0.5, clr, 1)
-    cv.imshow('object detection',img)
-    cv.waitKey(3) # delay for 3 milliseconds
-
-"""
-Normal Estimator
-"""
 class SNE:
     def __init__(self, color, depth, K, W, H, scale=1.0):
         self.color = color
@@ -252,40 +233,3 @@ class ObjectDetector:
             pt3d = np.mean(pt3ds,axis=0)
             nm3d = np.mean(nm3ds,axis=0)
             return pt3d, nm3d
-
-"""
-Detection Task
-"""
-class ObjectDetection:
-    def __init__(self,sensor,yolo_dir,scale=1.0,wantDepth=False):
-        self.sensor = sensor
-        self.detector = ObjectDetector(sensor,yolo_dir,scale=scale,wantDepth=wantDepth)
-
-    def socket(self,idx=0,ref=None):
-        target = None
-        detected = self.detector.detect(type=4,confidence_threshold=0.5)
-        if len(detected) == 1:
-            check = detected[0]
-            if ref is not None and abs(check.t-ref.t) < 15:
-                target = check
-        elif len(detected) > 1:
-            check1,check2 = detected[0],detected[1]
-            if (idx == 0 and check1.t > check2.t) or (idx == 1 and check1.t < check2.t):
-                target = check2
-            else:
-                target = check1
-        if target is not None:
-            display_detection(self.sensor,[target],0)
-        return target
-
-    def outlet(self):
-        detected = self.detector.detect(type=3,confidence_threshold=0.5)
-        return detected[-1] if len(detected) > 0 else None
-
-    def lever(self):
-        detected = self.detector.detect(type=1,confidence_threshold=0.5)
-        return detected[-1] if len(detected) > 0 else None
-
-    def door(self):
-        detected = self.detector.detect(type=0,confidence_threshold=0.5)
-        return detected[-1] if len(detected) > 0 else None

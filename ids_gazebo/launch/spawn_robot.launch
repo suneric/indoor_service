@@ -15,7 +15,7 @@
   <include file="$(find ids_control)/launch/controller.launch">
     <arg name="robot_ns" value="$(arg robot_ns)"/>
   </include>
-  <include file="$(find ids_detection)/launch/object_detection.launch"/>
+  <!-- <include file="$(find ids_detection)/launch/object_detection.launch"/> -->
 
   <!--spawn mobile robot-->
   <param name="robot_description" command="$(find xacro)/xacro '$(arg model)' ns:=$(arg robot_ns) tf_prefix:=$(arg tf_prefix)" />

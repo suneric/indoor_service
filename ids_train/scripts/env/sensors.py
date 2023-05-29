@@ -92,26 +92,27 @@ def noise_image(image, var):
 ArduCam looks up for observing door open status
 """
 class ArduCam:
-    def __init__(self, name, compressed=False):
+    def __init__(self, name, compressed=False,flipCode=None):
         print("create arducam instance...")
         self.name = name
         self.bridge=CvBridge()
-        self.caminfo_sub = rospy.Subscriber('/'+name+'/camera_info', CameraInfo, self._caminfo_callback)
+        self.caminfo_sub = rospy.Subscriber('/'+name+'/cam_info', CameraInfo, self._caminfo_callback)
         if compressed:
             self.color_sub = rospy.Subscriber('/'+name+'/image/compressed', CompressedImage, self._color_callback)
         else:
             self.color_sub = rospy.Subscriber('/'+name+'/image', Image, self._color_callback)
         self.cameraInfoUpdate = False
         self.cv_color = None
-        self.width = 256
-        self.height = 256
+        self.width = 500
+        self.height = 500
+        self.flipCode = flipCode
 
     def image_arr(self, resolution, noise_var = None):
         img = self.cv_color
         if noise_var is not None:
             img = noise_image(img, noise_var)
         img = resize_image(img,resolution)
-        img = np.array(img)/255 #- 0.5
+        img = np.array(img)/255 # - 0.5
         img = img.reshape((resolution[0],resolution[1],3))
         return img
 
@@ -121,12 +122,25 @@ class ArduCam:
             img = noise_image(img, noise_var)
         img = resize_image(img,resolution)
         img = cv.cvtColor(img,cv.COLOR_BGR2GRAY)
-        img = np.array(img)/255 #- 0.5
+        img = np.array(img)/255 # - 0.5
         img = img.reshape((resolution[0],resolution[1],1))
         return img
 
     def zero_arr(self, resolution):
         return np.zeros((resolution[0],resolution[1],1))
+
+    def binary_arr(self,resolution,detectInfo):
+        """
+        Generate a binary array for detected area given by the bounding box
+        """
+        t,b = detectInfo.t, detectInfo.b
+        l,r = detectInfo.l, detectInfo.r
+        img = np.zeros((self.height,self.width),dtype=np.float32)
+        img[int(t):int(b),int(l):int(r)] = 255
+        img = resize_image(img,resolution)
+        img = np.array(img)/255 # - 0.5
+        img = img.reshape((resolution[0],resolution[1],1))
+        return img
 
     def ready(self):
         return self.cameraInfoUpdate and self.cv_color is not None
@@ -155,6 +169,8 @@ class ArduCam:
                     self.cv_color = self._convertCompressedColorToCV2(data)
                 else:
                     self.cv_color = self.bridge.imgmsg_to_cv2(data, "bgr8")
+                if self.flipCode is not None:
+                    self.cv_color = cv.flip(self.cv_color,self.flipCode)
             except CvBridgeError as e:
                 print(e)
 
@@ -171,6 +187,7 @@ class ArduCam:
                 rospy.logdebug("Current image READY=>")
             except:
                 rospy.logerr("Current image not ready yet, retrying for getting image")
+
 
 """
 Realsense D435 RGB-D camera loop forward for detecting door, door handle, wall outlet and type B socket
@@ -537,36 +554,3 @@ class PoseSensor():
                 rospy.logdebug("Current  /gazebo/link_states READY=>")
             except:
                 rospy.logerr("Current  /gazebo/link_states not ready yet, retrying for getting  /gazebo/link_states")
-
-"""
-ObjectDetector
-"""
-class ObjectDetector:
-    def __init__(self, topic, type=None, max=6):
-        self.sub = rospy.Subscriber(topic, DetectionInfo, self.detect_cb)
-        self.info = []
-        self.type = type
-        self.max_count = max
-        self.names = ["door","door handle","human","outlet","socket"]
-
-    def reset(self):
-        self.info = []
-
-    def ready(self):
-        if len(self.info) < self.max_count:
-            return False
-        else:
-            # print("object detector ready.")
-            return True
-
-    def detect_cb(self, data):
-        if len(self.info) == self.max_count:
-            self.info.pop(0)
-        if self.type is None or self.type == data.type:
-            self.info.append(data)
-
-    def get_detect_info(self):
-        detected = []
-        for info in self.info:
-            detected.append(info)
-        return detected

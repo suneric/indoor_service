@@ -3,49 +3,143 @@ import rospy
 import sys, os
 import numpy as np
 import tensorflow as tf
-from robot.jrobot import JazzyRobot, RobotConfig
-from robot.detection import ObjectDetector
+from robot.jrobot import JazzyRobot
+from robot.detection import ObjectDetection
 from policy.dqn import jfv_actor_network
-import argparse
 import cv2
 
-"""
-Detection Task
-"""
-class ObjectDetection:
-    def __init__(self, sensor, yolo_dir, socketIdx=0, wantDepth=False):
-        self.sensor = sensor
-        self.socketIdx = socketIdx
-        self.detector = ObjectDetector(sensor,yolo_dir,scale=0.001,count=30,wantDepth=wantDepth)
-        self.names = ["door","lever","human","outlet","socket"]
+class ApproachTask:
+    def __init__(self, robot, yolo_dir, socketIdx):
+        self.robot = robot
+        self.rsdDetect = ObjectDetection(robot.camRSD,yolo_dir,scale=0.001,wantDepth=True)
+        self.ardDetect = ObjectDetection(robot.camARD1,yolo_dir,scale=1.0,wantDepth=False)
+        self.socketIdx = 0
+        self.target_dist = 0.8
 
-    def socket_info(self):
-        detected = self.detector.detect(type=4,confidence_threshold=0.7)
-        if len(detected) == 0:
-            return None
-        socket = detected[0]
-        if len(detected) > 1:
-            check = detected[1]
-            if socket.t > check.b:
-                socket = check
-        return socket
+    def align_outlet(self, speed=0.75):
+        detect = self.rsdDetect.outlet()
+        while detect is None:
+            print("outlet is undetecteable.")
+            return False
+        # align normal of the mobile base
+        err = detect.nx # nx should be zero if the camera pointing to the outlet straightly
+        print("=== normal: ({:.4f},{:.4f},{:.4f})".format(detect.nx,detect.ny,detect.nz))
+        curr_sign = np.sign(err)
+        if abs(err) > 0.01:
+            self.robot.move(0.0,curr_sign*speed)
+        rate = rospy.Rate(2)
+        while self.robot.is_safe():
+            rate.sleep()
+            detect = self.rsdDetect.outlet()
+            if detect is None:
+                continue
+            print("=== normal: ({:.4f},{:.4f},{:.4f})".format(detect.nx,detect.ny,detect.nz))
+            if abs(detect.nx) <= 0.01:
+                self.robot.stop()
+                break
+            else:
+                if np.sign(detect.nx) != curr_sign:
+                    curr_sign = np.sign(detect.nx)
+                    self.robot.move(0.0,curr_sign*speed)
+        self.robot.stop()
+        return True
 
-    def outlet_info(self):
-        detected = self.detector.detect(type=3,confidence_threshold=0.3)
-        if len(detected) == 0:
-            return None
-        outlet = detected[-1]
-        return outlet
+    def adjust_plug(self):
+        detect = self.rsdDetect.socket(self.socketIdx)
+        if detect is None:
+            print("socket is undetecteable")
+            return False
+        # adjust vertically
+        rate = rospy.Rate(2)
+        err = detect.y-self.robot.config.plug2rsd_Y
+        while abs(err) > 0.001:
+            self.robot.move_plug_ver(-np.sign(err)*max(2,abs(err)))
+            rate.sleep()
+            detect = self.rsdDetect.socket(self.socketIdx,detect)
+            if detect is None:
+                continue
+            print("=== position: ({:.4f},{:.4f},{:.4f})".format(detect.x,detect.y,detect.z))
+            err = detect.y-self.robot.config.plug2rsd_Y
+        # use another camera to align horizontally
+        detect = self.ardDetect.socket(self.socketIdx)
+        if detect is None:
+            print("undetecteable socket")
+            return True
+        err = (detect.l+detect.r)/2 - self.robot.camARD1.width/2
+        print("center u,err: ({:.4f},{:.4f})".format((detect.l+detect.r)/2, err))
+        while abs(err) > 5:
+            self.robot.move_plug_hor(-np.sign(err)*2)
+            rate.sleep()
+            detect = self.ardDetect.socket(self.socketIdx,detect)
+            if detect is None:
+                continue
+            err = (detect.l+detect.r)/2 - self.robot.camARD1.width/2
+            print("center u,err: ({:.4f},{:.4f})".format((detect.l+detect.r)/2, err))
+        detect = self.rsdDetect.socket(self.socketIdx)
+        print("=== position: ({:.4f},{:.4f},{:.4f})".format(detect.x,detect.y,detect.z))
+        return True
 
-    def display(self,info):
-        img = self.sensor.color_image()
-        text_horizontal = 0
-        label = self.names[int(info.type)]
-        l,t,r,b = int(info.l),int(info.t),int(info.r),int(info.b)
-        cv2.rectangle(img, (l,t), (r,b), (0,255,0), 2)
-        cv2.putText(img, label, (l-10,t-10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0,255,0), 1)
-        cv2.imshow('object detection',img)
-        cv2.waitKey(3) # delay for 3 milliseconds
+    def approch_outlet(self, speed=0.5):
+        # move closer based of depth info
+        detect = self.rsdDetect.socket(self.socketIdx)
+        # print("=== position: ({:.4f},{:.4f},{:.4f})".format(detect.x,detect.y,detect.z))
+        # err = detect.z-self.target_dist
+        # if err > 0:
+        self.robot.move(speed,0.0)
+        rate = rospy.Rate(2)
+        while self.robot.is_safe():
+            rate.sleep()
+            detect = self.rsdDetect.socket(self.socketIdx,detect)
+            if detect is None:
+                continue
+            print("=== position: ({:.4f},{:.4f},{:.4f})".format(detect.x,detect.y,detect.z))
+            if (detect.z-self.target_dist) <= 0:
+                self.robot.stop()
+                break
+        self.robot.stop()
+        # align normal
+        detect = self.rsdDetect.socket(self.socketIdx,detect)
+        while detect is None:
+            print("socket is undetecteable.")
+            return False
+        # align normal of the mobile base
+        err = detect.nx # nx should be zero if the camera pointing to the outlet straightly
+        print("=== normal: ({:.4f},{:.4f},{:.4f})".format(detect.nx,detect.ny,detect.nz))
+        curr_sign = np.sign(err)
+        if abs(err) > 0.01:
+            self.robot.move(0.0,curr_sign*speed)
+        rate = rospy.Rate(2)
+        while self.robot.is_safe():
+            rate.sleep()
+            detect = self.rsdDetect.socket(self.socketIdx,detect)
+            if detect is None:
+                continue
+            print("=== normal: ({:.4f},{:.4f},{:.4f})".format(detect.nx,detect.ny,detect.nz))
+            if abs(detect.nx) <= 0.01:
+                self.robot.stop()
+                break
+            else:
+                if np.sign(detect.nx) != curr_sign:
+                    curr_sign = np.sign(detect.nx)
+                    self.robot.move(0.0,curr_sign*speed)
+        self.robot.stop()
+        return True
+
+    def perform(self,speed=0.5):
+        print("=== approaching wall outlet.")
+        success = self.align_outlet(speed)
+        if not success:
+            print("fail to align outlet.")
+            return False
+        success = self.adjust_plug()
+        if not success:
+             print("fail to adjust plug.")
+             return False
+        success = self.approch_outlet(speed)
+        if not success:
+             print("fail to approch outlet.")
+             return False
+        return True
 
 """
 Plug Insertion Task
@@ -120,165 +214,41 @@ class PlugInsert:
 Real Robot Charging Task
 """
 class JazzyAutoCharge:
-    def __init__(self, yolo_dir, policy_dir):
-        self.config = RobotConfig()
-        self.robot = JazzyRobot()
-        self.rsdDetector = ObjectDetection(self.robot.camRSD, yolo_dir, wantDepth=True)
-        self.ardDetector = ObjectDetection(self.robot.camARD, yolo_dir, wantDepth=False)
-        self.plugin = PlugInsert(self.robot, self.ardDetector, policy_dir)
-
-    def pre_test(self):
-        print("pre-test auto charge")
-        #self.robot.pre_test()
-        #self.robot.reset_ft_sensors()
-        rate = rospy.Rate(1)
-        for i in range(10):
-            self.ardDetector.display(self.ardDetector.socket_info())
-            rate.sleep()
+    def __init__(self, robot, yolo_dir, policy_dir, socketIdx=0):
+        self.robot = robot
+        self.approach = ApproachTask(robot,yolo_dir,socketIdx =socketIdx)
+        # self.align = AlignTask(robot,yolo_dir,socketIdx=socketIdx)
+        # self.insert = InsertTask(robot,yolo_dir,policy_dir,socketIdx=socketIdx)
 
     def prepare(self):
-        print("prepare auto charge")
-        # long-range approach
-        self.align_outlet(speed=0.5)
-        self.approach_outlet(speed=0.4)
-        self.adjust_plug(self.config.rsdOffsetX, self.config.rsdOffsetZ)
-        # close-range manipulation
-        self.approach_socket(speed=0.4)
-        self.align_socket(speed=0.5)
+        self.robot.terminate()
+        print("== prepare for battery charging.")
 
-    def perform(self, speed=0.4):
-        print("perform auto charge")
-        self.plugin.plug(max_step=20)
-        return
+    def perform(self):
+        success = self.approach.perform()
+        if not success:
+            return False
+        # success = self.align.perform()
+        # if not success:
+        #     print("fail to align the socket")
+        #     return False
+        # success = self.insert.perform()
+        # if not success:
+        #     print("fail to plug")
+        #     return False
+        return True
 
     def terminate(self):
-        print("terminate auto charge")
         self.robot.terminate()
+        print("== charging completed.")
 
-    def align_outlet(self,speed=0.5,target=0.02):
-        self.robot.stop()
-        detect = self.rsdDetector.outlet_info()
-        if detect is None:
-            print("outlet is undetecteable")
-            return
-        rate = rospy.Rate(1)
-        while abs(detect.nx) > target:
-            self.robot.move(0.0,np.sign(detect.nx)*speed)
-            rate.sleep()
-            self.robot.stop()
-            detect = self.rsdDetector.outlet_info()
-            if detect is None:
-                print("outlet is undetecteable")
-                break
-            print("=== nx: {:.4f}".format(detect.nx))
-        self.robot.stop()
-
-    def approach_outlet(self,speed=0.5,target_d=0.7,target_a=0.01):
-        self.robot.stop()
-        detect = self.rsdDetector.outlet_info()
-        if detect is None:
-            print("outlet is undetecteable")
-            return
-        rate = rospy.Rate(1)
-        while detect.z-target_d > 0:
-            self.robot.move(speed,np.sign(detect.nx)*speed)
-            rate.sleep()
-            detect = self.rsdDetector.outlet_info()
-            if detect is None:
-                print("outlet is undetecteable")
-                break
-            print("=== z, nx: {:.4f},{:.4f}".format(detect.z, detect.nx))
-        self.robot.stop()
-
-        detect = self.rsdDetector.outlet_info()
-        if detect is None:
-            print("outlet is undetecteable")
-            return
-        while abs(detect.nx) > target_a:
-            self.robot.move(0.0,np.sign(detect.nx)*speed)
-            rate.sleep()
-            self.robot.stop()
-            detect = self.rsdDetector.outlet_info()
-            if detect is None:
-                print("outlet is undetecteable")
-                break
-            print("=== z, nx: {:.4f},{:.4f}".format(detect.z, detect.nx))
-        self.robot.stop()
-
-    def adjust_plug(self,target_h,target_v):
-        rate = rospy.Rate(1)
-        detect = self.rsdDetector.socket_info()
-        if detect is None:
-            print("socket is undetecteable")
-            return
-        print("=== x,y,z:({:.4f},{:.4f},{:.4f})".format(detect.x,detect.y,detect.z))
-        err = detect.x-target_h
-        while abs(err) > 0.001:
-            self.robot.move_plug_hor(-np.sign(err)*2)
-            rate.sleep()
-            detect = self.rsdDetector.socket_info()
-            print("=== x,y,z:({:.4f},{:.4f},{:.4f})".format(detect.x,detect.y,detect.z))
-            err = detect.x-target_h
-        err = detect.y-target_v
-        while abs(err) > 0.001:
-            self.robot.move_plug_ver(-np.sign(err)*4)
-            rate.sleep()
-            detect = self.rsdDetector.socket_info()
-            print("=== x,y,z:({:.4f},{:.4f},{:.4f})".format(detect.x,detect.y,detect.z))
-            err = detect.y-target_v
-
-    def approach_socket(self,speed=0.5,target=0.3):
-        self.robot.stop()
-        detect = self.ardDetector.socket_info()
-        if detect is None:
-            print("socket is undetecteable")
-            return
-        rate = rospy.Rate(1)
-        ratio = abs(detect.r-detect.l)/self.robot.camARD.width
-        while ratio < target:
-            self.align_socket()
-            self.robot.move(speed,0)
-            rate.sleep()
-            self.robot.stop()
-            detect = self.ardDetector.socket_info()
-            if detect is None:
-                print("socket is undetecteable")
-                break
-            print("=== ratio: {}".format(ratio))
-            ratio = abs(detect.r-detect.l)/self.robot.camARD.width
-        self.robot.stop()
-
-    def align_socket(self,speed=0.5,target=3):
-        self.robot.stop()
-        detect = self.ardDetector.socket_info()
-        if detect is None:
-            print("socket is undetecteable")
-            return
-        rate = rospy.Rate(1)
-        err = (detect.l+detect.r)/2 - self.robot.camARD.width/2
-        while err > target:
-            self.robot.move(0.0,-np.sign(err)*speed)
-            rate.sleep()
-            self.robot.stop()
-            detect = self.ardDetector.socket_info()
-            if detect is None:
-                print("socket is undetecteable")
-                break
-            print("=== centor u err: {}".format(err))
-            err = (detect.l+detect.r)/2 - self.robot.camARD.width/2
-        self.robot.stop()
-
-def get_args():
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--task', type=str, default=None) # build_map, charge_battery, open_door
-    return parser.parse_args()
 
 if __name__ == "__main__":
     rospy.init_node("experiment", anonymous=True, log_level=rospy.INFO)
+    robot = JazzyRobot()
     yolo_dir = os.path.join(sys.path[0],'classifier/yolo')
     policy_dir = os.path.join(sys.path[0],"policy/socket_plug/binary/q_net/10000")
-    task = JazzyAutoCharge(yolo_dir, policy_dir)
-    #task.pre_test()
+    task = JazzyAutoCharge(robot, yolo_dir, policy_dir)
     task.prepare()
     task.perform()
     task.terminate()

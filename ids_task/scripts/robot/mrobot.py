@@ -44,7 +44,8 @@ class MRobot:
         self.driver = RobotDriver()
         self.fdController = FrameDeviceController()
         self.camRSD = RSD435('camera')
-        self.camARD = ArduCam('arducam')
+        self.camARD1 = ArduCam('arducam1')
+        self.camARD2 = ArduCam('arducam2')
         self.ftPlug = FTSensor('ft_endeffector')
         self.ftHook = FTSensor('ft_sidebar')
         self.poseSensor = PoseSensor()
@@ -56,7 +57,8 @@ class MRobot:
         self.driver.check_publisher_connection()
         self.fdController.check_publisher_connection()
         self.camRSD.check_sensor_ready()
-        self.camARD.check_sensor_ready()
+        self.camARD1.check_sensor_ready()
+        self.camARD2.check_sensor_ready()
         self.ftPlug.check_sensor_ready()
         self.ftHook.check_sensor_ready()
 
@@ -113,27 +115,6 @@ class MRobot:
 
     def hook_forces(self):
         return self.ftHook.forces()
-
-    def rsd_vision(self,size=(64,64),type=None,info=None):
-        if type == 'binary':
-            return self.camRSD.binary_arr(size,info) # binary vision
-        elif type == 'greyscale':
-            return self.camRSD.grey_arr(size) # grey vision
-        elif type == 'color':
-            return self.camRSD.image_arr(size) # color vision
-        else:
-            return self.camRSD.zero_arr(size) # no vision
-
-    def ard_vision(self,size=(64,64),type=None):
-        if type == 'greyscale':
-            return self.camARD.grey_arr(size) # raw vision
-        elif type == 'color':
-            return self.camARD.image_arr(size) # color vision
-        else:
-            return self.camARD.zero_arr(size) # no vision
-
-    def robot_config(self):
-        return self.config
 
     def rsd2frame_matrix(self):
         a = -np.pi/2

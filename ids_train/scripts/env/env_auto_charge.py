@@ -8,7 +8,8 @@ from gym.spaces import Box, Discrete
 from gym.envs.registration import register
 from .gym_gazebo import GymGazeboEnv
 from .mrobot import MRobot
-from .sensors import ObjectDetector
+from .detection import ObjectDetector
+import cv2
 
 VSLIDER_BASE_H = 0.2725 # height to the floor of center of the plug
 PIN_OFFSET_Y = 0.0214 # the length of circular pin
@@ -26,12 +27,52 @@ goalList = [(1.63497,2.992,0.35454),(1.63497,2.992,0.31551), # NEMA-R15
 #             (2.43497,2.992,0.35454),(2.43497,2.992,0.31551),
 #             (3.23497,2.992,0.35454),(3.23497,2.992,0.31551)]
 
+"""
+Detection Task
+"""
+class ObjectDetection:
+    def __init__(self, sensor, yolo_dir, wantDepth=False):
+        self.sensor = sensor
+        self.detector = ObjectDetector(sensor,yolo_dir,scale=0.001,count=30,wantDepth=wantDepth)
+        self.names = ["door","lever","human","outlet","socket"]
+
+    def socket_info(self,idx=0):
+        detected = self.detector.detect(type=4,confidence_threshold=0.7)
+        print("detected socket", len(detected), "choose", idx)
+        if len(detected) == 0:
+            return None
+        socket = detected[0]
+        if len(detected) > 1:
+            check = detected[1]
+            if socket.t > check.b and idx == 0:
+                socket = check
+            elif check.t > socket.b and idx == 1:
+                socket = check
+        return socket
+
+    def outlet_info(self):
+        detected = self.detector.detect(type=3,confidence_threshold=0.3)
+        if len(detected) == 0:
+            return None
+        outlet = detected[-1]
+        return outlet
+
+    def display(self,detetced):
+        img = self.sensor.color_image()
+        for info in detetced:
+            label = self.names[int(info.type)]
+            l,t,r,b = int(info.l),int(info.t),int(info.r),int(info.b)
+            cv2.rectangle(img, (l,t), (r,b), (0,255,0), 2)
+            cv2.putText(img, label, (l-10,t-10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0,255,0), 1)
+        cv2.imshow('object detection',img)
+        cv2.waitKey(3) # delay for 3 milliseconds
+
 register(
   id='SocketPlugEnv-v0',
   entry_point='envs.socket_plug_env:SocketPlugEnv')
 
 class AutoChargeEnv(GymGazeboEnv):
-    def __init__(self, continuous = True, force_scale=0.01):
+    def __init__(self, continuous = True, force_scale=0.01, yolo_dir=None):
         super(AutoChargeEnv, self).__init__(
             start_init_physics_parameters=False,
             reset_world_or_sim='WORLD'
@@ -44,7 +85,7 @@ class AutoChargeEnv(GymGazeboEnv):
         else:
             self.action_space = Discrete(8) #
         self.robot = MRobot()
-        self.socketDetector = ObjectDetector(topic='detection',type=4)
+        self.ardDetector = ObjectDetection(self.robot.camARD, yolo_dir, wantDepth=False)
         self.success = False
         self.fail = False
         self.obs_image = None # observation image
@@ -98,8 +139,8 @@ class AutoChargeEnv(GymGazeboEnv):
         self.curr_dist = self.prev_dist
         socketInfo = None
         if self.vision_type == 'binary':
-            socketInfo = self.get_socket_info(idx%2)
-        self.obs_image = self.robot.rsd_vision(size=(64,64),type=self.vision_type,info=socketInfo)
+            socketInfo = self.ardDetector.socket_info(idx%2)
+        self.obs_image = self.robot.ard_vision(size=(64,64),type=self.vision_type,info=socketInfo)
         self.obs_force = self.robot.plug_forces(scale=self.force_scale)
         self.obs_joint = self.get_joints(self.robot.plug_joints())
 
@@ -168,18 +209,13 @@ class AutoChargeEnv(GymGazeboEnv):
         if rad is None:
             rad = np.random.uniform(size=4)
         rx += 0.01*(rad[0]-0.5) # 1cm
-        ry += 0.1*(rad[1]-0.5) # 10cm
+        ry += 0.05*(rad[1]-0.5) # 5cm
         rt += 0.02*(rad[2]-0.5) # 1.146 deg, 0.02 rad
         rh += 0.01*(rad[3]-0.5) # 1cm
         # reset robot and device
         self.robot.reset_robot(rx,ry,rt)
         self.robot.reset_joints(vpos=rh,hpos=0,spos=1.57,ppos=0.03)
         self.robot.lock_joints(v=False,h=False,s=True,p=True)
-        # reset socket detector
-        self.socketDetector.reset()
-        while not self.socketDetector.ready():
-            self.robot.move(-0.01,0.0)
-            rospy.sleep(0.01)
         self.robot.stop()
         # self.align_normal()
         # save initial pose
@@ -208,60 +244,3 @@ class AutoChargeEnv(GymGazeboEnv):
         else:
             act_list = [(sh,-sv),(sh,0),(sh,sv),(0,-sv),(0,sv),(-sh,-sv),(-sh,0),(-sh,sv)]
             return act_list[action]
-
-    def get_socket_info(self,idx):
-        detected = self.socketDetector.get_detect_info()
-        # find one or two sockets
-        infoList = [detected[-1]]
-        info = detected[-1]
-        i = len(detected)-2
-        while i >= 0:
-            check = detected[i]
-            if (check.b-info.b)-(info.b-info.t) > 5:
-                infoList.append(check)
-                break
-            elif (info.b-check.b)-(check.b-check.t) > 5:
-                infoList.insert(0,check)
-                break
-            else:
-                info = check
-            i = i-1
-        print("get detected socket", idx)
-        # choose upper or lower
-        if len(infoList) == 1:
-            return infoList[0]
-        else:
-            return infoList[idx]
-
-    def align_normal(self):
-        f = 10
-        dt = 1/f
-        rate = rospy.Rate(f)
-        kp = 0.1
-        # adjust robot (plug) orientation (yaw)
-        detect = self.socketDetector.get_detect_info()[-1]
-        # print("=== normal (nx,ny,nz): ({:.4f},{:.4f},{:.4f})".format(detect.nx,detect.ny,detect.nz))
-        t, te, e0 = 1e-6, 0, 0
-        err = detect.nx
-        while abs(err) > 0.01:
-            vz = kp*(err + te/t + dt*(err-e0))
-            self.robot.move(0.0,vz)
-            rate.sleep()
-            e0, te, t = err, te+err, t+dt
-            detect = self.socketDetector.get_detect_info()[-1]
-            # print("=== normal (nx,ny,nz): ({:.4f},{:.4f},{:.4f})".format(detect.nx,detect.ny,detect.nz))
-            err = detect.nx
-        self.robot.stop()
-        print("=== normal (nx,ny,nz): ({:.4f},{:.4f},{:.4f})".format(detect.nx,detect.ny,detect.nz))
-
-        detect = self.socketDetector.get_detect_info()[-1]
-        du = (detect.r+detect.l)/2-(self.robot.camRSD.width/2)
-        # print("=== center u distance: {:.4f}".format(du))
-        while abs(du) > 1:
-            self.robot.move(0.0,-np.sign(du)*0.2)
-            rate.sleep()
-            detect = self.socketDetector.get_detect_info()[-1]
-            du = (detect.r+detect.l)/2-(self.robot.camRSD.width/2)
-            # print("=== center u distance: {:.4f}".format(du))
-        self.robot.stop()
-        print("=== center u distance: {:.4f}".format(du))

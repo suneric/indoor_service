@@ -29,7 +29,7 @@
       <visual>
         <origin xyz="0 0 ${camera_link/2}" rpy="0 0 0"/>
         <geometry>
-          <box size="${camera_link} ${camera_link} ${camera_link}"/>
+          <box size="${camera_link/2} ${camera_link} ${camera_link}"/>
         </geometry>
       </visual>
       <inertial>
@@ -65,7 +65,7 @@
           <updateRate>60</updateRate>
           <cameraName>/$(arg ns)/${camera_name}</cameraName>
           <imageTopicName>image</imageTopicName>
-          <cameraInfoTopicName>camera_info</cameraInfoTopicName>
+          <cameraInfoTopicName>cam_info</cameraInfoTopicName>
           <frameName>$(arg tf_prefix)/${camera_name}</frameName>
           <hackBaseline>0.07</hackBaseline>
           <distortionK1>0.0</distortionK1>

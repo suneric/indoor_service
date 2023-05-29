@@ -47,6 +47,19 @@
 
   <!--camera, look upward-->
   <xacro:include filename="$(find ids_description)/urdf/camera.urdf.xacro"/>
+  <xacro:camera_macro parent="link_hslider">
+    <xacro:property name="location_x" value="0.166" />
+    <xacro:property name="location_y" value="0.0" />
+    <xacro:property name="location_z" value="-0.05" />
+    <xacro:property name="location_r" value="0" />
+    <xacro:property name="location_p" value="0" />
+    <xacro:property name="location_y" value="0" />
+    <xacro:property name="camera_width" value="500" />
+    <xacro:property name="camera_height" value="500" />
+    <xacro:property name="camera_name" value="arducam1"/>
+  </xacro:camera_macro>
+
+  <xacro:include filename="$(find ids_description)/urdf/camera.urdf.xacro"/>
   <xacro:camera_macro parent="link_tip">
     <xacro:property name="location_x" value="0.02" />
     <xacro:property name="location_y" value="0.0" />
@@ -54,9 +67,9 @@
     <xacro:property name="location_r" value="0" />
     <xacro:property name="location_p" value="-1.57" />
     <xacro:property name="location_y" value="0" />
-    <xacro:property name="camera_width" value="600" />
-    <xacro:property name="camera_height" value="600" />
-    <xacro:property name="camera_name" value="arducam"/>
+    <xacro:property name="camera_width" value="500" />
+    <xacro:property name="camera_height" value="500" />
+    <xacro:property name="camera_name" value="arducam2"/>
   </xacro:camera_macro>
 
   <!-- laser -->

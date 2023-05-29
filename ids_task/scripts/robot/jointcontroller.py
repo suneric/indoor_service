@@ -262,30 +262,30 @@ class FrameDeviceController:
     def move_vslider_to(self,vs=0.0):
         if self.vslider.locked:
             return
-        while abs(self.vslider.pos()-vs) > 0.0001:
+        while abs(self.vslider.pos()-vs) > 0.001:
             self.vslider.set_pos(vs)
-            rospy.sleep(0.5)
+            rospy.sleep(1)
 
     def move_hslider_to(self,hs=0.0):
         if self.hslider.locked:
             return
-        while abs(self.hslider.pos()-hs) > 0.0001:
+        while abs(self.hslider.pos()-hs) > 0.001:
             self.hslider.set_pos(hs)
-            rospy.sleep(0.5)
+            rospy.sleep(1)
 
     def move_hook_to(self,hp=0.0):
         if self.hook.locked:
             return
-        while abs(self.hook.pos()-hp) > 0.0001:
+        while abs(self.hook.pos()-hp) > 0.001:
             self.hook.set_pos(hp)
-            rospy.sleep(0.5)
+            rospy.sleep(1)
 
     def move_plug_to(self, pg=0.0):
         if self.plug.locked:
             return
-        while abs(self.plug.pos()-pg) > 0.0001:
+        while abs(self.plug.pos()-pg) > 0.001:
             self.plug.set_pos(pg)
-            rospy.sleep(0.5)
+            rospy.sleep(1)
 
     def lock_hook(self, lock=True):
         if lock and not self.hook.locked:
