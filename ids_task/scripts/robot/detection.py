@@ -181,7 +181,7 @@ class SNE:
 Object Detector with Distance and Normal Evaluation
 """
 class ObjectDetector:
-    def __init__(self,sensor,dir,scale=1.0,count=15,wantDepth=False):
+    def __init__(self,sensor,dir,scale=1.0,count=50,wantDepth=False):
         self.sensor = sensor
         self.net = torch.hub.load('ultralytics/yolov5','custom',path=os.path.join(dir,'best.pt'))
         self.scale = scale
@@ -261,22 +261,15 @@ class ObjectDetection:
         self.sensor = sensor
         self.detector = ObjectDetector(sensor,yolo_dir,scale=scale,wantDepth=wantDepth)
 
-    def socket(self,idx=0,ref=None):
-        target = None
+    def socket(self):
         detected = self.detector.detect(type=4,confidence_threshold=0.5)
-        if len(detected) == 1:
-            check = detected[0]
-            if ref is not None and abs(check.t-ref.t) < 15:
-                target = check
-        elif len(detected) > 1:
-            check1,check2 = detected[0],detected[1]
-            if (idx == 0 and check1.t > check2.t) or (idx == 1 and check1.t < check2.t):
-                target = check2
-            else:
-                target = check1
-        if target is not None:
-            display_detection(self.sensor,[target],0)
-        return target
+        if len(detected) < 2:
+            return None
+        else:
+            upper,lower = detected[0],detected[1]
+            if upper.t > detected[1].t:
+                lower, upper = detected[0], detected[1]
+            return (upper,lower)
 
     def outlet(self):
         detected = self.detector.detect(type=3,confidence_threshold=0.5)

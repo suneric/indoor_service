@@ -12,7 +12,7 @@ Robot Configuration
 class RobotConfig:
     plug2rsd_X = 0.01#0.0175 # plug offset to rsd camera center along camera's x
     plug2rsd_Y = 0.15 # plug offset to rsd camera center along camera's y
-    plug2rsd_Z = 0.22 # plug offset to rsd camera center along camera's z
+    plug2rsd_Z = 0.15 # plug offset to rsd camera center along camera's z
 
 class JazzyRobot:
     def __init__(self):
