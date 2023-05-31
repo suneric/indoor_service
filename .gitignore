@@ -4,3 +4,4 @@
 logs
 saved_models
 data
+__pycache__

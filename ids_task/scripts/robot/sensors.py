@@ -93,7 +93,7 @@ ArduCam looks up for observing door open status
 """
 class ArduCam:
     def __init__(self, name, compressed=False,flipCode=None):
-        print("create arducam instance...")
+        print("create {} instance...".format(name))
         self.name = name
         self.bridge=CvBridge()
         self.caminfo_sub = rospy.Subscriber('/'+name+'/cam_info', CameraInfo, self._caminfo_callback)
@@ -103,8 +103,8 @@ class ArduCam:
             self.color_sub = rospy.Subscriber('/'+name+'/image', Image, self._color_callback)
         self.cameraInfoUpdate = False
         self.cv_color = None
-        self.width = 500
-        self.height = 500
+        self.width = 400
+        self.height = 400
         self.flipCode = flipCode
 
     def image_arr(self, resolution, noise_var = None):
@@ -193,7 +193,7 @@ Realsense D435 RGB-D camera loop forward for detecting door, door handle, wall o
 """
 class RSD435:
     def __init__(self,name, compressed = False):
-        print("create realsense d435 instance...")
+        print("create realsense D435 instance...")
         self.name = name
         self.bridge=CvBridge()
         self.caminfo_sub = rospy.Subscriber('/'+name+'/color/camera_info', CameraInfo, self._caminfo_callback)
@@ -339,7 +339,7 @@ class FTSensor():
         force = data.wrench.force
         x = self.kfx.update(force.x)
         y = self.kfy.update(force.y)
-        z = self.kfz.update(force.z)
+        z = self.kfz.update(force.z)+9.8
         self.filtered = [x,y,z]
         self.record.append(self.filtered)
         self.record_temp.append(self.filtered)

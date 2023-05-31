@@ -24,7 +24,6 @@ class JazzyRobot:
         self.ftPlug = LCSensor('loadcell1_forces')
         self.ftHook = LCSensor('loadcell2_forces')
         self.config = RobotConfig()
-        # self.check_ready()
 
     def check_ready(self):
         self.driver.check_publisher_connection()
@@ -48,21 +47,30 @@ class JazzyRobot:
         self.ftPlug.reset()
         self.ftHook.reset()
 
-    def plug_forces(self, scale = 1.0, max=100):
+    def plug_forces(self, scale=1.0, max=100):
         forces = np.array(self.ftPlug.forces())
         return forces.clip(-max,max)*scale
 
-    def hook_forces(self, scale = 1.0, max=100):
+    def hook_forces(self, scale=1.0, max=100):
         forces = np.array(self.ftHook.forces())
         return forces.clip(-max,max)*scale
 
-    def move_plug_ver(self,data=10):
-        self.fdController.move_joint3(data)
-
-    def move_plug_hor(self,data=10):
-        self.fdController.move_joint1(data)
+    def set_plug_joints(self, hdata, vdata):
+        if hdata != 0:
+            self.fdController.move_joint1(hdata)
+            rospy.sleep(0.5)
+        if vdata != 0:
+            self.fdController.move_joint3(vdata)
+            rospy.sleep(0.5)
 
     def is_safe(self, max_force=20):
+        """
+        Americans with Disabilities Act Accessibility Guidelines (ADAAG),
+        ICC/ANSI A117.1 Standard on Accessible and Usable Building and Facilities,
+        and the Massachusetts Architectural Access Board requirements (521 CMR)
+        - Interior Doors: 5 pounds of force (22.14111 N)
+        - Exterior Doors: 15 pounds of force (66.72333 N)
+        """
         forces = self.plug_forces()
         abs_forces = [abs(v) for v in forces]
         return max(abs_forces) < max_force

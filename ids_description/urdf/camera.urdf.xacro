@@ -7,8 +7,8 @@
     <xacro:property name="location_r" value="0" />
     <xacro:property name="location_p" value="0" />
     <xacro:property name="location_y" value="0" />
-    <xacro:property name="camera_width" value="600" />
-    <xacro:property name="camera_height" value="600" />
+    <xacro:property name="camera_width" value="400" />
+    <xacro:property name="camera_height" value="400" />
     <xacro:property name="camera_link" value="0.02" />
     <xacro:property name="camera_name" value="front_cam" />
 
@@ -57,7 +57,7 @@
           <noise>
             <type>gaussian</type>
             <mean>0.0</mean>
-            <stddev>0.007</stddev>
+            <stddev>0.001</stddev>
           </noise>
         </camera>
         <plugin name="camera_controller" filename="libgazebo_ros_camera.so">
@@ -67,7 +67,7 @@
           <imageTopicName>image</imageTopicName>
           <cameraInfoTopicName>cam_info</cameraInfoTopicName>
           <frameName>$(arg tf_prefix)/${camera_name}</frameName>
-          <hackBaseline>0.07</hackBaseline>
+          <hackBaseline>0.01</hackBaseline>
           <distortionK1>0.0</distortionK1>
           <distortionK2>0.0</distortionK2>
           <distortionK3>0.0</distortionK3>

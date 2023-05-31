@@ -200,8 +200,8 @@ if __name__ == "__main__":
     rospy.init_node("simulation", anonymous=True, log_level=rospy.INFO)
 
     robot = MRobot()
-    yolo_dir = os.path.join(sys.path[0],'classifier/yolo')
-    policy_dir = os.path.join(sys.path[0],"policy/door_open/force_vision")
+    yolo_dir = os.path.join(sys.path[0],'policy/detection/yolo')
+    policy_dir = os.path.join(sys.path[0],"policy/pulling/force_vision")
     task = DoorOpeningTask(robot,yolo_dir,policy_dir)
     task.prepare()
 

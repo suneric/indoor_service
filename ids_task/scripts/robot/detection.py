@@ -17,6 +17,10 @@ import torch
 from ids_detection.msg import DetectionInfo
 import warnings
 
+def draw_observation(name, image):
+    cv.imshow(name,image)
+    cv.waitKey(1) # delay for 1 milliseconds
+
 """
 Draw image with detected bounding boxes
 """
@@ -30,8 +34,7 @@ def display_detection(sensor,detect,idx):
         clr = (255,0,0) if i==idx else (0,255,0)
         cv.rectangle(img, (l,t), (r,b), clr, 2)
         cv.putText(img, label, (l-10,t-10), cv.FONT_HERSHEY_SIMPLEX, 0.5, clr, 1)
-    cv.imshow('object detection',img)
-    cv.waitKey(3) # delay for 3 milliseconds
+    draw_observation("detection", img)
 
 """
 Normal Estimator
@@ -263,13 +266,18 @@ class ObjectDetection:
 
     def socket(self):
         detected = self.detector.detect(type=4,confidence_threshold=0.5)
-        if len(detected) < 2:
-            return None
-        else:
+        count = len(detected)
+        if count == 0:
+            return count, None
+        elif len(detected) == 1:
+            return count, detected
+        elif len(detected) == 2:
             upper,lower = detected[0],detected[1]
             if upper.t > detected[1].t:
                 lower, upper = detected[0], detected[1]
-            return (upper,lower)
+            return count, (upper,lower)
+        else:
+            return count, detected
 
     def outlet(self):
         detected = self.detector.detect(type=3,confidence_threshold=0.5)

@@ -246,8 +246,8 @@ if __name__ == "__main__":
     rospy.init_node("simulation", anonymous=True, log_level=rospy.INFO)
 
     robot = MRobot()
-    yolo_dir = os.path.join(sys.path[0],"classifier/yolo")
-    policy_dir = os.path.join(sys.path[0],"policy/socket_plug/binary_old")
+    yolo_dir = os.path.join(sys.path[0],'policy/detection/yolo')
+    policy_dir = os.path.join(sys.path[0],"policy/plugin/binary_old")
     task = AutoChargeTask(robot,yolo_dir,policy_dir)
     task.prepare()
 

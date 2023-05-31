@@ -259,33 +259,37 @@ class FrameDeviceController:
     def hook_released(self):
         return self.hook.is_released()
 
-    def move_vslider_to(self,vs=0.0):
+    def move_vslider_to(self,vs=0.0,tol=1e-3):
         if self.vslider.locked:
             return
-        while abs(self.vslider.pos()-vs) > 0.001:
+        rate = rospy.Rate(10)
+        while abs(self.vslider.pos()-vs) > tol:
             self.vslider.set_pos(vs)
-            rospy.sleep(1)
+            rate.sleep()
 
-    def move_hslider_to(self,hs=0.0):
+    def move_hslider_to(self,hs=0.0,tol=1e-3):
         if self.hslider.locked:
             return
-        while abs(self.hslider.pos()-hs) > 0.001:
+        rate = rospy.Rate(10)
+        while abs(self.hslider.pos()-hs) > tol:
             self.hslider.set_pos(hs)
-            rospy.sleep(1)
+            rate.sleep()
 
-    def move_hook_to(self,hp=0.0):
+    def move_hook_to(self,hp=0.0,tol=1e-3):
         if self.hook.locked:
             return
-        while abs(self.hook.pos()-hp) > 0.001:
+        rate = rospy.Rate(10)
+        while abs(self.hook.pos()-hp) > tol:
             self.hook.set_pos(hp)
-            rospy.sleep(1)
+            rate.sleep()
 
-    def move_plug_to(self, pg=0.0):
+    def move_plug_to(self,pg=0.0,tol=1e-3):
         if self.plug.locked:
             return
-        while abs(self.plug.pos()-pg) > 0.001:
+        rate = rospy.Rate(10)
+        while abs(self.plug.pos()-pg) > tol:
             self.plug.set_pos(pg)
-            rospy.sleep(1)
+            rate.sleep()
 
     def lock_hook(self, lock=True):
         if lock and not self.hook.locked:

@@ -6,7 +6,6 @@ import tensorflow as tf
 from robot.jrobot import JazzyRobot
 from robot.detection import ObjectDetection
 from policy.dqn import jfv_actor_network
-import cv2
 
 class ApproachTask:
     def __init__(self, robot, yolo_dir):
@@ -198,7 +197,7 @@ class InsertTask:
             print("undetecteable socket")
             return False
         image = self.robot.camARD1.binary_arr((64,64),detect[self.socketIdx])
-        force = self.robot.plug_forces()
+        force = self.robot.plug_forces(scale=0.01)
         joint = [0,0]
         connected, step = False, 0
         while not connected and step < max_attempts:
@@ -206,14 +205,8 @@ class InsertTask:
             idx = self.policy(obs)
             #idx = np.random.randint(8)
             act = self.get_action(idx)
-            if act[0] != 0:
-                self.robot.move_plug_hor(act[0])
-                rospy.sleep(1)
-                joint[0] += np.sign(act[0])
-            if act[1] != 0:
-                self.robot.move_plug_ver(act[1])
-                rospy.sleep(1)
-                joint[1] += np.sign(act[1])
+            self.robot.set_plug_joints(act[0],act[1])
+            joint += np.sign(act)
             connected,force = self.plug_once()
             step += 1
         print("connected", connected)
@@ -259,10 +252,10 @@ class JazzyAutoCharge:
         print("== prepare for battery charging.")
 
     def perform(self):
-        success = self.approach.perform()
-        if not success:
-            print("fail to approach.")
-            return False
+        # success = self.approach.perform()
+        # if not success:
+        #     print("fail to approach.")
+        #     return False
         success = self.align.perform()
         if not success:
             print("fail to align.")
@@ -280,8 +273,8 @@ class JazzyAutoCharge:
 if __name__ == "__main__":
     rospy.init_node("experiment", anonymous=True, log_level=rospy.INFO)
     robot = JazzyRobot()
-    yolo_dir = os.path.join(sys.path[0],'classifier/yolo')
-    policy_dir = os.path.join(sys.path[0],"policy/socket_plug/binary")
+    yolo_dir = os.path.join(sys.path[0],'policy/detection/yolo')
+    policy_dir = os.path.join(sys.path[0],"policy/plugin/binary")
     task = JazzyAutoCharge(robot, yolo_dir, policy_dir)
     task.prepare()
     task.perform()
