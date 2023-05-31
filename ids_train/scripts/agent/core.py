@@ -1,7 +1,6 @@
 import numpy as np
-import tensorflow as tf
-import tensorflow_probability as tfp
 import scipy.signal
+import tensorflow as tf
 from collections import deque
 
 def discount_cumsum(x,discount):

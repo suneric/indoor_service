@@ -40,34 +40,37 @@ class RobotConfig:
     outletY = 2.992
 
 """
-MobileRobot
+MobileRobot, used for simulation only.
 """
 class MRobot:
     def __init__(self):
+        print("create robot for simulation.")
         self.driver = RobotDriver()
         self.fdController = FrameDeviceController()
         self.camRSD = RSD435('camera')
-        self.camARD = ArduCam('arducam')
+        self.camARD1 = ArduCam('arducam1')
+        self.camARD2 = ArduCam('arducam2')
         self.ftPlug = FTSensor('ft_endeffector')
         self.ftHook = FTSensor('ft_sidebar')
         self.poseSensor = PoseSensor()
         self.robotPoseReset = RobotPoseReset()
         self.config = RobotConfig()
+        self.check_ready()
 
     def check_ready(self):
         self.driver.check_publisher_connection()
         self.fdController.check_publisher_connection()
         self.camRSD.check_sensor_ready()
-        self.camARD.check_sensor_ready()
+        self.camARD1.check_sensor_ready()
+        self.camARD2.check_sensor_ready()
         self.ftPlug.check_sensor_ready()
         self.ftHook.check_sensor_ready()
-        # self.poseSensor.check_sensor_ready()
 
     def reset_robot(self,rx,ry,yaw):
         self.robotPoseReset.reset(rx,ry,yaw)
         rospy.sleep(0.5)
         crPos = self.poseSensor.robot()
-        if math.sqrt((crPos[0]-rx)**2+(crPos[1]-ry)**2) > 0.01:
+        if np.sqrt((crPos[0]-rx)**2+(crPos[1]-ry)**2) > 0.01:
             self.robotPoseReset.reset(rx,ry,yaw)
             print("train reset robot again.")
 
@@ -90,8 +93,8 @@ class MRobot:
         return (hpos,vpos)
 
     def set_plug_joints(self, hpos, vpos):
-        self.fdController.move_hslider_to(hpos)
         self.fdController.move_vslider_to(vpos)
+        self.fdController.move_hslider_to(hpos)
 
     def lock_joints(self,v=True,h=True,s=True,p=True):
         self.fdController.lock_vslider(v)
@@ -99,42 +102,23 @@ class MRobot:
         self.fdController.lock_hook(s)
         self.fdController.lock_plug(p)
 
+    def release_hook(self):
+        self.fdController.move_hook_to(0.0)
+
+    def retrieve_hook(self):
+        self.fdController.move_hook_to(1.57)
+
     def robot_pose(self):
         return self.poseSensor.robot()
 
     def plug_pose(self):
         return self.poseSensor.plug()
 
-    def plug_forces(self, scale = 1.0, max=100):
-        forces = np.array(self.ftPlug.forces())
-        return forces.clip(-max,max)*scale
+    def plug_forces(self):
+        return self.ftPlug.forces()
 
-    def hook_forces(self, scale = 1.0, max=100):
-        forces = np.array(self.ftHook.forces())
-        return forces.clip(-max,max)*scale
-
-    def rsd_vision(self,size=(64,64),type=None,info=None):
-        if type == 'binary':
-            return self.camRSD.binary_arr(size,info) # binary vision
-        elif type == 'greyscale':
-            return self.camRSD.grey_arr(size) # grey vision
-        elif type == 'color':
-            return self.camRSD.image_arr(size) # color vision
-        else:
-            return self.camRSD.zero_arr(size) # no vision
-
-    def ard_vision(self,size=(64,64),type=None,info=None):
-        if type == 'binary':
-            return self.camARD.binary_arr(size,info) # binary vision
-        elif type == 'greyscale':
-            return self.camARD.grey_arr(size) # raw vision
-        elif type == 'color':
-            return self.camARD.image_arr(size) # color vision
-        else:
-            return self.camARD.zero_arr(size) # no vision
-
-    def robot_config(self):
-        return self.config
+    def hook_forces(self):
+        return self.ftHook.forces()
 
     def rsd2frame_matrix(self):
         a = -np.pi/2

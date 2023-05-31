@@ -10,7 +10,7 @@ import argparse
 
 from agent.core import *
 from env.env_door_open import DoorOpenEnv
-from agent.world_model import WorldModel, ReplayBuffer
+# from agent.dreamer1 import Agent
 
 """
 https://www.tensorflow.org/guide/gpu#limiting_gpu_memory_growth
@@ -43,7 +43,7 @@ def get_args():
 
 def plot_predict(model,image,force,prev_z,prev_a,filepath):
     fig, axs = plt.subplots(1,3)
-    z = model.encode_obs(image,force)
+    z,_,_ = model.encode_obs(image,force)
     r_image,r_force = model.decode_latent(z)
     axs[0].imshow(image,cmap='gray')
     axs[0].set_title("[{:.2f},{:.2f},{:.2f}]".format(force[0],force[1],force[2]))
@@ -59,38 +59,37 @@ def plot_predict(model,image,force,prev_z,prev_a,filepath):
     plt.savefig(filepath)
     plt.close(fig)
 
+def plot_z_clusters(latent_arr, rewards, filepath):
+    fig = plt.figure(figsize=(12,10))
+    plt.scatter(latent_arr[:,0],latent_arr[:,1],c=rewards)
+    plt.colorbar()
+    plt.xlabel("z[0]")
+    plt.ylabel("z[1]")
+    plt.savefig(filepath)
+    plt.close(fig)
+
 def test_model(env,model,model_dir,ep,action_dim,max_step=50):
     ep_path = os.path.join(model_dir,"ep{}".format(ep))
     os.mkdir(ep_path)
     obs, done = env.reset(),False
     plot_predict(model,obs['image'],obs['force'],None,None,os.path.join(ep_path,"step{}".format(0)))
+    _,z_mu,_ = model.encode_obs(obs['image'],obs['force'])
+    latent_list, rewards = [z_mu], [0]
     for i in range(max_step):
         z,a,v,logp = model.forward(obs['image'],obs['force'])
         nobs,rew,done,info = env.step(a)
         plot_predict(model,nobs['image'],nobs['force'],z,np.identity(action_dim)[a],os.path.join(ep_path,"step{}".format(i+1)))
+        _,z_mu,_ = model.encode_obs(nobs['image'],nobs['force'])
+        latent_list.append(z_mu)
+        rewards.append(rew)
         if done:
             break
-
-def test_recurrent_model(env,model,model_dir,ep,latent_dim,action_dim,seq_len,max_step=50):
-    ep_path = os.path.join(model_dir,"ep{}".format(ep))
-    os.mkdir(ep_path)
-    obs, done = env.reset(),False
-    plot_predict(model,obs['image'],obs['force'],None,None,os.path.join(ep_path,"step{}".format(0)))
-
-    z_seq, a_seq = zero_seq(latent_dim,seq_len), zero_seq(action_dim,seq_len)
-    for i in range(max_step):
-        z,a,v,logp = model.forward(obs['image'],obs['force'])
-        nobs,rew,done,info = env.step(a)
-        z_seq.append(z)
-        a_seq.append(np.identity(action_dim)[a])
-        plot_predict(model,nobs['image'],nobs['force'],np.array(z_seq.copy()),np.array(a_seq.copy()),os.path.join(ep_path,"step{}".format(i+1)))
-        if done:
-            break
+    plot_z_clusters(np.array(latent_list),np.array(rewards),os.path.join(ep_path,"z_cluster"))
 
 if __name__=="__main__":
     args = get_args()
-    rospy.init_node('world_model_train', anonymous=True)
-    model_dir = os.path.join(sys.path[0],'../saved_models/door_open/wm',datetime.now().strftime("%Y-%m-%d-%H-%M"))
+    rospy.init_node('dreamer1_train', anonymous=True)
+    model_dir = os.path.join(sys.path[0],'../saved_models/door_open/dreamer1',datetime.now().strftime("%Y-%m-%d-%H-%M"))
     summaryWriter = tf.summary.create_file_writer(model_dir)
     tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir=model_dir)
 
@@ -100,47 +99,25 @@ if __name__=="__main__":
     action_dim = env.action_space.n
     print("create door open environment for world model", image_shape, force_dim, action_dim)
 
-    seq_len = args.seq_len
-    latent_dim = 4
-    capacity = args.train_freq+args.max_step
-    buffer = ReplayBuffer(capacity,image_shape,force_dim)
-    model = WorldModel(image_shape,force_dim,action_dim,latent_dim,seq_len)
-
     ep_returns, t, success_counter = [], 0, 0
+    epsilon, eps_stop, eps_decay = 0.0, 0.1, 0.99
     for ep in range(args.max_ep):
         obs, done, ep_ret, step = env.reset(), False, 0, 0
         while not done and step < args.max_step:
-            z, act, logp, val = model.forward(obs['image'],obs['force'])
+            act = np.random.randint(action_dim)
             nobs, rew, done, info = env.step(act)
-            buffer.add_observation(obs['image'],obs['force'],nobs['image'],nobs['force'],act,rew,val,logp)
+            # buffer.add_observation(obs['image'],obs['force'],nobs['image'],nobs['force'],act,rew)
             ep_ret += rew
             obs = nobs
             step += 1
             t += 1
 
         success_counter = success_counter+1 if env.success else success_counter
-        last_value = 0
-        if not done:
-            z, act, logp, last_value = model.forward(obs['image'],obs['force'])
-        buffer.end_trajectry(last_value)
-
         ep_returns.append(ep_ret)
         print("Episode *{}*: Return {:.4f}, Total Step {}, Success Count {} ".format(ep,ep_ret,t,success_counter))
 
         with summaryWriter.as_default():
             tf.summary.scalar('episode reward', ep_ret, step=ep)
-
-        if buffer.size() >= args.train_freq or (ep+1) == args.max_ep:
-            model.train(buffer,epochs=500,batch_size=64,verbose=0,callbacks=[tensorboard_callback])
-            if seq_len is None:
-                obs = env.reset()
-                model.imagine_train(capacity=100,image=obs['image'],force=obs['force'])
-                test_model(env,model,model_dir,ep+1,action_dim,args.max_step)
-            else:
-                obs = env.reset()
-                model.imagine_train_recurrent(capacity=100,image=obs['image'],force=obs['force'])
-                test_recurrent_model(env,model,model_dir,ep+1,latent_dim,action_dim,seq_len,args.max_step)
-            model.save(os.path.join(model_dir,"ep{}".format(ep+1)))
 
     env.close()
     plt.plot(ep_returns, 'k--', linewidth=1)
