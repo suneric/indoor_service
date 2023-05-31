@@ -20,7 +20,7 @@ tf.random.set_seed(321)
 def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--policy', type=str, default='ppo') # ppo, rppo
-    parser.add_argument('--max_ep', type=int, default=1000)
+    parser.add_argument('--max_ep', type=int, default=2000)
     parser.add_argument('--max_step', type=int, default=30)
     parser.add_argument('--train_freq', type=int, default=200)
     parser.add_argument('--seq_len', type=int, default=None)

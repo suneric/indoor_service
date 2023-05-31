@@ -113,8 +113,8 @@ class AutoChargeEnv(GymGazeboEnv):
         elif self.fail:
             reward = -100
         else:
-            dist2goal_change = (self.prev_dist-self.curr_dist)*(100/0.01) # scale to 10 mm
-            reward = dist2goal_change - 1
+            # dist change scale to 1 cm - step penalty
+            reward = 100*(self.prev_dist-self.curr_dist)/0.01 - 0.3
             self.prev_dist = self.curr_dist
         return reward
 
