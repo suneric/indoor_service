@@ -266,6 +266,7 @@ class ObjectDetection:
 
     def socket(self):
         detected = self.detector.detect(type=4,confidence_threshold=0.5)
+        display_detection(self.sensor,detected,0)
         count = len(detected)
         if count == 0:
             return count, None

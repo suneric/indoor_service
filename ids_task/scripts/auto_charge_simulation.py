@@ -2,217 +2,286 @@
 import rospy
 import os,sys
 import numpy as np
-from policy.dqn import DQN
+import tensorflow as tf
 from robot.mrobot import MRobot
 from robot.detection import ObjectDetection
-from robot.sensors import *
+from robot.sensors import BumpSensor
+from agent.model import jfv_actor_network
 from localization import *
 
 class ApproachTask:
-    def __init__(self, robot, yolo_dir, socketIdx):
+    def __init__(self, robot, yolo_dir):
         self.robot = robot
-        self.target_dist = 0.5
         self.rsdDetect = ObjectDetection(robot.camRSD,yolo_dir,scale=1.0,wantDepth=True)
-        self.socketIdx = socketIdx
 
-    def perform(self):
-        print("approaching.")
-        f = 10
-        dt = 1/f
-        rate = rospy.Rate(f)
-        kp = 0.1
-        # adjust robot (plug) orientation (yaw)
+    def perform(self, speed=0.5):
+        print("=== approaching wall outlet.")
+        success = self.align_outlet(speed)
+        if not success:
+            print("fail to align outlet.")
+            return False
+        success = self.approach_outlet(speed)
+        if not success:
+             print("fail to approch outlet.")
+             return False
+        return True
+#
+    def align_outlet(self, target=0.01):
         detect = self.rsdDetect.outlet()
-        while detect is None:
-            self.robot.move(0.2,0.0)
-            rate.sleep()
-            detect = self.rsdDetector.socket(self.socketIdx)
+        if detect is None:
+            print("outlet is undetectable.")
+            return False
 
-        t, te, e0 = 1e-6, 0, 0
+        f, dt, kp = 10, 0.1, 0.1
         err = detect.nx
-        while abs(err) > 0.01:
+        t, te, e0 = 1e-6, 0, 0
+        rate = rospy.Rate(f)
+        while abs(err) > target:
             vz = kp*(err + te/t + dt*(err-e0))
             self.robot.move(0.0,vz)
             rate.sleep()
             e0, te, t = err, te+err, t+dt
             detect = self.rsdDetect.outlet()
-            if detect is not None:
-                print("=== normal (nx,ny,nz): ({:.4f},{:.4f},{:.4f})".format(detect.nx,detect.ny,detect.nz))
-                err = detect.nx
+            if detect is None:
+                continue
+            print("=== normal (nx,ny,nz): ({:.4f},{:.4f},{:.4f})".format(detect.nx,detect.ny,detect.nz))
+            err = detect.nx
         self.robot.stop()
+        return True
 
-        # move closer based of depth info
+    def approach_outlet(self, speed=0.5, target=0.7):
         detect = self.rsdDetect.outlet()
         if detect is None:
+            print("outlet is undetecteable.")
             return False
 
-        rate = rospy.Rate(1)
-        err = detect.z-self.target_dist
+        rate = rospy.Rate(10)
+        err = detect.z-target
         while err > 0:
             self.robot.move(0.5,0.0)
             rate.sleep()
             detect = self.rsdDetect.outlet()
-            if detect is not None:
-                print("=== position (x,y,z): ({:.4f},{:.4f},{:.4f})".format(detect.x,detect.y,detect.z))
-                err = detect.z-self.target_dist
+            if detect is None:
+                continue
+            print("=== position (x,y,z): ({:.4f},{:.4f},{:.4f})".format(detect.x,detect.y,detect.z))
+            err = detect.z-target
         self.robot.stop()
-
-        detect = self.rsdDetect.socket(self.socketIdx)
-        if detect is None:
-            return False
-        # adjust plug position
-        joints = self.robot.plug_joints()
-        self.robot.set_plug_joints(joints[0]-detect.x, joints[1]-detect.y+self.robot.config.rsdOffsetZ)
         return True
 
 class AlignTask:
-    def __init__(self,robot,yolo_dir,socketIdx,target_ratio=0.3):
+    def __init__(self,robot,yolo_dir,socketIdx):
         self.robot = robot
-        self.rsdDetect = ObjectDetection(robot.camRSD,yolo_dir,scale=1.0,wantDepth=False)
+        self.ardDetect = ObjectDetection(robot.camARD1,yolo_dir,scale=1.0,wantDepth=False)
         self.socketIdx = socketIdx
-        self.target_ratio = target_ratio
 
     def perform(self):
-        print("aligning.")
+        print("=== align socket.")
+        success = self.align_socket(idx=self.socketIdx)
+        if not success:
+            print("fail to align socket.")
+            return False
+        success = self.adjust_plug(idx=self.socketIdx)
+        if not success:
+             print("fail to adjust plug.")
+             return False
+        success = self.initial_touch(idx=self.socketIdx)
+        if not success:
+             print("fail to initialize.")
+             return False
+        return True
+
+    def align_socket(self, idx=0, speed=np.pi/5, target=10):
+        self.robot.move(0.5,0.0)
         rate = rospy.Rate(10)
-        detect = self.rsdDetect.socket(self.socketIdx)
-        if detect is None:
+        count, detect = self.ardDetect.socket()
+        while self.robot.is_safe(max_force=15) and count < 2:
+            rate.sleep()
+            count, detect = self.ardDetect.socket()
+        if count < 2:
+            print("socket is undetectable")
             return False
 
-        while (detect.r-detect.l)/self.robot.camRSD.width < self.target_ratio:
-            self.robot.move(0.2,0.0)
+        err = (detect[idx].l+detect[idx].r)/2 - self.robot.camARD1.width/2
+        print("center u err: {:.4f}".format(err))
+        while abs(err) > target:
+            self.robot.move(0.0,-np.sign(err)*speed)
             rate.sleep()
-            detect = self.rsdDetect.socket(self.socketIdx)
-            if detect is None:
-                break
-        self.robot.stop()
-
-        detect = self.rsdDetect.socket(self.socketIdx)
-        if detect is None:
-            return False
-
-        du = (detect.r+detect.l)/2-(self.robot.camRSD.width/2)
-        while abs(du) > 3:
-            self.robot.move(0.0,-np.sign(du)*0.2)
-            rate.sleep()
-            detect = self.rsdDetect.socket(self.socketIdx)
-            if detect is None:
-                break
-            du = (detect.r+detect.l)/2-(self.robot.camRSD.width/2)
-            print("=== center u distance: {:.4f}".format(du))
+            count, detect = self.ardDetect.socket()
+            if count < 2:
+                continue
+            err = (detect[idx].l+detect[idx].r)/2 - self.robot.camARD1.width/2
+            print("center u err: {:.4f}".format(err))
         self.robot.stop()
         return True
 
+    def adjust_plug(self, idx=0, target=3):
+        count, detect = self.ardDetect.socket()
+        self.robot.move(0.3,0.0)
+        rate = rospy.Rate(10)
+        while count < 2:
+            rate.sleep()
+            count, detect = self.ardDetect.socket()
+        self.robot.stop()
+        if count < 2:
+            print("socket is undetectable")
+            return False
+
+        err = (detect[1].t+detect[1].b)/2 - self.robot.camARD1.height/2
+        print("center v err: {:.4f}".format(err))
+        while abs(err) > target:
+            self.robot.set_plug_joints(0.0,-np.sign(err)*0.002)
+            rate.sleep()
+            count, detect = self.ardDetect.socket()
+            if count < 2:
+                continue
+            err = (detect[1].t+detect[1].b)/2 - self.robot.camARD1.height/2
+            print("center v err: {:.4f}".format(err))
+
+        err = (detect[idx].l+detect[idx].r)/2 - self.robot.camARD1.width/2
+        print("center u err: {:.4f}".format(err))
+        while abs(err) > target:
+            self.robot.set_plug_joints(-np.sign(err)*0.002,0.0)
+            rate.sleep()
+            count, detect = self.ardDetect.socket()
+            if count < 2:
+                continue
+            err = (detect[idx].l+detect[idx].r)/2 - self.robot.camARD1.width/2
+            print("center u err: {:.4f}".format(err))
+        return True
+
+    def initial_touch(self, idx=0, speed=0.5):
+        rate = rospy.Rate(10)
+        while self.robot.is_safe(max_force=20):
+            self.robot.move(speed,0.0)
+            rate.sleep()
+        self.robot.stop()
+        count, detect = self.ardDetect.socket()
+        while count < 2:
+            self.robot.move(-speed,0.0)
+            rate.sleep()
+            count, detect = self.ardDetect.socket()
+        self.robot.stop()
+        return True
+
+
 class InsertTask:
-    def __init__(self, robot, yolo_dir, policy_dir, socketIdx, max_attempts=3):
+    def __init__(self, robot, yolo_dir, policy_dir, socketIdx):
         self.robot = robot
         self.ardDetect = ObjectDetection(robot.camARD1,yolo_dir,scale=1.0,wantDepth=False)
-        self.model = self.load_model(policy_dir)
+        self.model = jfv_actor_network((64,64,1),3,2,8)
+        self.model.load_weights(os.path.join(policy_dir,'q_net/250'))
         self.socketIdx = socketIdx
-        self.max_attempts = max_attempts
         self.bumper = BumpSensor()
 
-    def load_model(self, dir):
-        model_path = os.path.join(dir,"q_net/9950")
-        print("load model from", model_path)
-        model = DQN((64,64,1),3,2,8,gamma=0.99,lr=2e-4,update_freq=500)
-        model.load(model_path)
-        return model
+    def policy(self,obs):
+        image = tf.expand_dims(tf.convert_to_tensor(obs['image']), 0)
+        force = tf.expand_dims(tf.convert_to_tensor(obs['force']), 0)
+        joint = tf.expand_dims(tf.convert_to_tensor(obs['joint']), 0)
+        return np.argmax(self.model([image, force, joint]))
 
-    def action(self,idx):
+    def get_action(self,idx):
         sh,sv = 0.001, 0.001 # 1 mm, scale for horizontal and vertical move
         act_list = [(sh,-sv),(sh,0),(sh,sv),(0,-sv),(0,sv),(-sh,-sv),(-sh,0),(-sh,sv)]
         return act_list[idx]
 
-    def perform(self):
-        print("plugging.")
-        connected = self.plug()
-        retry = 1
-        while not connected and retry < self.max_attempts:
-            self.robot.move(-1.0,0.0)
-            rospy.sleep(6)
-            detect = self.ardDetect.socket(self.socketIdx)
-            du = (detect.r+detect.l)/2-(self.robot.camARD1.width/2)
-            rate = rospy.Rate(10)
-            while abs(du) > 3:
-                self.robot.move(0.0,-np.sign(du)*0.2)
-                rate.sleep()
-                detect = self.ardDetect.socket(self.socketIdx)
-                du = (detect.r+detect.l)/2-(self.robot.camARD1.width/2)
-                print("=== center u distance: {:.4f}".format(du))
-            self.robot.stop()
-            connected = self.plug()
-            retry += 1
+    def perform(self, max_attempts=3):
+        print("=== insert plug...")
+        connected, retry = self.plug(), 1
+        while not connected and retry < max_attempts:
+            connected, retry = self.plug(), retry+1
         if not connected:
             return False
         else:
-            return push_plug()
+            return self.push_plug()
 
     def plug(self,max=15):
-        sj = self.robot.plug_joints()
-        detect = self.ardDetect.socket()
-        image = self.robot.camARD1.binary_arr(resolution=(64,64),info=detect)
+        detect = self.adjust_plug(self.socketIdx)
+        image = self.robot.camARD1.binary_arr((64,64),detect[self.socketIdx])
         force = self.robot.plug_forces()
-        cj = self.robot.plug_joints()
-        joint = (cj[0]-sj[0],cj[1])
+        joint = [0,0]
         connected, step = False, 0
         while not connected and step < max:
-            obs = dict(image=image, force=force, joint=joint)
-            act = self.action(self.model.policy(obs))
-            self.robot.set_plug_joints(cj[0]+act[0],cj[1]+act[1])
-            connected,force = insert_plug()
-            cj = self.robot.plug_joints()
-            joint = (cj[0]-sj[0],cj[1])
+            obs = dict(image=image, force=force/100, joint=joint)
+            act = self.get_action(self.policy(obs))
+            self.robot.set_plug_joints(act[0],act[1])
+            connected,force = self.insert_plug()
+            joint += np.sign(act)
             step += 1
+        print("connected", connected)
         return connected
 
-    def insert_plug(self,f_max=20):
+    def adjust_plug(self, idx=0, speed=0.5, target=3):
+        self.robot.move(-speed,0.0)
+        count, detect = self.ardDetect.socket()
+        rate = rospy.Rate(10)
+        while count < 2:
+            rate.sleep()
+            count, detect = self.ardDetect.socket()
+        self.robot.stop()
+
+        err = (detect[1].t+detect[1].b)/2 - self.robot.camARD1.height/2
+        print("center v err: {:.4f}".format(err))
+        while abs(err) > target:
+            self.robot.set_plug_joints(0.0,-np.sign(err)*0.001)
+            rate.sleep()
+            count, detect = self.ardDetect.socket()
+            while count < 2:
+                rate.sleep()
+                self.robot.move(-speed,0.0)
+                count, detect = self.ardDetect.socket()
+            err = (detect[1].t+detect[1].b)/2 - self.robot.camARD1.height/2
+            print("center v err: {:.4f}".format(err))
+
+        err = (detect[1].l+detect[1].r)/2 - self.robot.camARD1.width/2
+        print("center u err: {:.4f}".format(err))
+        while abs(err) > target:
+            self.robot.set_plug_joints(-np.sign(err)*0.001,0.0)
+            rate.sleep()
+            count, detect = self.ardDetect.socket()
+            if count < 2:
+                continue
+            err = (detect[idx].l+detect[idx].r)/2 - self.robot.camARD1.width/2
+            print("center u err: {:.4f}".format(err))
+        return detect
+
+    def insert_plug(self,speed=0.5,f_max=20):
         self.robot.lock_joints(v=True,h=True,s=True,p=True)
+        self.robot.move(speed,0.0)
         rate = rospy.Rate(10)
         inserted = False
-        forces= self.robot.plug_forces()
-        while forces[0] > -f_max and abs(forces[1]) < 10 and abs(forces[2]+9.8) < 10:
-            self.robot.move(0.2,0.0)
+        while self.robot.is_safe(max_force=f_max):
             rate.sleep()
-            forces = self.robot.plug_forces()
+            forces= self.robot.plug_forces()
             inserted = (self.robot.poseSensor.plug()[1] > self.robot.config.outletY)
             print("=== plug position y: ({:.4f})".format(self.robot.config.outletY-self.robot.poseSensor.plug()[1]), inserted)
             if inserted:
                 break
-        self.robot.stop()
         if not inserted: # back for reduce force
-            f = self.robot.plug_forces()
-            while f[0] <= -f_max or abs(f[1]) >= 10 or abs(f[2]+9.8) >= 10:
-                self.robot.move(-0.2,0.0)
+            self.robot.move(-speed,0.0)
+            while not self.robot.is_safe(max_force=5):
                 rate.sleep()
-                f = self.robot.plug_forces()
-            self.robot.stop()
+        self.robot.stop()
         self.robot.lock_joints(v=False,h=False,s=True,p=True)
         return inserted,forces
 
-    def push_plug(self, max=100):
+    def push_plug(self, speed=0.1, max=100):
         rate = rospy.Rate(30)
-        step = 0
-        bpConnected = False
-        while not bpConnected and step < max:
-            self.robot.lock_joints(v=True,h=True,s=True,p=True)
-            self.robot.move(0.1,0.0)
-            rate.sleep()
+        bpConnected, step = False, 0
+        while not self.bumper.connected() and step < max:
             self.robot.lock_joints(v=False,h=False,s=True,p=True)
-            bpConnected = self.bumper.connected()
+            self.robot.move(speed,0.0)
+            rate.sleep()
             force = self.robot.plug_forces()
-            print("=== push plug (x,y,z): ({:.4f},{:.4f},{:.4f})".format(force[0],force[1],force[2]))
-            joint = self.robot.plug_joints()
             act = [-np.sign(force[1])*0.001,-np.sign(force[2])*0.001]
-            self.robot.set_plug_joints(joint[0]+act[0],joint[1]+act[1])
+            self.robot.set_plug_joints(act[0],act[1])
             step += 1
         self.robot.stop()
-        return bpConnected
+        return self.bumper.connected()
 
 class AutoChargeTask:
     def __init__(self, robot, yolo_dir, policy_dir, socketIdx=0):
         self.robot = robot
-        self.approach = ApproachTask(robot,yolo_dir,socketIdx =socketIdx)
+        self.approach = ApproachTask(robot,yolo_dir)
         self.align = AlignTask(robot,yolo_dir,socketIdx=socketIdx)
         self.insert = InsertTask(robot,yolo_dir,policy_dir,socketIdx=socketIdx)
 
@@ -247,13 +316,11 @@ if __name__ == "__main__":
 
     robot = MRobot()
     yolo_dir = os.path.join(sys.path[0],'policy/detection/yolo')
-    policy_dir = os.path.join(sys.path[0],"policy/plugin/binary_old")
+    policy_dir = os.path.join(sys.path[0],"policy/plugin/binary")
     task = AutoChargeTask(robot,yolo_dir,policy_dir)
     task.prepare()
-
     nav = BasicNavigator(robot)
     nav.move2goal(create_goal(1.63497,1.8,np.pi/2))
-
     success = task.perform()
     if success:
         robot.stop()

@@ -113,13 +113,13 @@ class MRobot:
     def plug_pose(self):
         return self.poseSensor.plug()
 
-    def plug_forces(self, scale=1.0, max=100):
+    def plug_forces(self, max=100):
         forces = np.array(self.ftPlug.forces())
-        return forces.clip(-max,max)*scale
+        return forces.clip(-max,max)
 
-    def hook_forces(self, scale=1.0, max=100):
+    def hook_forces(self, max=100):
         forces = np.array(self.ftHook.forces())
-        return forces.clip(-max,max)*scale
+        return forces.clip(-max,max)
 
     def is_safe(self, max_force=20):
         """

@@ -50,7 +50,7 @@
   <xacro:camera_macro parent="link_hslider">
     <xacro:property name="location_x" value="0.166" />
     <xacro:property name="location_y" value="0.0" />
-    <xacro:property name="location_z" value="-0.05" />
+    <xacro:property name="location_z" value="-0.04" />
     <xacro:property name="location_r" value="0" />
     <xacro:property name="location_p" value="0" />
     <xacro:property name="location_y" value="0" />
