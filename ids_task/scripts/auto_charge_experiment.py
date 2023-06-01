@@ -213,7 +213,7 @@ class InsertTask:
         if not connected:
             return False
         else:
-            return push_plug()
+            print("connected for charging.")
 
     def plug(self,max=15):
         detect = self.adjust_plug(self.socketIdx)
