@@ -198,7 +198,7 @@ class AutoChargeEnv(GymGazeboEnv):
         while count < 2-idx:
             rate.sleep()
             count, detect = self.ardDetect.socket()
-            dist, _ self.dist2goal()
+            dist, _ = self.dist2goal()
             if dist > self.initOffset:
                 detect = None
                 break
