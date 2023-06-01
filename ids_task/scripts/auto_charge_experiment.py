@@ -133,7 +133,7 @@ class AlignTask:
 
     def adjust_plug(self,idx=0,target=10):
         count, detect = self.ardDetect.socket()
-        self.robot.move(0.3,0.0)
+        self.robot.move(0.4,0.0)
         rate = rospy.Rate(10)
         while count < 2:
             rate.sleep()
@@ -200,7 +200,7 @@ class InsertTask:
         return np.argmax(self.model([image, force, joint]))
 
     def get_action(self,idx):
-        sh,sv = 1, 3 # 1 mm, scale for horizontal and vertical move
+        sh,sv = 1, 4 # 1 mm, scale for horizontal and vertical move
         act_list = [(sh,-sv),(sh,0),(sh,sv),(0,-sv),(0,sv),(-sh,-sv),(-sh,0),(-sh,sv)]
         return act_list[idx]
 
@@ -267,7 +267,7 @@ class InsertTask:
             print("center u err: {:.4f}".format(err))
         return detect
 
-    def insert_plug(self,speed=0.3,f_max=15):
+    def insert_plug(self,speed=0.4,f_max=15):
         self.robot.move(speed,0.0)
         rate = rospy.Rate(10)
         inserted = False

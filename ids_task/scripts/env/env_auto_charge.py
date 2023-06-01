@@ -86,7 +86,7 @@ class AutoChargeEnv(GymGazeboEnv):
         self.reset_robot()
         detect = self.initial_touch(speed=0.5,idx=idx%2) # 0 for upper, 1 for lower
         self.success = False
-        self.fail = False
+        self.fail = (detect is None)
         _, self.prev_dist = self.dist2goal()
         self.curr_dist = self.prev_dist
         self.obs_image = self.robot.camARD1.binary_arr(resolution=(64,64),detectInfo=detect)
@@ -198,6 +198,10 @@ class AutoChargeEnv(GymGazeboEnv):
         while count < 2-idx:
             rate.sleep()
             count, detect = self.ardDetect.socket()
+            dist, _ self.dist2goal()
+            if dist > self.initOffset:
+                detect = None
+                break
         print("detect {} sockets".format(count))
         self.robot.stop()
         self.robot.lock_joints(v=False,h=False,s=True,p=True)
