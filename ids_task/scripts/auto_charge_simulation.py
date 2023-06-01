@@ -2,6 +2,7 @@
 import rospy
 import os,sys
 import numpy as np
+import pandas as pd
 import tensorflow as tf
 from robot.mrobot import MRobot
 from robot.detection import ObjectDetection
@@ -186,15 +187,17 @@ class InsertTask:
 
     def perform(self, max_attempts=3):
         print("=== insert plug...")
-        connected, retry = self.plug(), 1
-        while not connected and retry < max_attempts:
-            connected, retry = self.plug(), retry+1
-        if not connected:
-            return False
-        else:
-            return self.push_plug()
+        connected = False
+        for i in range(max_attempts):
+            connected, force_profile = self.plug()
+            file = os.path.join(sys.path[0],'../dump',"force_profice_{}.csv".format(i))
+            pd.DataFrame(force_profile).to_csv(file)
+            if connected:
+                break
+        return self.push_plug() if connected else False
 
     def plug(self,max=15):
+        self.robot.ftPlug.reset_temp()
         detect = self.adjust_plug(self.socketIdx)
         image = self.robot.camARD1.binary_arr((64,64),detect[self.socketIdx])
         force = self.robot.plug_forces()
@@ -208,7 +211,8 @@ class InsertTask:
             joint += np.sign(act)
             step += 1
         print("connected", connected)
-        return connected
+        profile = self.robot.ftPlug.temp_record()
+        return connected, profile
 
     def adjust_plug(self, idx=0, speed=0.5, target=3):
         self.robot.move(-speed,0.0)
@@ -313,7 +317,6 @@ class AutoChargeTask:
 
 if __name__ == "__main__":
     rospy.init_node("simulation", anonymous=True, log_level=rospy.INFO)
-
     robot = MRobot()
     yolo_dir = os.path.join(sys.path[0],'policy/detection/yolo')
     policy_dir = os.path.join(sys.path[0],"policy/plugin/binary")

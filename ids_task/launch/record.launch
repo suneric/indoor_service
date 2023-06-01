@@ -1,0 +1,8 @@
+<launch>
+  <arg name="simulation" default="1"/>
+  <arg name="task" default="auto_charge"/>
+  <node pkg="ids_task" type="record.py" name="record" output="screen">
+    <param name="simulation" value="$(arg simulation)"/>
+    <param name="task" value="$(arg task)"/>
+  </node>
+</launch>

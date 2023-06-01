@@ -131,9 +131,9 @@ class AlignTask:
         self.robot.stop()
         return True
 
-    def adjust_plug(self,idx=0,target=10):
+    def adjust_plug(self,idx=0,speed=0.4,target=8):
         count, detect = self.ardDetect.socket()
-        self.robot.move(0.4,0.0)
+        self.robot.move(speed,0.0)
         rate = rospy.Rate(10)
         while count < 2:
             rate.sleep()
@@ -147,7 +147,7 @@ class AlignTask:
         print("center v err: {:.4f}".format(err))
         rate = rospy.Rate(1)
         while abs(err) > target:
-            self.robot.set_plug_joints(0.0,-np.sign(err)*4)
+            self.robot.set_plug_joints(0.0,-np.sign(err)*2)
             rate.sleep()
             count, detect = self.ardDetect.socket()
             if count < 2:
@@ -159,7 +159,7 @@ class AlignTask:
         print("center u err: {:.4f}".format(err))
         rate = rospy.Rate(1)
         while abs(err) > target:
-            self.robot.set_plug_joints(-np.sign(err)*2,0.0)
+            self.robot.set_plug_joints(-np.sign(err)*1,0.0)
             rate.sleep()
             count, detect = self.ardDetect.socket()
             if count < 2:
@@ -190,7 +190,7 @@ class InsertTask:
         self.robot = robot
         self.ardDetect = ObjectDetection(robot.camARD1,yolo_dir,scale=1.0,wantDepth=False)
         self.model = jfv_actor_network((64,64,1),3,2,8)
-        self.model.load_weights(os.path.join(policy_dir,'q_net/250'))
+        self.model.load_weights(os.path.join(policy_dir,'q_net/300'))
         self.socketIdx = socketIdx
 
     def policy(self,obs):
@@ -204,7 +204,7 @@ class InsertTask:
         act_list = [(sh,-sv),(sh,0),(sh,sv),(0,-sv),(0,sv),(-sh,-sv),(-sh,0),(-sh,sv)]
         return act_list[idx]
 
-    def perform(self, max_attempts=3):
+    def perform(self, max_attempts=5):
         print("=== insert plug...")
         connected, retry = self.plug(), 1
         while not connected and retry < max_attempts:
@@ -232,7 +232,7 @@ class InsertTask:
         print("connected", connected)
         return connected
 
-    def adjust_plug(self,idx=0,speed=0.4,target=10):
+    def adjust_plug(self,idx=0,speed=0.4,target=8):
         self.robot.move(-speed,0.0)
         count, detect = self.ardDetect.socket()
         rate = rospy.Rate(10)
@@ -244,7 +244,7 @@ class InsertTask:
         err = (detect[1].t+detect[1].b)/2 - self.robot.camARD1.height/2
         print("center v err: {:.4f}".format(err))
         while abs(err) > target:
-            self.robot.set_plug_joints(0.0,-np.sign(err)*4)
+            self.robot.set_plug_joints(0.0,-np.sign(err)*2)
             rate.sleep()
             count, detect = self.ardDetect.socket()
             self.robot.move(-speed,0.0)
@@ -258,7 +258,7 @@ class InsertTask:
         err = (detect[1].l+detect[1].r)/2 - self.robot.camARD1.width/2
         print("center u err: {:.4f}".format(err))
         while abs(err) > target:
-            self.robot.set_plug_joints(-np.sign(err)*2,0.0)
+            self.robot.set_plug_joints(-np.sign(err)*1,0.0)
             rate.sleep()
             count, detect = self.ardDetect.socket()
             if count < 2:
