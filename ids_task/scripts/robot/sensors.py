@@ -129,16 +129,17 @@ class ArduCam:
     def zero_arr(self, resolution):
         return np.zeros((resolution[0],resolution[1],1))
 
-    def binary_arr(self,resolution,detectInfo):
+    def binary_arr(self, resolution, detectInfo = None):
         """
         Generate a binary array for detected area given by the bounding box
         """
-        t,b = detectInfo.t, detectInfo.b
-        l,r = detectInfo.l, detectInfo.r
         img = np.zeros((self.height,self.width),dtype=np.float32)
-        img[int(t):int(b),int(l):int(r)] = 255
+        if detectInfo is not None:
+            t,b = detectInfo.t, detectInfo.b
+            l,r = detectInfo.l, detectInfo.r
+            img[int(t):int(b),int(l):int(r)] = 1.0
         img = resize_image(img,resolution)
-        img = np.array(img)/255 #- 0.5
+        img = np.array(img) #- 0.5
         img = img.reshape((resolution[0],resolution[1],1))
         return img
 
