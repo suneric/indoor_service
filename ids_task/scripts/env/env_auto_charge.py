@@ -94,8 +94,8 @@ class AutoChargeEnv(GymGazeboEnv):
             reward = 100
         elif self.fail:
             reward = -100
-        else: # dist change scale to 1 cm - step penalty
-            reward = 100*(self.prev_dist-self.curr_dist)/0.01 - 0.3
+        else: # dist change (in mm) - step penalty
+            reward = 1000*(self.prev_dist-self.curr_dist) - 0.7
             self.prev_dist = self.curr_dist
         return reward
 
@@ -152,9 +152,9 @@ class AutoChargeEnv(GymGazeboEnv):
         rh = self.goal[2]+PIN_OFFSET_Z-VSLIDER_BASE_H
         rt = np.pi/2
         rad = np.random.uniform(size=4) if self.initRandom is None else self.initRandom
-        rx += 0.02*(rad[0]-0.5) # 1cm
+        rx += 0.01*(rad[0]-0.5) # 1cm
         ry += 0.02*(rad[1]-0.5) # 1cm
-        rh += 0.02*(rad[2]-0.5) # 1cm
+        rh += 0.01*(rad[2]-0.5) # 1cm
         rt += 0.02*(rad[3]-0.5) # 1.146 deg, 0.02 rad
         self.robot.reset_robot(rx,ry,rt)
         self.robot.reset_joints(vpos=rh,hpos=0,spos=1.57,ppos=0.03)
