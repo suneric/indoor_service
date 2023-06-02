@@ -10,54 +10,64 @@ import matplotlib.pyplot as plt
 import time
 
 class Visualizer:
-    def __init__(self, robot, simulation, task, yolo_dir):
+    def __init__(self, robot, simulation, task):
         if task == 'auto_charge':
-            self.v_sensor = robot.camARD1
-            self.f_sensor = robot.ftPlug
-            # self.camDetect = ObjectDetection(robot.camARD1,yolo_dir,scale=1.0,wantDepth=False)
+            self.cam0 = robot.camRSD
+            self.cam1 = robot.camARD1
+            self.loadcell = robot.ftPlug
         elif task == 'door_open':
-            self.v_sensor = robot.camRSD
-            self.f_sensor = robot.ftHook
-            # self.camDetect = ObjectDetection(robot.camRSD,yolo_dir,scale=1.0 if simulation else 0.001,wantDepth=True)
+            self.cam0 = robot.camRSD
+            self.cam1 = robot.camARD2 if simulation else robot.camARD1
+            self.loadcell = robot.ftHook
         else:
             print("unknown task")
 
     def run(self):
         try:
             plt.ion()
-            fig = plt.figure(figsize=(8,4), constrained_layout = True)
-            gs = fig.add_gridspec(1,2)
-            gs1 = gs[1].subgridspec(3,1)
+            fig = plt.figure(figsize=(12,3), constrained_layout = True)
+            gs = fig.add_gridspec(1,3,width_ratios=[1,1,2])
+            gs2 = gs[2].subgridspec(3,1)
             a0 = fig.add_subplot(gs[0])
-            a1 = fig.add_subplot(gs1[0])
-            a2 = fig.add_subplot(gs1[1])
-            a3 = fig.add_subplot(gs1[2])
-            a0.set_title("Vision")
+            a1 = fig.add_subplot(gs[1])
+            a20 = fig.add_subplot(gs2[0])
+            a21 = fig.add_subplot(gs2[1])
+            a22 = fig.add_subplot(gs2[2])
+            a0.set_title("3D Sensor")
             a0.set_xticks([])
             a0.set_yticks([])
-            image = self.display_detection()
-            if image is not None:
-                a0.imshow(image)
-            a1.set_title("Forces")
-            a1.set_ylim(-30,30)
-            a2.set_ylim(-30,30)
-            a3.set_ylim(-30,30)
-            a1.set_ylabel("X (N)")
-            a2.set_ylabel("Y (N)")
-            a3.set_ylabel("Z (N)")
-            profile = self.f_sensor.profile(size=1000).clip(-30,30)
-            lineX = a1.plot([f[0] for f in profile],color='red',label="X")
-            lineY = a2.plot([f[1] for f in profile],color='green',label="Y")
-            lineZ = a3.plot([f[2] for f in profile],color='blue',label="Z")
+            img0 = self.cam0.color_image((200,200),code='rgb')
+            if img0 is not None:
+                a0.imshow(img0)
+            a1.set_title("2D Camera")
+            a1.set_xticks([])
+            a1.set_yticks([])
+            img1 = self.cam1.color_image((200,200),code='rgb')
+            if img1 is not None:
+                a1.imshow(img1)
+            a20.set_title("Loadcell")
+            a20.set_ylim(-30,30)
+            a21.set_ylim(-30,30)
+            a22.set_ylim(-30,30)
+            a20.set_ylabel("X (N)")
+            a21.set_ylabel("Y (N)")
+            a22.set_ylabel("Z (N)")
+            profile = self.loadcell.profile(size=1000).clip(-30,30)
+            lineX = a20.plot([f[0] for f in profile],color='red',label="X")
+            lineY = a21.plot([f[1] for f in profile],color='green',label="Y")
+            lineZ = a22.plot([f[2] for f in profile],color='blue',label="Z")
             # plt.legend()
-            rate = rospy.Rate(10)
+            rate = rospy.Rate(2)
             start = time.time()
             while not rospy.is_shutdown():
                 fig.suptitle("Sensor Information {:.2f} s".format(time.time()-start))
-                image = self.display_detection()
-                if image is not None:
-                    a0.imshow(image)
-                profile = self.f_sensor.profile(size=1000).clip(-30,30)
+                img0 = self.cam0.color_image((200,200),code='rgb')
+                if img0 is not None:
+                    a0.imshow(img0)
+                img1 = self.cam1.color_image((200,200),code='rgb')
+                if img1 is not None:
+                    a1.imshow(img1)
+                profile = self.loadcell.profile(size=1000).clip(-30,30)
                 lineX[0].set_ydata([f[0] for f in profile])
                 lineY[0].set_ydata([f[1] for f in profile])
                 lineZ[0].set_ydata([f[2] for f in profile])
@@ -67,30 +77,11 @@ class Visualizer:
         except rospy.ROSInterruptException:
             pass
 
-    def display_detection(self):
-        image = self.v_sensor.color_image(resolution=(400,400),code='rgb')
-        return image
-        # detect_list = []
-        # count, detect = self.camDetect.socket()
-        # if count > 0:
-        #     for i in detect:
-        #         detect_list.append(i)
-        # detect = self.camDetect.outlet()
-        # if detect is not None:
-        #     detect_list.append(detect)
-        # detect = self.camDetect.door()
-        # if detect is not None:
-        #     detect_list.append(detect)
-        # detect = self.camDetect.lever()
-        # if detect is not None:
-        #     detect_list.append(detect)
-        # return draw_detection(image,detect_list)
 
 if __name__ == '__main__':
     simulation = int(rospy.get_param('/visualization/simulation')) # simulation or real robot
     task = str(rospy.get_param('/visualization/task'))
     rospy.init_node("visualization", anonymous=True, log_level=rospy.INFO)
-    yolo_dir = os.path.join(sys.path[0],'policy/detection/yolo')
     robot = MRobot() if simulation else JazzyRobot()
-    record = Visualizer(robot, simulation, task, yolo_dir)
+    record = Visualizer(robot, simulation, task)
     record.run()
