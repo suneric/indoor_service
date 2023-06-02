@@ -2,153 +2,203 @@
 import rospy
 import os,sys
 import numpy as np
-from policy.ppo import PPO
 from robot.mrobot import MRobot
+import tensorflow as tf
 from robot.detection import ObjectDetection
+from agent.model import fv_actor_network
+from tensorflow_probability import distributions as tfpd
 from navigation import *
 
 class ApproachTask:
     def __init__(self, robot, yolo_dir):
         self.robot = robot
-        self.target_dist = 0.8
         self.rsdDetect = ObjectDetection(robot.camRSD, yolo_dir,scale=1.0,wantDepth=True)
 
     def perform(self):
-        f = 10
-        dt = 1/f
-        rate = rospy.Rate(f)
-        kp = 0.1
-        # adjust robot orientation (yaw)
-        detect = self.rsdDetect.lever()
-        if detect == None:
+        print("=== approaching wall outlet.")
+        success = self.align_door_handle()
+        if not success:
+            print("fail to align door handle.")
             return False
+        success = self.approch_door_handle()
+        if not success:
+             print("fail to approch door handle.")
+             return False
+        return True
 
+    def align_door_handle(self, target=0.05):
+        rate = rospy.Rate(10)
+        self.robot.move(0.5,0.0)
+        detect = self.rsdDetect.lever()
+        while detect is None:
+            rate.sleep()
+            detect = self.rsdDetect.lever()
+        self.robot.stop()
+
+        f, dt, kp = 10, 0.1, 0.1
         t, te, e0 = 1e-6, 0, 0
         err = detect.nx
-        while abs(err) > 0.005:
+        rate = rospy.Rate(f)
+        while abs(err) > target:
             vz = kp*(err + te/t + dt*(err-e0))
             self.robot.move(0.0,vz)
             rate.sleep()
             e0, te, t = err, te+err, t+dt
             detect = self.rsdDetect.lever()
+            if detect is None:
+                continue
             print("=== normal (nx,ny,nz): ({:.4f},{:.4f},{:.4f})".format(detect.nx,detect.ny,detect.nz))
             err = detect.nx
         self.robot.stop()
+        return True
 
-        # move closer based of depth info
+    def approch_door_handle(self, speed=0.5, target=0.7):
+        rate = rospy.Rate(10)
+        self.robot.move(0.5,0.0)
         detect = self.rsdDetect.lever()
-        t, te, e0 = 1e-6, 0, 0
-        err = detect.z-self.target_dist
-        while err > 0:
-            vx = 2*kp*(err + te/t + dt*(err-e0))
-            self.robot.move(vx,0.0)
+        while detect is None:
             rate.sleep()
-            e0, te, t = err, te+err, t+dt
             detect = self.rsdDetect.lever()
-            print("=== position (x,y,z): ({:.4f},{:.4f},{:.4f})".format(detect.x,detect.y,detect.z))
-            err = detect.z-self.target_dist
         self.robot.stop()
 
-        # adjust plug position
-        detect = self.rsdDetect.lever()
-        joints = self.robot.plug_joints()
-        self.robot.set_plug_joints(joints[0]-detect.x, joints[1]-detect.y+self.robot.config.rsdOffsetZ+0.07)
+        err = detect.z-target
+        while err > 0:
+            self.robot.move(speed,0.0)
+            rate.sleep()
+            detect = self.rsdDetect.lever()
+            if detect is None:
+                continue
+            print("=== position (x,y,z): ({:.4f},{:.4f},{:.4f})".format(detect.x,detect.y,detect.z))
+            err = detect.z-target
+        self.robot.stop()
         return True
 
 class UnlatchTask:
-    def __init__(self, robot):
+    def __init__(self, robot, yolo_dir):
         self.robot = robot
+        self.ardDetect = ObjectDetection(robot.camARD1,yolo_dir)
 
     def perform(self):
+        print("unlatch door")
+        success = self.align_door_handle()
+        if not success:
+            print("unable to align door handle")
+            return False
+        else:
+            self.touch_door()
+            self.unlatch_door()
+        return True
+
+    def align_door_handle(self, speed=np.pi/4, target=10):
+        detect = self.ardDetect.lever()
+        if detect is None:
+            print("door handle is undetectable")
+            return False
+
+        rate = rospy.Rate(10)
+        err = (detect.l+detect.r)/2 - self.robot.camARD1.width/2
+        print("center u err: {:.4f}".format(err))
+        while abs(err) > target:
+            self.robot.move(0.0,-np.sign(err)*speed)
+            rate.sleep()
+            detect = self.ardDetect.lever()
+            if detect is None:
+                continue
+            err = (detect.l+detect.r)/2 - self.robot.camARD1.width/2
+            print("center u err: {:.4f}".format(err))
+        self.robot.stop()
+
+        err = self.robot.camARD1.height/2-(detect.t+detect.b)/2
+        print("center v err: {:.4f}".format(err))
+        while abs(err) > target:
+            self.robot.set_plug_joints(0.0,0.002*np.sign(err))
+            rate.sleep()
+            detect = self.ardDetect.lever()
+            if detect is None:
+                continue
+            err = self.robot.camARD1.height/2-(detect.t+detect.b)/2
+            print("center v err: {:.4f}".format(err))
+        self.robot.stop()
+        return True
+
+    def touch_door(self, speed=0.5):
         # move closer until touch the door
+        rate = rospy.Rate(10)
         forces= self.robot.plug_forces()
-        while forces[0] > -20:
-            self.robot.move(1.0,0.0)
+        while self.robot.is_safe(max_force=20):
+            self.robot.move(speed,0.0)
             rate.sleep()
             forces= self.robot.plug_forces()
-            print("=== grab forces (x,y,z): ({:.4f},{:.4f},{:.4f})".format(forces[0],forces[1],forces[2]))
+            print("=== forces: ({:.4f},{:.4f},{:.4f})".format(forces[0],forces[1],forces[2]))
         self.robot.stop()
-        while forces[0] < -1:
+        while not self.robot.is_safe(max_force=20):
             self.robot.move(-0.2,0.0)
             rate.sleep()
             forces= self.robot.plug_forces()
-            print("=== grab forces (x,y,z): ({:.4f},{:.4f},{:.4f})".format(forces[0],forces[1],forces[2]))
+            print("=== forces: ({:.4f},{:.4f},{:.4f})".format(forces[0],forces[1],forces[2]))
         self.robot.stop()
+        return True
 
-        # grab the door handle
-        forces= self.robot.plug_forces()
-        while abs(forces[2]+10) < 10: # compensation 14 N in z for gravity
-            joints = self.robot.plug_joints()
-            self.robot.set_plug_joints(joints[0], joints[1]-0.002)
-            forces= self.robot.plug_forces()
-            print("=== grab forces (x,y,z): ({:.4f},{:.4f},{:.4f})".format(forces[0],forces[1],forces[2]))
-        for i in range(3): # press the door handle down
-            joints = self.robot.plug_joints()
-            self.robot.set_plug_joints(joints[0], joints[1]-0.001)
+    def unlatch_door(self, speed=1.0):
+        # push down door handle
+        rate = rospy.Rate(10)
+        while self.robot.is_safe(max_force=10):
+            self.robot.set_plug_joints(0.0,-0.002)
+            rate.sleep()
+        for i in range(10):
+            self.robot.set_plug_joints(0.0,-0.001)
+            rate.sleep()
         # pull door unlatch
-        self.robot.move(-1.0,-0.2*np.pi)
+        self.robot.move(-speed,-0.2*np.pi)
         rospy.sleep(3)
         self.robot.stop()
         self.robot.release_hook()
         # rotate to hold the door
-        rate = rospy.Rate(10)
+        self.robot.move(0,np.pi/2)
         forces = self.robot.hook_forces()
-        step = 0
-        while abs(forces[1]) < 10 and step < 100:
-            self.robot.move(0,0.5*np.pi)
+        while abs(forces[1]) < 5:
             rate.sleep()
             forces = self.robot.hook_forces()
-            print("=== side forces (x,y,z): ({:.4f},{:.4f},{:.4f})".format(forces[0],forces[1],forces[2]))
-            step += 1
+            print("=== side forces: ({:.4f},{:.4f},{:.4f})".format(forces[0],forces[1],forces[2]))
         self.robot.stop()
         # release grab
-        forces = self.robot.hook_forces()
-        if abs(forces[1]) > 5:
-            joint = self.robot.plug_joints()
-            self.robot.set_plug_joints(0.13,joint[1]+0.2)
-            rospy.sleep(2)
-            print("=== door is unlatched.")
-            return True
-        else:
-            print("=== door is not unlatched.")
-            return False
+        self.robot.set_plug_joints(0.13,0.2)
+        return True
 
 class PullingTask:
-    def __init__(self, robot, policy_dir, max=50):
+    def __init__(self, robot, policy_dir):
         self.robot = robot
-        self.model = self.load_model(policy_dir)
-        self.max = max
-        self.openAngle =  0.45*np.pi # 81 degree
+        self.model = fv_actor_network((64,64,1),3,8)
+        self.model.load_weights(os.path.join(policy_dir,'pi_net/best'))
+        self.openAngle = 0.45*np.pi # 81 degree
 
-    def load_model(self, dir):
-        print("load model from", dir)
-        actor_path = os.path.join(dir,"logits_net/best")
-        critic_path = os.path.join(dir, "val_net/best")
-        model = PPO((64,64,1),3,8,pi_lr=3e-4,q_lr=1e-3,clip_ratio=0.2,beta=1e-3,target_kld=0.01)
-        model.load(actor_path, critic_path)
-        return model
+    def policy(self, obs):
+        img = tf.expand_dims(tf.convert_to_tensor(obs['image']), 0)
+        frc = tf.expand_dims(tf.convert_to_tensor(obs['force']), 0)
+        pmf = tfpd.Categorical(logits=self.model([img,frc]))
+        act = tf.squeeze(pmf.sample()).numpy()
+        return act
 
-    def action(self,idx):
+    def get_action(self,idx):
         vx, vz = 1.0, 3.14 # scale of linear and angular velocity
         act_list = [(vx,-vz),(vx,0.0),(vx,vz),(0,-vz),(0,vz),(-vx,-vz),(-vx,0),(-vx,vz)]
         return act_list[idx]
 
-    def perform(self):
+    def perform(self, max_attempts=50):
         image = self.robot.camARD2.grey_arr(resolution=(64,64))
         force = self.robot.hook_forces()
         rate = rospy.Rate(1)
         opened, step = False, 0
-        while not opened and step < self.max:
-            obs = dict(image=image,force=force)
-            idx, _ = self.model.policy(obs)
-            act = self.action(idx)
+        while not opened and step < max_attempts:
+            obs = dict(image=image,force=force/100)
+            act = self.get_action(self.policy(obs))
             self.robot.move(act[0],act[1])
             rate.sleep()
             angle = self.robot.poseSensor.door_angle()
-            print("=== door pulling, angle {:.4f}".format(angle))
-            if angle < 0:
-                break
+            failed = angle == 0
             opened = angle > self.openAngle
+            if failed or opened:
+                break
             image = self.robot.camARD2.grey_arr(resolution=(64,64))
             force = self.robot.hook_forces()
             step += 1
@@ -166,8 +216,8 @@ Door opening task
 class DoorOpeningTask:
     def __init__(self, robot, yolo_dir, policy_dir):
         self.robot = robot
-        self.approach = ApproachTask(robot,yolo_dir)
-        self.unlatch = UnlatchTask(robot)
+        self.approach = ApproachTask(robot, yolo_dir)
+        self.unlatch = UnlatchTask(robot, yolo_dir)
         self.pulling = PullingTask(robot, policy_dir)
 
     def prepare(self):
@@ -204,10 +254,8 @@ if __name__ == "__main__":
     policy_dir = os.path.join(sys.path[0],"policy/pulling/force_vision")
     task = DoorOpeningTask(robot,yolo_dir,policy_dir)
     task.prepare()
-
     nav = BasicNavigator(robot)
     nav.move2goal(create_goal(1.5,0.83,np.pi))
-
     success = task.perform()
     if success: # traverse doorway
         curr = nav.eular_pose(nav.pose)

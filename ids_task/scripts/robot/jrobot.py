@@ -20,7 +20,7 @@ class JazzyRobot:
         self.driver = RobotDriver(speed_scale=1.0)
         self.fdController = MotorController()
         self.camRSD = RSD435(name='camera', compressed=True)
-        self.camARD1 = ArduCam(name='arducam', compressed=True,flipCode=-1) # flip vertically
+        self.camARD1 = ArduCam(name='arducam', compressed=True, flipCode=-1) # flip vertically
         self.ftPlug = LCSensor('loadcell1_forces')
         self.ftHook = LCSensor('loadcell2_forces')
         self.config = RobotConfig()

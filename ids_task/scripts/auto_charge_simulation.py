@@ -15,28 +15,28 @@ class ApproachTask:
         self.robot = robot
         self.rsdDetect = ObjectDetection(robot.camRSD,yolo_dir,scale=1.0,wantDepth=True)
 
-    def perform(self, speed=0.5):
+    def perform(self):
         print("=== approaching wall outlet.")
-        success = self.align_outlet(speed)
+        success = self.align_outlet()
         if not success:
             print("fail to align outlet.")
             return False
-        success = self.approach_outlet(speed)
+        success = self.approach_outlet()
         if not success:
              print("fail to approch outlet.")
              return False
         return True
 #
-    def align_outlet(self, target=0.01):
+    def align_outlet(self, target=0.05):
         detect = self.rsdDetect.outlet()
         if detect is None:
             print("outlet is undetectable.")
             return False
 
         f, dt, kp = 10, 0.1, 0.1
-        err = detect.nx
         t, te, e0 = 1e-6, 0, 0
         rate = rospy.Rate(f)
+        err = detect.nx
         while abs(err) > target:
             vz = kp*(err + te/t + dt*(err-e0))
             self.robot.move(0.0,vz)
@@ -59,7 +59,7 @@ class ApproachTask:
         rate = rospy.Rate(10)
         err = detect.z-target
         while err > 0:
-            self.robot.move(0.5,0.0)
+            self.robot.move(speed,0.0)
             rate.sleep()
             detect = self.rsdDetect.outlet()
             if detect is None:
