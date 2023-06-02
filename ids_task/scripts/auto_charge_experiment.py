@@ -2,6 +2,7 @@
 import rospy
 import sys, os
 import numpy as np
+import pandas as pd
 import tensorflow as tf
 from robot.jrobot import JazzyRobot
 from robot.detection import ObjectDetection
@@ -85,10 +86,10 @@ class AlignTask:
 
     def perform(self):
         print("=== align socket.")
-        # success = self.align_socket(idx=self.socketIdx)
-        # if not success:
-        #     print("fail to align socket.")
-        #     return False
+        success = self.align_socket(idx=self.socketIdx)
+        if not success:
+            print("fail to align socket.")
+            return False
         success = self.adjust_plug(idx=self.socketIdx)
         if not success:
              print("fail to adjust plug.")
@@ -204,18 +205,19 @@ class InsertTask:
         act_list = [(sh,-sv),(sh,0),(sh,sv),(0,-sv),(0,sv),(-sh,-sv),(-sh,0),(-sh,sv)]
         return act_list[idx]
 
-    def perform(self, max_attempts=5):
+    def perform(self, max_attempts=3):
         print("=== insert plug...")
-        connected, retry = self.plug(), 1
-        while not connected and retry < max_attempts:
-            self.adjust_plug(self.socketIdx)
-            connected, retry = self.plug(), retry+1
-        if not connected:
-            return False
-        else:
-            print("connected for charging.")
+        connected = False
+        for i in range(max_attempts):
+            connected, force_profile = self.plug()
+            file = os.path.join(sys.path[0],'../dump',"JFProf_{}.csv".format(i))
+            pd.DataFrame(force_profile).to_csv(file)
+            if connected:
+                break
+        return connected
 
     def plug(self,max=15):
+        self.robot.ftPlug.reset_temp()
         detect = self.adjust_plug(self.socketIdx)
         image = self.robot.camARD1.binary_arr((64,64),detect[self.socketIdx])
         force = self.robot.plug_forces()
@@ -230,7 +232,8 @@ class InsertTask:
             joint += np.sign(act)
             step += 1
         print("connected", connected)
-        return connected
+        profile = self.robot.ftPlug.temp_record()
+        return connected, profile
 
     def adjust_plug(self,idx=0,speed=0.4,target=8):
         self.robot.move(-speed,0.0)
@@ -300,10 +303,10 @@ class JazzyAutoCharge:
         print("== prepare for battery charging.")
 
     def perform(self):
-        # success = self.approach.perform()
-        # if not success:
-        #     print("fail to approach.")
-        #     return False
+        success = self.approach.perform()
+        if not success:
+            print("fail to approach.")
+            return False
         success = self.align.perform()
         if not success:
             print("fail to align.")

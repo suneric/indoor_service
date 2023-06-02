@@ -17,24 +17,26 @@ import torch
 from ids_detection.msg import DetectionInfo
 import warnings
 
-def draw_observation(name, image):
+def display_observation(name, image):
     cv.imshow(name,image)
     cv.waitKey(1) # delay for 1 milliseconds
 
 """
 Draw image with detected bounding boxes
 """
-def display_detection(sensor,detect,idx):
+def draw_detection(image, detect):
+    if image is None:
+        return None
     names = ["door","lever","human","outlet","socket"]
-    img = sensor.color_image()
+    colors = [(255,0,0),(255,255,0),(0,255,0),(0,255,255),(0,0,255)]
     for i in range(len(detect)):
         info = detect[i]
         label = names[int(info.type)]
+        clr = colors[int(info.type)]
         l,t,r,b = int(info.l),int(info.t),int(info.r),int(info.b)
-        clr = (255,0,0) if i==idx else (0,255,0)
-        cv.rectangle(img, (l,t), (r,b), clr, 2)
-        cv.putText(img, label, (l-10,t-10), cv.FONT_HERSHEY_SIMPLEX, 0.5, clr, 1)
-    draw_observation("detection", img)
+        cv.rectangle(image, (l,t), (r,b), clr, 2)
+        cv.putText(image, label, (l-10,t-10), cv.FONT_HERSHEY_SIMPLEX, 0.5, clr, 1)
+    return image
 
 """
 Normal Estimator
@@ -266,7 +268,7 @@ class ObjectDetection:
 
     def socket(self):
         detected = self.detector.detect(type=4,confidence_threshold=0.5)
-        display_detection(self.sensor,detected,0)
+        display_observation("detection", draw_detection(self.sensor.color_image(),detected))
         count = len(detected)
         if count == 0:
             return count, None
@@ -282,12 +284,15 @@ class ObjectDetection:
 
     def outlet(self):
         detected = self.detector.detect(type=3,confidence_threshold=0.5)
+        display_observation("detection", draw_detection(self.sensor.color_image(),detected))
         return detected[-1] if len(detected) > 0 else None
 
     def lever(self):
         detected = self.detector.detect(type=1,confidence_threshold=0.5)
+        display_observation("detection", draw_detection(self.sensor.color_image(),detected))
         return detected[-1] if len(detected) > 0 else None
 
     def door(self):
         detected = self.detector.detect(type=0,confidence_threshold=0.5)
+        display_observation("detection", draw_detection(self.sensor.color_image(),detected))
         return detected[-1] if len(detected) > 0 else None

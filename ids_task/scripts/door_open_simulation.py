@@ -5,7 +5,7 @@ import numpy as np
 from policy.ppo import PPO
 from robot.mrobot import MRobot
 from robot.detection import ObjectDetection
-from localization import *
+from navigation import *
 
 class ApproachTask:
     def __init__(self, robot, yolo_dir):

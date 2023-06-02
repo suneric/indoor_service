@@ -8,7 +8,7 @@ from robot.mrobot import MRobot
 from robot.detection import ObjectDetection
 from robot.sensors import BumpSensor
 from agent.model import jfv_actor_network
-from localization import *
+from navigation import *
 
 class ApproachTask:
     def __init__(self, robot, yolo_dir):
@@ -190,7 +190,7 @@ class InsertTask:
         connected = False
         for i in range(max_attempts):
             connected, force_profile = self.plug()
-            file = os.path.join(sys.path[0],'../dump',"force_profice_{}.csv".format(i))
+            file = os.path.join(sys.path[0],'../dump',"MFProf_{}.csv".format(i))
             pd.DataFrame(force_profile).to_csv(file)
             if connected:
                 break
