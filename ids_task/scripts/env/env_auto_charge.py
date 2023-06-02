@@ -9,7 +9,7 @@ from gym.spaces import Box, Discrete
 from gym.envs.registration import register
 from .gym_gazebo import GymGazeboEnv
 from robot.mrobot import MRobot
-from robot.detection import ObjectDetection, draw_observation
+from robot.detection import ObjectDetection
 
 VSLIDER_BASE_H = 0.2725 # height to the floor of center of the plug
 PIN_OFFSET_Y = 0.0214 # the length of circular pin
