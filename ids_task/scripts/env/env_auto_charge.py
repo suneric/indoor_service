@@ -95,7 +95,7 @@ class AutoChargeEnv(GymGazeboEnv):
         elif self.fail:
             reward = -100
         else: # dist change (in mm) - step penalty
-            reward = 1000*(self.prev_dist-self.curr_dist) - 0.7
+            reward = 100*(self.prev_dist-self.curr_dist)/0.01 - 1
             self.prev_dist = self.curr_dist
         return reward
 
