@@ -74,7 +74,7 @@ class AutoChargeEnv(GymGazeboEnv):
     def _set_init(self):
         idx = np.random.randint(len(GOALLIST)) if self.initGoalIdx is None else self.initGoalIdx
         self.reset_robot(idx)
-        detect = self.initial_touch(speed=0.5,idx=idx%2) # 0 for upper, 1 for lower
+        detect = self.initial_touch(idx%2) # 0 for upper, 1 for lower
         self.obs_image = self.robot.camARD1.binary_arr((64,64),detect)
         self.obs_force = self.robot.plug_forces()
         self.obs_joint = [0,0]
@@ -82,38 +82,34 @@ class AutoChargeEnv(GymGazeboEnv):
     def _take_action(self, action):
         act = self.get_action(action)
         self.robot.set_plug_joints(act[0],act[1])
-        self.obs_force = self.plug()
+        self.robot.lock_joints(v=True,h=True,s=True,p=True)
+        self.robot.move(0.5,0.0) # move forward for insertion
+        rate = rospy.Rate(10)
+        while not self.success_or_fail() and self.robot.is_safe(max_force=20):
+            rate.sleep()
+        self.robot.stop()
+        _, self.curr_dist = self.dist2goal()
+        self.obs_force = self.robot.plug_forces()
         self.obs_joint += np.sign(act)
+        self.robot.move(-0.5,0.0) # back for reduce force
+        while not self.robot.is_safe(max_force=20):
+            rate.sleep()
+        self.robot.stop()
+        self.robot.lock_joints(v=False,h=False,s=True,p=True)
 
     def _is_done(self):
         return self.success or self.fail
 
     def _compute_reward(self):
-        reward = 0
+        reward = -1
         if self.success:
             reward = 100
         elif self.fail:
             reward = -100
         else: # dist change (in mm) - step penalty
-            reward = 100*(self.prev_dist-self.curr_dist)/0.01 - 1
+            reward += 100*(self.prev_dist-self.curr_dist)/0.01
             self.prev_dist = self.curr_dist
         return reward
-
-    def plug(self, speed=0.3, f_max=20):
-        self.robot.lock_joints(v=True,h=True,s=True,p=True)
-        self.robot.move(speed,0.0) # move forward for insertion
-        rate = rospy.Rate(10)
-        while not self.success_or_fail() and self.robot.is_safe(max_force=f_max):
-            rate.sleep()
-        self.robot.stop()
-        _, self.curr_dist = self.dist2goal()
-        forces = self.robot.plug_forces()
-        self.robot.move(-speed,0.0) # back for reduce force
-        while not self.robot.is_safe(max_force=f_max):
-            rate.sleep()
-        self.robot.stop()
-        self.robot.lock_joints(v=False,h=False,s=True,p=True)
-        return forces
 
     def dist2goal(self):
         """
@@ -160,13 +156,13 @@ class AutoChargeEnv(GymGazeboEnv):
         self.robot.reset_joints(vpos=rh,hpos=0,spos=1.57,ppos=0.03)
         self.robot.reset_ft_sensors()
 
-    def initial_touch(self,speed=0.5,idx=0):
+    def initial_touch(self,idx=0):
         self.robot.lock_joints(v=True,h=True,s=True,p=True)
-        self.robot.move(speed,0.0) # move forward to touch the wall
+        self.robot.move(0.5,0.0) # move forward to touch the wall
         rate = rospy.Rate(10)
         while not self.success_or_fail() and self.robot.is_safe(max_force=15):
             rate.sleep()
-        self.robot.move(-speed,0.0) # move back until socket is detected
+        self.robot.move(-0.5,0.0) # move back until socket is detected
         count, detect = self.ardDetect.socket()
         while count < 2-idx:
             rate.sleep()

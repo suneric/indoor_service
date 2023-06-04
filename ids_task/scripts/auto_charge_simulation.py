@@ -170,7 +170,7 @@ class InsertTask:
         self.robot = robot
         self.ardDetect = ObjectDetection(robot.camARD1,yolo_dir,scale=1.0,wantDepth=False)
         self.model = jfv_actor_network((64,64,1),3,2,8)
-        self.model.load_weights(os.path.join(policy_dir,'q_net/250'))
+        self.model.load_weights(os.path.join(policy_dir,'q_net/best'))
         self.socketIdx = socketIdx
         self.bumper = BumpSensor()
 

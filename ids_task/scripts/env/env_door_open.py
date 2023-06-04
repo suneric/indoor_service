@@ -43,10 +43,7 @@ class DoorOpenEnv(GymGazeboEnv):
         self.robot.check_ready()
 
     def _get_observation(self):
-        # cv.imshow('observation', self.obs_image)
-        # cv.waitKey(1)
-        obs = dict(image = self.obs_image, force = self.obs_force)
-        return obs
+        return dict(image=self.obs_image, force=self.obs_force)
 
     def _post_information(self):
         return dict(
@@ -61,7 +58,7 @@ class DoorOpenEnv(GymGazeboEnv):
         self.prev_angle = self.poseSensor.door_angle()
         self.curr_angle = self.poseSensor.door_angle()
         self.obs_image = self.robot.camARD2.grey_arr((64,64))
-        self.obs_force = 0.01*self.robot.hook_forces()
+        self.obs_force = self.robot.hook_forces()
 
     def _take_action(self, action):
         self.robot.ftHook.reset_temp()
@@ -69,23 +66,22 @@ class DoorOpenEnv(GymGazeboEnv):
         self.robot.move(act[0],act[1])
         rospy.sleep(1)
         self.curr_angle = self.poseSensor.door_angle()
-        self.obs_image = self.robot.camARD2.grey_arr((64,64))
-        self.obs_force = 0.01*self.robot.hook_forces()
         self.success = self.curr_angle > 0.45*np.pi # 81 degree
         self.fail = self.is_failed()
+        self.obs_image = self.robot.camARD2.grey_arr((64,64))
+        self.obs_force = self.robot.hook_forces()
 
     def _is_done(self):
         return self.success or self.fail
 
     def _compute_reward(self):
-        reward = 0
+        reward = -1 # step penalty
         if self.success:
             reward = 100
         elif self.fail:
             reward = -100
         else:
-            # angle change - step penalty
-            reward = 100*(self.curr_angle-self.prev_angle)/(np.pi/2) - 1
+            reward += 100*(self.curr_angle-self.prev_angle)/(np.pi/2)
             self.prev_angle = self.curr_angle
         return reward
 
