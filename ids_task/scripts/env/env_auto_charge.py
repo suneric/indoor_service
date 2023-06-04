@@ -76,13 +76,13 @@ class AutoChargeEnv(GymGazeboEnv):
         self.reset_robot(idx)
         detect = self.initial_touch(speed=0.5,idx=idx%2) # 0 for upper, 1 for lower
         self.obs_image = self.robot.camARD1.binary_arr((64,64),detect)
-        self.obs_force = 0.01*self.robot.plug_forces()
+        self.obs_force = self.robot.plug_forces()
         self.obs_joint = [0,0]
 
     def _take_action(self, action):
         act = self.get_action(action)
         self.robot.set_plug_joints(act[0],act[1])
-        self.obs_force = 0.01*self.plug()
+        self.obs_force = self.plug()
         self.obs_joint += np.sign(act)
 
     def _is_done(self):
