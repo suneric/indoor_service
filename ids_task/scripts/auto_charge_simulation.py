@@ -170,7 +170,7 @@ class InsertTask:
         self.robot = robot
         self.ardDetect = ObjectDetection(robot.camARD1,yolo_dir,scale=1.0,wantDepth=False)
         self.model = jfv_actor_network((64,64,1),3,2,8)
-        self.model.load_weights(os.path.join(policy_dir,'q_net/best'))
+        self.model.load_weights(os.path.join(policy_dir,'q_net/2000'))
         self.socketIdx = socketIdx
         self.bumper = BumpSensor()
 
@@ -204,7 +204,7 @@ class InsertTask:
         joint = [0,0]
         connected, step = False, 0
         while not connected and step < max:
-            obs = dict(image=image, force=force/100, joint=joint)
+            obs = dict(image=image, force=force, joint=joint)
             act = self.get_action(self.policy(obs))
             self.robot.set_plug_joints(act[0],act[1])
             connected,force = self.insert_plug()

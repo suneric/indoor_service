@@ -86,10 +86,10 @@ class AlignTask:
 
     def perform(self):
         print("=== align socket.")
-        success = self.align_socket(idx=self.socketIdx)
-        if not success:
-            print("fail to align socket.")
-            return False
+        # success = self.align_socket(idx=self.socketIdx)
+        # if not success:
+        #     print("fail to align socket.")
+        #     return False
         success = self.adjust_plug(idx=self.socketIdx)
         if not success:
              print("fail to adjust plug.")
@@ -132,7 +132,7 @@ class AlignTask:
         self.robot.stop()
         return True
 
-    def adjust_plug(self,idx=0,speed=0.4,target=8):
+    def adjust_plug(self,idx=0,speed=0.45,target=5):
         count, detect = self.ardDetect.socket()
         self.robot.move(speed,0.0)
         rate = rospy.Rate(10)
@@ -169,7 +169,7 @@ class AlignTask:
             print("center u err: {:.4f}".format(err))
         return True
 
-    def initial_touch(self,idx=0,speed=0.5):
+    def initial_touch(self,idx=0,speed=0.45):
         rate = rospy.Rate(10)
         while self.robot.is_safe(max_force=20):
             self.robot.move(speed,0.0)
@@ -191,7 +191,7 @@ class InsertTask:
         self.robot = robot
         self.ardDetect = ObjectDetection(robot.camARD1,yolo_dir,scale=1.0,wantDepth=False)
         self.model = jfv_actor_network((64,64,1),3,2,8)
-        self.model.load_weights(os.path.join(policy_dir,'q_net/best'))
+        self.model.load_weights(os.path.join(policy_dir,'q_net/2000'))
         self.socketIdx = socketIdx
 
     def policy(self,obs):
@@ -201,7 +201,7 @@ class InsertTask:
         return np.argmax(self.model([image, force, joint]))
 
     def get_action(self,idx):
-        sh,sv = 1, 4 # 1 mm, scale for horizontal and vertical move
+        sh,sv = 1, 2 # 1 mm, scale for horizontal and vertical move
         act_list = [(sh,-sv),(sh,0),(sh,sv),(0,-sv),(0,sv),(-sh,-sv),(-sh,0),(-sh,sv)]
         return act_list[idx]
 
@@ -224,7 +224,7 @@ class InsertTask:
         joint = [0,0]
         connected, step = False, 0
         while not connected and step < max:
-            obs = dict(image=image, force=force/100, joint=joint)
+            obs = dict(image=image, force=force, joint=joint)
             act = self.get_action(self.policy(obs))
             #act = self.get_action(np.random.randint(8))
             self.robot.set_plug_joints(act[0],act[1])
@@ -235,7 +235,7 @@ class InsertTask:
         profile = self.robot.ftPlug.temp_record()
         return connected, profile
 
-    def adjust_plug(self,idx=0,speed=0.4,target=8):
+    def adjust_plug(self,idx=0,speed=0.45,target=5):
         self.robot.move(-speed,0.0)
         count, detect = self.ardDetect.socket()
         rate = rospy.Rate(10)
@@ -270,7 +270,7 @@ class InsertTask:
             print("center u err: {:.4f}".format(err))
         return detect
 
-    def insert_plug(self,speed=0.4,f_max=15):
+    def insert_plug(self,speed=0.45,f_max=15):
         self.robot.move(speed,0.0)
         rate = rospy.Rate(10)
         inserted = False
@@ -303,10 +303,10 @@ class JazzyAutoCharge:
         print("== prepare for battery charging.")
 
     def perform(self):
-        success = self.approach.perform()
-        if not success:
-            print("fail to approach.")
-            return False
+        # success = self.approach.perform()
+        # if not success:
+        #     print("fail to approach.")
+        #     return False
         success = self.align.perform()
         if not success:
             print("fail to align.")

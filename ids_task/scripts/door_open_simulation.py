@@ -190,7 +190,7 @@ class PullingTask:
         rate = rospy.Rate(1)
         opened, step = False, 0
         while not opened and step < max_attempts:
-            obs = dict(image=image,force=force/100)
+            obs = dict(image=image,force=force)
             act = self.get_action(self.policy(obs))
             self.robot.move(act[0],act[1])
             rate.sleep()
