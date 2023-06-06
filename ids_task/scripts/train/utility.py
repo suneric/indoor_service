@@ -27,14 +27,14 @@ def get_args():
     parser.add_argument('--warmup_ep', type=int, default=5)
     return parser.parse_args()
 
-def plot_episodic_returns(name,ep_returns,weight=0.99):
+def plot_episodic_returns(name,ep_returns,dir,weight=0.99):
     plt.title(name)
     plt.plot(ep_returns, 'k--', linewidth=1)
     plt.plot(smoothExponential(ep_returns,weight), 'g-', linewidth=2)
     plt.xlabel('Episode')
     plt.ylabel('Return')
     plt.legend(['Return','Smoothed Return'])
-    plt.show()
+    plt.savefig(os.path.join(dir,"{}.png".format(name)))
 
 def smoothExponential(data, weight):
     last = data[0]

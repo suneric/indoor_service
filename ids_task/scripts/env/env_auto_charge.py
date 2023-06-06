@@ -82,16 +82,17 @@ class AutoChargeEnv(GymGazeboEnv):
     def _take_action(self, action):
         act = self.get_action(action)
         self.robot.set_plug_joints(act[0],act[1])
+        self.obs_joint += np.sign(act)
         self.robot.lock_joints(v=True,h=True,s=True,p=True)
         self.robot.move(0.5,0.0) # move forward for insertion
-        rate = rospy.Rate(10)
+        rate = rospy.Rate(30)
         while not self.success_or_fail() and self.robot.is_safe(max_force=20):
             rate.sleep()
+        self.obs_force = self.robot.plug_forces()
         self.robot.stop()
         _, self.curr_dist = self.dist2goal()
-        self.obs_force = self.robot.plug_forces()
-        self.obs_joint += np.sign(act)
-        self.robot.move(-0.5,0.0) # back for reduce force
+        # back for reduce force
+        self.robot.move(-0.5,0.0)
         while not self.robot.is_safe(max_force=20):
             rate.sleep()
         self.robot.stop()
@@ -101,13 +102,13 @@ class AutoChargeEnv(GymGazeboEnv):
         return self.success or self.fail
 
     def _compute_reward(self):
-        reward = -1
+        reward = -0.3 # step penalty
         if self.success:
             reward = 100
         elif self.fail:
             reward = -100
         else:
-            reward += 100*(self.prev_dist-self.curr_dist)/0.01
+            reward += 1000*(self.prev_dist-self.curr_dist)
             self.prev_dist = self.curr_dist
         return reward
 
@@ -158,11 +159,18 @@ class AutoChargeEnv(GymGazeboEnv):
 
     def initial_touch(self,idx=0):
         self.robot.lock_joints(v=True,h=True,s=True,p=True)
-        self.robot.move(1.0,0.0) # move forward to touch the wall
-        rate = rospy.Rate(10)
-        while not self.success_or_fail() and self.robot.is_safe(max_force=15):
+        # move forward to touch the wall
+        self.robot.move(1.0,0.0)
+        rate = rospy.Rate(30)
+        while not self.success_or_fail() and self.robot.is_safe(max_force=20):
             rate.sleep()
-        self.robot.move(-0.5,0.0) # move back until socket is detected
+        # move back until socket is detected
+        self.robot.move(-0.5,0.0)
+        count, detect = self.ardDetect.socket()
+        while count < 2-idx:
+            rate.sleep()
+            count, detect = self.ardDetect.socket()
+        # add uncerntainty
         rospy.sleep(np.random.randint(0,10)/10)
         self.robot.stop()
         count, detect = self.ardDetect.socket()
@@ -170,7 +178,6 @@ class AutoChargeEnv(GymGazeboEnv):
             detect = [None]
             self.fail = True
         print("Initially detected {} sockets".format(count))
-        self.robot.stop()
         self.robot.lock_joints(v=False,h=False,s=True,p=True)
         _, self.prev_dist = self.dist2goal()
         self.curr_dist = self.prev_dist

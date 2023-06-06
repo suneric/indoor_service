@@ -340,7 +340,7 @@ class FTSensor():
         force = data.wrench.force
         x = self.kfx.update(force.x)
         y = self.kfy.update(force.y)
-        z = self.kfz.update(force.z)+9.8
+        z = self.kfz.update(force.z)+10.5
         self.filtered = [x,y,z]
         self.record.append(self.filtered)
         self.record_temp.append(self.filtered)

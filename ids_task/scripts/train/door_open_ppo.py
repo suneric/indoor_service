@@ -17,8 +17,6 @@ def ppo_train(env, num_episodes, train_freq, max_steps, model_dir):
     force_dim = env.observation_space[1]
     action_dim = env.action_space.n
     print("create door open environment for ppo", image_shape, force_dim, action_dim)
-
-    model_dir = os.path.join(model_dir, "ppo", datetime.now().strftime("%Y-%m-%d-%H-%M"))
     summaryWriter = tf.summary.create_file_writer(model_dir)
 
     buffer_capacity = train_freq+max_steps
@@ -64,8 +62,6 @@ def rppo_train(env, num_episodes, train_freq, seq_len, max_steps, model_dir):
     force_dim = env.observation_space[1]
     action_dim = env.action_space.n
     print("create door open environment for recurrent ppo", image_shape, force_dim, action_dim)
-
-    model_dir = os.path.join(model_dir, "rppo", datetime.now().strftime("%Y-%m-%d-%H-%M"))
     summaryWriter = tf.summary.create_file_writer(model_dir)
 
     buffer_capacity = train_freq+max_steps
@@ -116,14 +112,16 @@ def rppo_train(env, num_episodes, train_freq, seq_len, max_steps, model_dir):
 if __name__=="__main__":
     args = get_args()
     rospy.init_node('ppo_train', anonymous=True)
-    model_dir = os.path.join(sys.path[0],"../../saved_models/door_open")
+    model_dir = os.path.join(sys.path[0],"../../saved_models/door_open",datetime.now().strftime("%Y-%m-%d-%H-%M"))
     env = DoorOpenEnv(continuous=False)
     ep_returns, name = None, None
     if args.policy == 'ppo':
-        name = "ppo train"
+        model_dir = os.path.join(model_dir,"ppo",datetime.now().strftime("%Y-%m-%d-%H-%M"))
+        name = "ppo_train"
         ep_returns = ppo_train(env, args.max_ep, args.train_freq, args.max_step, model_dir)
     elif args.policy == 'rppo':
-        name = "recurrent ppo train"
+        model_dir = os.path.join(model_dir,"rppo",datetime.now().strftime("%Y-%m-%d-%H-%M"))
+        name = "recurrent_ppo_train"
         ep_returns = rppo_train(env, args.max_ep, args.train_freq, args.seq_len, args.max_step, model_dir)
     env.close()
-    plot_episodic_returns(name,ep_returns)
+    plot_episodic_returns(name,ep_returns,model_dir)

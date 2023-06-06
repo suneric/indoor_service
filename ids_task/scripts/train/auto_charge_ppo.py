@@ -18,8 +18,6 @@ def ppo_train(env, num_episodes, train_freq, max_steps, model_dir):
     joint_dim = env.observation_space[2]
     action_dim = env.action_space.n
     print("create socket pluging environment for PPO.", image_shape, force_dim, action_dim)
-
-    model_dir = os.path.join(model_dir, "ppo", datetime.now().strftime("%Y-%m-%d-%H-%M"))
     summaryWriter = tf.summary.create_file_writer(model_dir)
 
     buffer_capacity = train_freq+max_steps
@@ -64,8 +62,8 @@ if __name__=="__main__":
     args = get_args()
     rospy.init_node('ppo_train', anonymous=True)
     yolo_dir = os.path.join(sys.path[0],'../policy/detection/yolo')
-    model_dir = os.path.join(sys.path[0],"../../saved_models/auto_charge")
+    model_dir = os.path.join(sys.path[0],"../../saved_models/auto_charge/ppo",datetime.now().strftime("%Y-%m-%d-%H-%M"))
     env = AutoChargeEnv(continuous=False, yolo_dir=yolo_dir, vision_type='binary')
     ep_returns = ppo_train(env, args.max_ep, args.train_freq, args.max_step, model_dir)
     env.close()
-    plot_episodic_returns("ppo train",ep_returns)
+    plot_episodic_returns("ppo train",ep_returns,model_dir)
