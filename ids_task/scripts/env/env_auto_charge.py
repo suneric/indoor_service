@@ -106,7 +106,7 @@ class AutoChargeEnv(GymGazeboEnv):
             reward = 100
         elif self.fail:
             reward = -100
-        else: # dist change (in mm) - step penalty
+        else:
             reward += 100*(self.prev_dist-self.curr_dist)/0.01
             self.prev_dist = self.curr_dist
         return reward
@@ -149,7 +149,7 @@ class AutoChargeEnv(GymGazeboEnv):
         rt = np.pi/2
         rad = np.random.uniform(size=4) if self.initRandom is None else self.initRandom
         rx += 0.01*(rad[0]-0.5) # 1cm
-        ry += 0.02*(rad[1]-0.5) # 1cm
+        ry += 0.01*(rad[1]-0.5) # 1cm
         rh += 0.01*(rad[2]-0.5) # 1cm
         rt += 0.02*(rad[3]-0.5) # 1.146 deg, 0.02 rad
         self.robot.reset_robot(rx,ry,rt)
@@ -158,20 +158,17 @@ class AutoChargeEnv(GymGazeboEnv):
 
     def initial_touch(self,idx=0):
         self.robot.lock_joints(v=True,h=True,s=True,p=True)
-        self.robot.move(0.5,0.0) # move forward to touch the wall
+        self.robot.move(1.0,0.0) # move forward to touch the wall
         rate = rospy.Rate(10)
         while not self.success_or_fail() and self.robot.is_safe(max_force=15):
             rate.sleep()
         self.robot.move(-0.5,0.0) # move back until socket is detected
+        rospy.sleep(np.random.randint(0,10)/10)
+        self.robot.stop()
         count, detect = self.ardDetect.socket()
-        while count < 2-idx:
-            rate.sleep()
-            count, detect = self.ardDetect.socket()
-            dist, _ = self.dist2goal()
-            if abs(dist) > self.initOffset:
-                detect = [None]
-                self.fail = True
-                break
+        if count < 2-idx:
+            detect = [None]
+            self.fail = True
         print("Initially detected {} sockets".format(count))
         self.robot.stop()
         self.robot.lock_joints(v=False,h=False,s=True,p=True)
