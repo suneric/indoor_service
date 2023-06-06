@@ -11,11 +11,11 @@ class Sampling(layers.Layer):
     sample = sigma*x + mean, where x belongs to normal distribution N(0,1)
     """
     def call(self, inputs):
-        mean, log_var = inputs
+        mean, logv = inputs
         batch = tf.shape(mean)[0]
         dim = tf.shape(mean)[1]
         epsilon = tf.random.normal(shape=(batch,dim)) # noise
-        return mean + tf.exp(0.5*log_var) * epsilon
+        return mean + tf.exp(0.5*logv) * epsilon
 
 class DistLayer(layers.Layer):
     def call(self, inputs):
@@ -41,11 +41,11 @@ def fv_encoder(image_shape, force_dim, latent_dim):
 
     h = layers.concatenate([v_output, f_output])
     h = layers.Dense(32,activation='relu')(h)
-    mu = layers.Dense(latent_dim, name='z_mean')(h)
-    log_var = layers.Dense(latent_dim,name='z_log_var')(h)
-    z = Sampling()([mu,log_var])
-    model = keras.Model(inputs=[v_input,f_input],outputs=[mu,log_var,z],name='encoder')
-    print(model.summary())
+    mean = layers.Dense(latent_dim, name='z_mean')(h)
+    logv = layers.Dense(latent_dim,name='z_log_var')(h)
+    z = Sampling()([mean,logv])
+    model = keras.Model(inputs=[v_input,f_input],outputs=[mean,logv,z],name='encoder')
+    #print(model.summary())
     return model
 
 """
@@ -68,59 +68,58 @@ def fv_decoder(latent_dim):
     f_output = layers.Dense(3, activation='tanh')(fh)
 
     model = keras.Model(inputs=z_input,outputs=[v_output,f_output],name='decoder')
-    print(model.summary())
+    #print(model.summary())
     return model
 
 """
 z dynamics model z_t | z_{t-1}, a_{t-1}
 output z1 distribution mean and log variance
 """
-def latent_dynamics_network(latent_dim,action_dim):
+def latent_dynamics_network(latent_dim,action_dim,act='elu'):
     z_input = keras.Input(shape=(latent_dim,))
     a_input = keras.Input(shape=(action_dim,))
     concat = layers.concatenate([z_input,a_input])
-    h = layers.Dense(32,activation='relu')(concat)
-    h = layers.Dense(32,activation='relu')(h)
-    mean = layers.Dense(latent_dim, name='z1_mu')(h)
+    h = layers.Dense(64,activation=act,kernel_initializer='random_normal')(concat)
+    h = layers.Dense(64,activation=act,kernel_initializer='random_normal')(h)
+    mean = layers.Dense(latent_dim,name='z1_mu')(h)
     logv = layers.Dense(latent_dim,name='z1_log_var')(h)
     z1 = Sampling()([mean,logv])
     model = keras.Model(inputs=[z_input,a_input],outputs=[mean,logv,z1],name='latent_forward_dynamics')
-    print(model.summary())
+    #print(model.summary())
     return model
-
 
 """
 z actor network
 """
-def latent_actor_network(latent_dim, output_dim):
+def latent_actor_network(latent_dim, output_dim,act='elu'):
     z_input = keras.Input(shape=(latent_dim,))
-    h = layers.Dense(32, activation='relu')(z_input)
-    h = layers.Dense(32, activation='relu')(h)
-    output = layers.Dense(output_dim, activation='linear')(h)
+    h = layers.Dense(32, activation=act)(z_input)
+    h = layers.Dense(32, activation=act)(h)
+    output = layers.Dense(output_dim)(h)
     model = keras.Model(inputs=z_input,outputs=output)
-    print(model.summary())
+    #print(model.summary())
     return model
 
 """
 z critic network
 """
-def latent_critic_network(latent_dim):
+def latent_critic_network(latent_dim,act='elu'):
     z_input = keras.Input(shape=(latent_dim,))
-    h = layers.Dense(32, activation='relu')(z_input)
-    h = layers.Dense(32, activation='relu')(h)
-    output = layers.Dense(1,activation='linear')(h)
+    h = layers.Dense(32, activation=act)(z_input)
+    h = layers.Dense(32, activation=act)(h)
+    output = layers.Dense(1)(h)
     model = keras.Model(inputs=z_input,outputs=output)
-    print(model.summary())
+    #print(model.summary())
     return model
 
 """
 latent reward
 """
-def latent_reward_network(latent_dim):
+def latent_reward_network(latent_dim,act='elu'):
     z_input = keras.Input(shape=(latent_dim,))
-    h = layers.Dense(32, activation='relu')(z_input)
-    h = layers.Dense(32, activation='relu')(h)
-    output = layers.Dense(1,activation='linear')(h)
+    h = layers.Dense(32, activation=act)(z_input)
+    h = layers.Dense(32, activation=act)(h)
+    output = layers.Dense(1)(h)
     model = keras.Model(inputs=z_input,outputs=output,name='latent_reward')
-    print(model.summary())
+    #print(model.summary())
     return model

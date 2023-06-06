@@ -30,8 +30,12 @@ class Visualizer:
             rate = rospy.Rate(2)
             while not rospy.is_shutdown():
                 fig.suptitle("Sensor Information {:.2f} s".format(time.time()-start))
-                a0.imshow(self.cam0.color_image((200,200),code='rgb'))
-                a1.imshow(self.cam1.color_image((200,200),code='rgb'))
+                img0 = self.cam0.color_image((200,200),code='rgb')
+                if img0 is not None:
+                    a0.imshow(img0)
+                img1 = self.cam1.color_image((200,200),code='rgb')
+                if img1 is not None:
+                    a1.imshow(img1)
                 profile = self.loadcell.profile(size=1000).clip(-30,30)
                 lineX.set_ydata(profile[:,0])
                 lineY.set_ydata(profile[:,1])

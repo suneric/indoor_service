@@ -391,10 +391,10 @@ class LCSensor:
 
     def _force_cb(self,data):
         self.filtered = data.data # raw LC_x,LC_y,LC_z
-        if self.topic == 'loadcell1_forces': # for plug, x=LC_z, y=LC_y, z=-LC_x
-            self.filtered = [self.filtered[2],self.filtered[1],-self.filtered[0]]
+        if self.topic == 'loadcell1_forces': # for plug, x=-LC_z, y=LC_y, z=LC_x
+            self.filtered = np.array([-self.filtered[2],self.filtered[1],self.filtered[0]])
         elif self.topic == 'loadcell2_forces': # for sidebar, x=LC_z, y=-LC_y, z=LC_x
-            self.filtered = [self.filtered[2],-self.filtered[1],self.filtered[0]]
+            self.filtered = np.array([self.filtered[2],-self.filtered[1],self.filtered[0]])
         self.record.append(self.filtered)
         self.record_temp.append(self.filtered)
 
@@ -416,10 +416,10 @@ class LCSensor:
         self.record_temp = []
 
     def temp_record(self):
-        return self.record_temp
+        return np.array(self.record_temp)
 
     def forces_record(self):
-        return self.record
+        return np.array(self.record)
 
     def check_sensor_ready(self):
         rospy.logdebug("Waiting for loadcell to be READY...")

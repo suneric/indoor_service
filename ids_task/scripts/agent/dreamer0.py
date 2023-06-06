@@ -4,7 +4,7 @@ import numpy as np
 from tensorflow import keras
 from tensorflow_probability import distributions as tfpd
 import matplotlib.pyplot as plt
-from .model import *
+from .network import *
 
 class ReplayBuffer:
     def __init__(self,capacity,image_shape,force_dim,gamma=0.99,lamda=0.95):
@@ -27,8 +27,10 @@ class ReplayBuffer:
         self.ptr = (self.ptr+1)%self.capacity
         self.size = min(self.size+1, self.capacity)
 
-    def sample(self, batch_size=64):
-        s = np.random.choice(self.size, batch_size)
+    def sample(self, batch_size=None):
+        s = slice(0,self.size)
+        if batch_size is not None:
+            s = np.random.choice(self.size, batch_size)
         data = (
             tf.convert_to_tensor(self.image_buf[s]),
             tf.convert_to_tensor(self.force_buf[s]),
@@ -38,6 +40,7 @@ class ReplayBuffer:
             tf.convert_to_tensor(self.rew_buf[s]),
         )
         return data
+
 
 """
 Observation(vision+force) VAE
@@ -59,16 +62,17 @@ class ObservationVAE(keras.Model):
         self.decoder = fv_decoder(latent_dim)
         self.compile(optimizer=keras.optimizers.Adam(lr))
 
+    @tf.function
     def train_step(self,data):
         x,y = data
         images,forces = x
         with tf.GradientTape() as tape:
-            mu, log_var, z = self.encoder([images,forces])
-            r_images, r_forces = self.decoder(z)
+            mu,logv,z = self.encoder([images,forces])
+            r_images,r_forces = self.decoder(z) # reconstruction
             image_loss = tf.reduce_sum(keras.losses.MSE(images,r_images), axis=(1,2))
             force_loss = keras.losses.MSE(forces,r_forces)
             rc_loss = tf.reduce_mean(image_loss+force_loss)
-            kl_loss = 0.5*(tf.square(mu) + tf.exp(log_var) - log_var - 1)
+            kl_loss = 0.5*(tf.square(mu) + tf.exp(logv) - logv - 1)
             kl_loss = tf.reduce_mean(tf.reduce_sum(kl_loss, axis=1))
             total_loss = rc_loss + kl_loss
         grads = tape.gradient(total_loss, self.trainable_variables)
@@ -93,13 +97,14 @@ class LatentDynamics(keras.Model):
         self.transit = latent_dynamics_network(latent_dim, action_dim)
         self.compile(optimizer=keras.optimizers.Adam(lr))
 
+    @tf.function
     def train_step(self,data):
         x,y = data
         z,a = x
-        mu2,log_var2,z1_true = y # Q(z_t|x_t)
+        z1_mean,z1_logv,z1 = y # posterior distribution Q(z_t|x_t)
         with tf.GradientTape() as tape:
-            mu1,log_var1,z1_pred = self.transit([z,a]) # P(z_t|z_{t-1},a_{]t-1})
-            kl_loss = self.compute_kl((mu1,log_var1),(mu2,log_var2)) #+ (1-self.alpha)*self.compute_kl((mu2,log_var2),(mu1,log_var1))
+            z1_mean_prior,z1_logv_prior,z1_prior = self.transit([z,a]) # Prior distribution P(z_t|z_{t-1},a_{]t-1})
+            kl_loss = self.compute_kl((z1_mean,z1_logv),(z1_mean_prior,z1_logv_prior))
             kl_loss = tf.reduce_mean(tf.reduce_sum(kl_loss, axis=1))
         grads = tape.gradient(kl_loss, self.trainable_variables)
         self.optimizer.apply_gradients(zip(grads,self.trainable_variables))
@@ -111,11 +116,16 @@ class LatentDynamics(keras.Model):
         z1_mu,z1_log_var,z1 = self.transit([z,a])
         return tf.squeeze(z1).numpy()
 
-    def compute_kl(self,posterior,prior):
-        mu1,log_var1 = posterior
-        mu2,log_var2 = prior
-        return 0.5*(log_var2-log_var1)+(tf.exp(log_var1)+tf.square(mu1-mu2))/(2*tf.exp(log_var2))-0.5
-
+    def compute_kl(self,p,q):
+        """
+        KL distance of distribution P from Q, measure how P is different from Q
+        """
+        dist1 = tfpd.Normal(loc=p[0],scale=tf.sqrt(tf.exp(p[1])))
+        dist2 = tfpd.Normal(loc=q[0],scale=tf.sqrt(tf.exp(q[1])))
+        return tfpd.kl_divergence(dist1,dist2)
+        # mu_p,logv_p = p
+        # mu_q,logv_q = q
+        # return 0.5*(logv_q-logv_p)+(tf.exp(logv_p)+tf.square(mu_p-mu_q))/(2*tf.exp(logv_q))-0.5
 
 """
 Reward Model (r_t|z_t)
@@ -126,12 +136,12 @@ class RewardModel(keras.Model):
         self.reward = latent_reward_network(latent_dim)
         self.compile(optimizer=keras.optimizers.Adam(lr))
 
+    @tf.function
     def train_step(self,data):
         z,r = data
         with tf.GradientTape() as tape:
             logits = self.reward(z)
-            dist = tfpd.Normal(loc=logits,scale=1.0)
-            loss = -tf.reduce_mean(dist.log_prob(r))
+            loss = -tf.reduce_mean(tfpd.Normal(loc=logits,scale=1.0).log_prob(r))
         grads = tape.gradient(loss, self.trainable_variables)
         self.optimizer.apply_gradients(zip(grads,self.trainable_variables))
         return {'reward_loss':loss}
@@ -146,7 +156,7 @@ class RewardModel(keras.Model):
 Behavior Controller
 """
 class ActorCritic:
-    def __init__(self,action_dim,latent_dim,pi_lr=3e-4,q_lr=1e-3,gamma=0.95,lambda_=0.6):
+    def __init__(self,action_dim,latent_dim,pi_lr=1e-4,q_lr=1e-3,gamma=0.99,lambda_=0.6):
         self.pi = latent_actor_network(latent_dim,action_dim)
         self.q = latent_critic_network(latent_dim)
         self.pi_opt = keras.optimizers.Adam(pi_lr)
@@ -154,38 +164,27 @@ class ActorCritic:
         self.gamma = gamma
         self.lambda_ = lambda_
 
+    @tf.function
     def train(self, wm, start, horizon=5, factor=0.1):
+        print("train behavior")
         with tf.GradientTape() as actor_tape:
             seq = wm.imagine(self.pi,start,horizon)
-            target = self.target(seq)
-            pmf = tfd.Categorical(logits=self.pi(seq['z'][:-2]))
-            baseline = self.q(seq['z'][:-2]).mode()
-            advantage = target[1:]-baseline
-            objective = factor*target[1:] +(1-factor)*pmf.log_prob(seq['a'][1:-1])*advantage
-            objective += 0.01*pmf.entropy()
-            pi_loss = -tf.reduce_mean(objective)
-
+            returns = self.target(seq)
+            pi_loss = -tf.reduce_mean(returns)
         pi_grad = actor_tape.gradient(pi_loss, self.pi.trainable_variables)
         self.pi_opt.apply_gradients(zip(pi_grad, self.pi.trainable_variables))
 
         with tf.GradientTape() as critic_tape:
-            logits = self.q(tf.convert_to_tensor(seq['z']))
-            dist = tfpd.Normal(loc=logits,scale=1.0)
-            q_loss = -tf.reduce_mean(dist.log_prob(target))
+            logits = self.q(start)
+            q_loss = -tf.reduce_mean(tfpd.Normal(loc=logits,scale=1.0).log_prob(returns))
         q_grad = critic_tape.gradient(q_loss, self.q.trainable_variables)
         self.q_opt.apply_gradients(zip(q_grad, self.q.trainable_variables))
 
     def target(self,seq):
-        # seq,batch,feature
-        r = seq['r'][0] # r_t
-        logits = self.q(tf.convert_to_tensor(seq['z'][1]))
-        dist = tfpd.Normal(loc=logits,scale=1.0)
-        v = dist.mode().numpy() #v_{t+1}
-
-        booststrap = v[-1]
-        nv= tf.concat([v[1:],booststrap[None]],0)
-        inputs = r + self.gamma*nv*(1-self.lambda_)
-        return tf.scan(lambda agg, cur: cur[0]+cur[1]*self.lambda_*agg, (inputs,self.gamma), booststrap, reverse=True)
+        ret = seq['r'][0]
+        for i in range(len(seq['r'])-1):
+            ret += (self.gamma**(i+1))*seq['r'][i+1]
+        return ret
 
 """
 World Model
@@ -200,32 +199,30 @@ class WorldModel(keras.Model):
         self.dynamics = LatentDynamics(latent_dim,action_dim)
         self.latent = ObservationVAE(image_shape,force_dim,latent_dim)
 
-    def train_representation(self,sample,callbacks=None,verbose=0):
+    @tf.function
+    def train(self,sample,verbose=0,callbacks=None):
+        print("train world model")
         images,forces,nimages,nforces,actions,rewards = sample
-        self.latent.fit((nimages,nforces),(),epochs=1,verbose=verbose,callbacks=callbacks)
-
-    def train_dynamics(self,sample,callbacks=None,verbose=0):
-        images,forces,nimages,nforces,actions,rewards = sample
+        self.latent.train_step(((images,forces),()))
         z_mean,z_logv,z = self.latent.encoder([images,forces])
         z1_mean,z1_logv,z1 = self.latent.encoder([nimages,nforces])
-        self.reward.fit(z1,rewards,epochs=1,verbose=verbose,callbacks=callbacks)
-        a = tf.convert_to_tensor(np.identity(self.action_dim)[actions.numpy()])
-        self.dynamics.fit((z,a),(z1_mean,z1_logv,z1),epochs=1,verbose=verbose,callbacks=callbacks)
-        return tf.squeeze(z).numpy(), tf.squeeze(z1).numpy()
+        self.reward.train_step((z1,rewards))
+        a = tf.one_hot(actions,self.action_dim)
+        self.dynamics.train_step(((z,a),(z1_mean,z1_logv,z1)))
+        return z1
 
     def imagine(self,policy,start,horizon):
-        seq = {'z':[start],'a':[],'r':[]}
+        seq = {'a':[],'z':[],'r':[]}
+        z = start
         for _ in range(horizon):
-            pmf = tfd.Categorical(logits=policy(tf.convert_to_tensor(seq['z'][-1])))
-            a = np.identity(self.action_dim)[pmf.mode().numpy()]
-            _,_,z1 = self.dynamics.transit([tf.convert_to_tensor(seq['z'][-1]),tf.convert_to_tensor(a)])
-            z1 = tf.squeeze(z1).numpy()
-            logits = self.reward.reward(tf.convert_to_tensor(seq['z'][-1]))
-            dist = tfpd.Normal(loc=logits,scale=1.0)
-            r = dist.mode()
+            action = tfd.Categorical(logits=policy(z)).sample()
+            a = tf.one_hot(action,self.action_dim)
+            _,_,z1 = self.dynamics.transit([z,a])
+            r = tfpd.Normal(loc=self.reward.reward(z1),scale=1.0).sample()
             seq['z'].append(z1)
             seq['a'].append(a)
             seq['r'].append(r)
+            z = z1
         return seq #'seq','batch size','feature'
 
 """
@@ -244,14 +241,11 @@ class Agent:
         pmf = tfd.Categorical(logits=self.ac.pi(z))
         return tf.squeeze(pmf.sample()).numpy()
 
-    def train(self,buffer,epochs=80,batch_size=32,callbacks=None):
+    def train(self,buffer,epochs=80,batch_size=32,verbose=0,callbacks=None):
         for _ in range(epochs):
             data = buffer.sample(batch_size=batch_size)
-            self.wm.train_representation(data,callbacks=callbacks)
-        for _ in range(epochs):
-            data = buffer.sample(batch_size=batch_size)
-            z,z1 = self.wm.train_dynamics(data,callbacks=callbacks)
-            self.ac.train(self.wm,z1,horizon=5)
+            z = self.wm.train(data,callbacks=callbacks)
+            self.ac.train(self.wm,z,horizon=5)
 
     def encode(self,obs):
         img = tf.expand_dims(tf.convert_to_tensor(obs['image']), 0)
@@ -265,7 +259,7 @@ class Agent:
         return tf.squeeze(image).numpy(),tf.squeeze(force).numpy()
 
     def imagine(self,z,a):
-        a = tf.expand_dims(tf.convert_to_tensor(np.identity(self.action_dim)[a]),0)
+        a = tf.expand_dims(tf.one_hot(a,self.action_dim),0)
         z = tf.expand_dims(tf.convert_to_tensor(z), 0)
         z1_mean, z1_logv, z1 = self.wm.dynamics.transit([z,a])
         return tf.squeeze(z1).numpy()

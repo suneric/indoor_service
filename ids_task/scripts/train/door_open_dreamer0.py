@@ -11,8 +11,10 @@ from datetime import datetime
 import matplotlib.pyplot as plt
 from env.env_door_open import DoorOpenEnv
 from agent.dreamer0 import Agent, ReplayBuffer
+from utility import *
 
 def dreamer_train(env, num_episodes, max_steps, warmup_ep, model_dir):
+    print("dreaner training", num_episodes, max_steps, warmup_ep)
     image_shape = env.observation_space[0]
     force_dim = env.observation_space[1]
     action_dim = env.action_space.n
@@ -23,7 +25,7 @@ def dreamer_train(env, num_episodes, max_steps, warmup_ep, model_dir):
     tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir=model_dir)
 
     latent_dim = 16
-    capacity = 1000
+    capacity = 5000
     buffer = ReplayBuffer(capacity,image_shape,force_dim)
     agent = Agent(image_shape,force_dim,action_dim,latent_dim)
 
@@ -32,9 +34,9 @@ def dreamer_train(env, num_episodes, max_steps, warmup_ep, model_dir):
         obs, done, ep_ret, step = env.reset(), False, 0, 0
         while not done and step < max_steps:
             act = agent.policy(obs) if ep >= warmup_ep else np.random.randint(action_dim)
-            nobs, rew, done, info = env.step(act)
+            nobs,rew,done,info = env.step(act)
             buffer.add_observation(obs['image'],obs['force'],nobs['image'],nobs['force'],act,rew)
-            obs, ep_ret, step, t = nobs, ep_ret+rew, step+1, t+1
+            obs,ep_ret,step,t = nobs,ep_ret+rew,step+1,t+1
         success_counter = success_counter+1 if env.success else success_counter
         ep_returns.append(ep_ret)
         print("Episode *{}*: Return {:.4f}, Total Step {}, Success Count {} ".format(ep+1,ep_ret,t,success_counter))
@@ -42,7 +44,7 @@ def dreamer_train(env, num_episodes, max_steps, warmup_ep, model_dir):
             tf.summary.scalar('episode reward', ep_ret, step=ep)
 
         if (ep+1) > warmup_ep:
-            agent.train(buffer,epochs=max_steps)
+            agent.train(buffer,verbose=1,epochs=max_steps)
         if (ep+1)%100 == 0:
             test_model(env,agent,model_dir,ep+1,action_dim)
         if (ep+1) >= 500 and ep_ret > best_ep_return:
