@@ -62,6 +62,7 @@ class MRobot:
         self.ftHook.check_sensor_ready()
 
     def reset_robot(self,rx,ry,yaw):
+        print("reset robot to ({:4f},{:4f},{:4f}).".format(rx,ry,yaw))
         self.robotPoseReset.reset(rx,ry,yaw)
         rospy.sleep(0.5)
         crPos = self.poseSensor.robot()

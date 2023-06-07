@@ -60,7 +60,7 @@ class AutoChargeEnv(GymGazeboEnv):
         # config the environment
         self.initGoalIdx = None
         self.initRandom = None
-        self.initOffset = 0.5
+        self.initOffset = 0.55
 
     def _check_all_systems_ready(self):
         self.robot.check_ready()

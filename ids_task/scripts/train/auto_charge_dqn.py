@@ -7,7 +7,7 @@ import rospy
 import numpy as np
 import tensorflow as tf
 from datetime import datetime
-from agent.model import jfv_actor_network_1
+from agent.model import jfv_actor_network
 from agent.dqn import JFVDQN, JFVReplayBuffer
 from env.env_auto_charge import AutoChargeEnv
 from utility import *
@@ -20,7 +20,7 @@ def dqn_train(env, num_episodes, max_steps, model_dir):
     print("create socket pluging environment for DQN.", image_shape, force_dim, joint_dim, action_dim)
     summaryWriter = tf.summary.create_file_writer(model_dir)
 
-    actor = jfv_actor_network_1(image_shape,force_dim,joint_dim,action_dim)
+    actor = jfv_actor_network(image_shape,force_dim,joint_dim,action_dim)
     buffer = JFVReplayBuffer(image_shape,force_dim,joint_dim,action_dim,capacity=50000,batch_size=64)
     agent = JFVDQN(actor,action_dim,gamma=0.99,lr=2e-4,update_freq=500)
 

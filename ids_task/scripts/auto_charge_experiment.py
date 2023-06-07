@@ -216,7 +216,7 @@ class InsertTask:
                 break
         return connected
 
-    def plug(self,max=30):
+    def plug(self,max=15):
         detect = self.adjust_plug()
         image = self.robot.camARD1.binary_arr((64,64),detect[self.socketIdx])
         force = self.robot.plug_forces()
