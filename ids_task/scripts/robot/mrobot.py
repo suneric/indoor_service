@@ -61,14 +61,16 @@ class MRobot:
         self.ftPlug.check_sensor_ready()
         self.ftHook.check_sensor_ready()
 
-    def reset_robot(self,rx,ry,yaw):
-        print("reset robot to ({:4f},{:4f},{:4f}).".format(rx,ry,yaw))
-        self.robotPoseReset.reset(rx,ry,yaw)
-        rospy.sleep(0.5)
-        crPos = self.poseSensor.robot()
-        if np.sqrt((crPos[0]-rx)**2+(crPos[1]-ry)**2) > 0.01:
+    def reset_robot(self,rx,ry,yaw,attempts=3):
+        for i in range(attempts):
             self.robotPoseReset.reset(rx,ry,yaw)
-            print("try reset robot again.")
+            rospy.sleep(0.5)
+            crPos = self.poseSensor.robot()
+            if np.sqrt((crPos[0]-rx)**2+(crPos[1]-ry)**2) < 0.01:
+                print("reset robot to ({:4f},{:4f},{:4f}).".format(rx,ry,yaw))
+                return True
+        print("fail to reset robot to ({:4f},{:4f},{:4f}).".format(rx,ry,yaw))
+        return False
 
     def reset_joints(self,vpos,hpos,spos,ppos):
         self.fdController.set_position(hk=spos,vs=vpos,hs=hpos,pg=ppos)

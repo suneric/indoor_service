@@ -60,7 +60,7 @@ class AutoChargeEnv(GymGazeboEnv):
         # config the environment
         self.initGoalIdx = None
         self.initRandom = None
-        self.initOffset = 0.55
+        self.initOffset = 0.525
 
     def _check_all_systems_ready(self):
         self.robot.check_ready()
@@ -73,7 +73,9 @@ class AutoChargeEnv(GymGazeboEnv):
 
     def _set_init(self):
         idx = np.random.randint(len(GOALLIST)) if self.initGoalIdx is None else self.initGoalIdx
-        self.reset_robot(idx)
+        if not self.reset_robot(idx):
+            self.fail = True
+            return
         detect = self.detect_sockets(idx%2) # 0 for upper, 1 for lower
         self.obs_image = self.robot.camARD1.binary_arr((64,64),detect)
         self.obs_force = self.robot.plug_forces()
@@ -150,9 +152,9 @@ class AutoChargeEnv(GymGazeboEnv):
         ry += 0.01*(rad[1]-0.5) # 1cm
         rh += 0.01*(rad[2]-0.5) # 1cm
         rt += 0.02*(rad[3]-0.5) # 1.146 deg, 0.02 rad
-        self.robot.reset_robot(rx,ry,rt)
         self.robot.reset_joints(vpos=rh,hpos=0,spos=1.57,ppos=0.03)
         self.robot.reset_ft_sensors()
+        return self.robot.reset_robot(rx,ry,rt)
 
     def detect_sockets(self,idx=0):
         self.robot.lock_joints(v=True,h=True,s=True,p=True)
