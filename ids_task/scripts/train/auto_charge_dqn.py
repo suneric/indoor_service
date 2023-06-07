@@ -22,9 +22,9 @@ def dqn_train(env, num_episodes, max_steps, model_dir):
 
     actor = jfv_actor_network_1(image_shape,force_dim,joint_dim,action_dim)
     buffer = JFVReplayBuffer(image_shape,force_dim,joint_dim,action_dim,capacity=50000,batch_size=64)
-    agent = JFVDQN(actor,action_dim,gamma=0.99,lr=1e-4,update_freq=500)
+    agent = JFVDQN(actor,action_dim,gamma=0.99,lr=2e-4,update_freq=500)
 
-    epsilon, epsilon_stop, decay = 0.99, 0.01, 0.9999
+    epsilon, epsilon_stop, decay = 0.99, 0.01, 0.999
     ep_returns, t, success_counter, best_ep_return = [], 0, 0, -np.inf
     for ep in range(num_episodes):
         epsilon = max(epsilon_stop, epsilon*decay)

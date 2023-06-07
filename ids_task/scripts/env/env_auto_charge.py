@@ -74,7 +74,7 @@ class AutoChargeEnv(GymGazeboEnv):
     def _set_init(self):
         idx = np.random.randint(len(GOALLIST)) if self.initGoalIdx is None else self.initGoalIdx
         self.reset_robot(idx)
-        detect = self.initial_touch(idx%2) # 0 for upper, 1 for lower
+        detect = self.detect_sockets(idx%2) # 0 for upper, 1 for lower
         self.obs_image = self.robot.camARD1.binary_arr((64,64),detect)
         self.obs_force = self.robot.plug_forces()
         self.obs_joint = [0,0]
@@ -86,9 +86,12 @@ class AutoChargeEnv(GymGazeboEnv):
         self.robot.lock_joints(v=True,h=True,s=True,p=True)
         self.robot.move(0.5,0.0) # move forward for insertion
         rate = rospy.Rate(30)
-        while not self.success_or_fail() and self.robot.is_safe(max_force=20):
+        while self.robot.is_safe(max_force=20):
             rate.sleep()
         self.obs_force = self.robot.plug_forces()
+        dist1, dist2 = self.dist2goal()
+        self.success = dist1 > 0.0 and dist2 < 0.001
+        self.fail = dist2 > 0.02 # 2 cm
         self.robot.stop()
         _, self.curr_dist = self.dist2goal()
         # back for reduce force
@@ -135,12 +138,6 @@ class AutoChargeEnv(GymGazeboEnv):
         self.initRandom = rad
         self.initOffset = offset
 
-    def success_or_fail(self):
-        dist1, dist2 = self.dist2goal()
-        self.success = dist1 > 0.0 and dist2 < 0.001
-        self.fail = dist2 > 0.02 # 2 cm
-        return self.success or self.fail
-
     def reset_robot(self,idx):
         self.robot.stop()
         self.goal = GOALLIST[idx]
@@ -157,26 +154,29 @@ class AutoChargeEnv(GymGazeboEnv):
         self.robot.reset_joints(vpos=rh,hpos=0,spos=1.57,ppos=0.03)
         self.robot.reset_ft_sensors()
 
-    def initial_touch(self,idx=0):
+    def detect_sockets(self,idx=0):
         self.robot.lock_joints(v=True,h=True,s=True,p=True)
-        # move forward to touch the wall
-        self.robot.move(1.0,0.0)
         rate = rospy.Rate(30)
-        while not self.success_or_fail() and self.robot.is_safe(max_force=20):
-            rate.sleep()
-        # move back until socket is detected
-        self.robot.move(-0.5,0.0)
+        # move forward to touch the wall
+        self.robot.move(0.5,0.0)
         count, detect = self.ardDetect.socket()
-        while count < 2-idx:
+        while count < 2-idx and self.robot.is_safe(max_force=20):
             rate.sleep()
             count, detect = self.ardDetect.socket()
-        # add uncerntainty
-        rospy.sleep(np.random.randint(0,10)/10)
-        self.robot.stop()
-        count, detect = self.ardDetect.socket()
+        # move back until socket is detected
         if count < 2-idx:
-            detect = [None]
-            self.fail = True
+            self.robot.move(-0.5,0.0)
+            count, detect = self.ardDetect.socket()
+            while count < 2-idx:
+                rate.sleep()
+                count, detect = self.ardDetect.socket()
+                # add uncerntainty
+            rospy.sleep(np.random.randint(0,10)/10)
+            count, detect = self.ardDetect.socket()
+            if count < 2-idx:
+                detect = [None]
+                self.fail = True
+        self.robot.stop()
         print("Initially detected {} sockets".format(count))
         self.robot.lock_joints(v=False,h=False,s=True,p=True)
         _, self.prev_dist = self.dist2goal()
