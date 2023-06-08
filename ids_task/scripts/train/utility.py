@@ -19,12 +19,11 @@ tf.random.set_seed(321)
 
 def get_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--policy', type=str, default='ppo') # ppo, rppo
-    parser.add_argument('--max_ep', type=int, default=10)
+    parser.add_argument('--max_ep', type=int, default=100)
     parser.add_argument('--max_step', type=int, default=30)
-    parser.add_argument('--train_freq', type=int, default=100)
+    parser.add_argument('--train_freq', type=int, default=300)
     parser.add_argument('--seq_len', type=int, default=None)
-    parser.add_argument('--warmup_ep', type=int, default=5)
+    parser.add_argument('--warmup_ep', type=int, default=0)
     return parser.parse_args()
 
 def plot_episodic_returns(name,ep_returns,dir,weight=0.99):

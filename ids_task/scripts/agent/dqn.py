@@ -1,86 +1,98 @@
+import os
 import numpy as np
 import tensorflow as tf
-from .core import *
 from copy import deepcopy
-import os
+from .model import actor_network
+from .util import *
 
-class JFVReplayBuffer:
-    def __init__(self, image_shape, force_dim, joint_dim, action_dim, capacity, batch_size):
-        self.img_buf = np.zeros([capacity]+list(image_shape), dtype=np.float32)
-        self.frc_buf = np.zeros((capacity, force_dim),dtype=np.float32)
-        self.jnt_buf = np.zeros((capacity, joint_dim),dtype=np.float32)
-        self.n_img_buf = np.zeros([capacity]+list(image_shape), dtype=np.float32)
-        self.n_frc_buf = np.zeros((capacity, force_dim),dtype=np.float32)
-        self.n_jnt_buf = np.zeros((capacity, joint_dim),dtype=np.float32)
-        self.act_buf = np.zeros(capacity, dtype=np.int32)
-        self.rew_buf = np.zeros(capacity, dtype=np.float32)
-        self.done_buf = np.zeros(capacity, dtype=np.float32)
-        self.ptr, self.size, self.max_size = 0, 0, capacity
-        self.batch_size = batch_size
+class ReplayBuffer:
+    def __init__(self,capacity,image_shape,force_dim,joint_dim=None):
+        self.wantJoint = False if joint_dim is None else True
+        self.image = np.zeros([capacity]+list(image_shape), dtype=np.float32)
+        self.image1 = np.zeros([capacity]+list(image_shape), dtype=np.float32)
+        self.force = np.zeros((capacity, force_dim),dtype=np.float32)
+        self.force1 = np.zeros((capacity, force_dim),dtype=np.float32)
+        if self.wantJoint:
+            self.joint = np.zeros((capacity, joint_dim),dtype=np.float32)
+            self.joint1 = np.zeros((capacity, joint_dim),dtype=np.float32)
+        self.action = np.zeros(capacity, dtype=np.int32)
+        self.reward = np.zeros(capacity, dtype=np.float32)
+        self.done = np.zeros(capacity, dtype=np.float32)
+        self.ptr,self.size,self.capacity = 0,0,capacity
 
-    def store(self, obs_tuple):
-        self.img_buf[self.ptr] = obs_tuple[0]["image"]
-        self.frc_buf[self.ptr] = obs_tuple[0]["force"]
-        self.jnt_buf[self.ptr] = obs_tuple[0]["joint"]
-        self.act_buf[self.ptr] = obs_tuple[1]
-        self.rew_buf[self.ptr] = obs_tuple[2]
-        self.n_img_buf[self.ptr] = obs_tuple[3]["image"]
-        self.n_frc_buf[self.ptr] = obs_tuple[3]["force"]
-        self.n_jnt_buf[self.ptr] = obs_tuple[3]["joint"]
-        self.done_buf[self.ptr] = obs_tuple[4]
-        self.ptr = (self.ptr+1) % self.max_size
-        self.size = min(self.size+1, self.max_size)
+    def add_experience(self,obs,act,rew,obs1,done):
+        self.image[self.ptr] = obs["image"]
+        self.image1[self.ptr] = obs1["image"]
+        self.force[self.ptr] = obs["force"]
+        self.force1[self.ptr] = obs1["force"]
+        if self.wantJoint:
+            self.joint[self.ptr] = obs["joint"]
+            self.joint1[self.ptr] = obs1["joint"]
+        self.action[self.ptr] = act
+        self.reward[self.ptr] = rew
+        self.done[self.ptr] = done
+        self.ptr = (self.ptr+1) % self.capacity
+        self.size = min(self.size+1, self.capacity)
 
-    def sample(self):
-        idxs = np.random.choice(self.size, size=self.batch_size)
-        return dict(
-            images = tf.convert_to_tensor(self.img_buf[idxs]),
-            forces = tf.convert_to_tensor(self.frc_buf[idxs]),
-            joints = tf.convert_to_tensor(self.jnt_buf[idxs]),
-            actions = tf.convert_to_tensor(self.act_buf[idxs]),
-            rewards = tf.convert_to_tensor(self.rew_buf[idxs]),
-            next_images = tf.convert_to_tensor(self.n_img_buf[idxs]),
-            next_forces = tf.convert_to_tensor(self.n_frc_buf[idxs]),
-            next_joints = tf.convert_to_tensor(self.n_jnt_buf[idxs]),
-            dones = tf.convert_to_tensor(self.done_buf[idxs]),
-        )
-
-class JFVDQN:
-    def __init__(self,q_net,action_dim,gamma,lr,update_freq):
-        self.q = q_net
-        self.q_stable = deepcopy(self.q)
-        self.optimizer = tf.keras.optimizers.Adam(lr)
-        self.gamma = gamma
-        self.act_dim = action_dim
-        self.learn_iter = 0
-        self.update_freq = update_freq
-
-    def policy(self, obs, epsilon=0.0):
-        """
-        get action based on epsilon greedy
-        """
-        if np.random.random() < epsilon:
-            return np.random.randint(self.act_dim)
+    def sample(self, batch_size):
+        idxs = np.random.choice(self.size, size=batch_size)
+        if self.wantJoint:
+            return dict(
+                image = self.image[idxs],
+                force = self.force[idxs],
+                joint = self.joint[idxs],
+                action = self.action[idxs],
+                reward = self.reward[idxs],
+                image1 = self.image1[idxs],
+                force1 = self.force1[idxs],
+                joint1 = self.joint1[idxs],
+                done = self.done[idxs],
+            )
         else:
-            image = tf.expand_dims(tf.convert_to_tensor(obs['image']), 0)
-            force = tf.expand_dims(tf.convert_to_tensor(obs['force']), 0)
-            joint = tf.expand_dims(tf.convert_to_tensor(obs['joint']), 0)
-            return np.argmax(self.q([image, force, joint]))
+            return dict(
+                image = self.image[idxs],
+                force = self.force[idxs],
+                action = self.action[idxs],
+                reward = self.reward[idxs],
+                image1 = self.image1[idxs],
+                force1 = self.force1[idxs],
+                done = self.done[idxs],
+            )
 
-    def learn(self, buffer):
-        experiences = buffer.sample()
-        images = experiences['images']
-        forces = experiences['forces']
-        joints = experiences['joints']
-        actions = experiences['actions']
-        rewards = experiences['rewards']
-        next_images = experiences['next_images']
-        next_forces = experiences['next_forces']
-        next_joints = experiences['next_joints']
-        dones = experiences['dones']
-        self.update(images,forces,joints,actions,rewards,next_images,next_forces,next_joints,dones)
+class DQN:
+    def __init__(self,image_shape,force_dim,action_dim,joint_dim=None,gamma=0.99,lr=2e-4,update_freq=500):
+        self.action_dim = action_dim
+        self.wantJoint = False if joint_dim is None else True
+        self.q = actor_network(image_shape,force_dim,action_dim,joint_dim)
+        self.optimizer = tf.keras.optimizers.Adam(lr)
+        self.q_stable = deepcopy(self.q)
+        self.update_freq = update_freq
+        self.learn_iter = 0
+        self.gamma = gamma
 
-    def update(self, img, frc, jnt, act, rew, nimg, nfrc, njnt, done):
+    def policy(self,obs,epsilon=0.0):
+        if np.random.random() < epsilon:
+            return np.random.randint(self.action_dim)
+        else:
+            img = tf.expand_dims(tf.convert_to_tensor(obs['image']),0)
+            frc = tf.expand_dims(tf.convert_to_tensor(obs['force']),0)
+            jnt = tf.expand_dims(tf.convert_to_tensor(obs['joint']),0) if self.wantJoint else None
+            logits = self.q([img,frc,jnt]) if self.wantJoint else self.q([img,frc])
+            return np.argmax(logits)
+
+    def train(self,buffer,batch_size=64):
+        # print("dqn training with batch size {}".format(batch_size))
+        data = buffer.sample(batch_size)
+        img = tf.convert_to_tensor(data['image'])
+        img1 = tf.convert_to_tensor(data['image1'])
+        frc = tf.convert_to_tensor(data['force'])
+        frc1 = tf.convert_to_tensor(data['force1'])
+        act = tf.convert_to_tensor(data['action'])
+        rew = tf.convert_to_tensor(data['reward'])
+        done = tf.convert_to_tensor(data['done'])
+        jnt = tf.convert_to_tensor(data['joint']) if self.wantJoint else None
+        jnt1 = tf.convert_to_tensor(data['joint1']) if self.wantJoint else None
+
         self.learn_iter += 1
         """
         Optimal Q-function follows Bellman Equation:
@@ -89,11 +101,14 @@ class JFVDQN:
         with tf.GradientTape() as tape:
             tape.watch(self.q.trainable_variables)
             # compute current Q
-            oh_act = tf.one_hot(act,depth=self.act_dim)
-            pred_q = tf.math.reduce_sum(self.q([img,frc,jnt])*oh_act,axis=-1)
+            logits = self.q([img,frc,jnt]) if self.wantJoint else self.q([img,frc])
+            oh_act = tf.one_hot(act,depth=self.action_dim)
+            pred_q = tf.math.reduce_sum(logits*oh_act,axis=-1)
             # compute target Q
-            oh_nact = tf.one_hot(tf.math.argmax(self.q([nimg,nfrc,njnt]),axis=-1),depth=self.act_dim)
-            next_q = tf.math.reduce_sum(self.q_stable([nimg,nfrc,njnt])*oh_nact,axis=-1)
+            logits1 = self.q([img1,frc1,jnt1]) if self.wantJoint else self.q([img1,frc1])
+            oh_act1 = tf.one_hot(tf.math.argmax(logits1,axis=-1),depth=self.action_dim)
+            s_logits = self.q_stable([img1,frc1,jnt1]) if self.wantJoint else self.q_stable([img1,frc1])
+            next_q = tf.math.reduce_sum(s_logits*oh_act1,axis=-1)
             true_q = rew + (1-done) * self.gamma * next_q
             loss = tf.keras.losses.MSE(true_q, pred_q)
         grad = tape.gradient(loss, self.q.trainable_variables)

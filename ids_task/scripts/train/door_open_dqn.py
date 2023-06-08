@@ -8,19 +8,18 @@ import numpy as np
 import tensorflow as tf
 from datetime import datetime
 from agent.dqn import DQN, ReplayBuffer
-from env.env_auto_charge import AutoChargeEnv
+from env.env_door_open import DoorOpenEnv
 from utility import *
 
 def dqn_train(env, num_episodes, max_steps, model_dir):
     image_shape = env.observation_space[0]
     force_dim = env.observation_space[1]
-    joint_dim = env.observation_space[2]
     action_dim = env.action_space.n
-    print("create auto charge environment for dqn train.", image_shape, force_dim, joint_dim, action_dim)
+    print("create auto charge environment for dqn train.", image_shape, force_dim, action_dim)
     summaryWriter = tf.summary.create_file_writer(model_dir)
 
-    buffer = ReplayBuffer(50000,image_shape,force_dim,joint_dim)
-    agent = DQN(image_shape,force_dim,action_dim,joint_dim)
+    buffer = ReplayBuffer(50000,image_shape,force_dim)
+    agent = DQN(image_shape,force_dim,action_dim)
 
     epsilon, epsilon_stop, decay = 0.99, 0.01, 0.999
     ep_returns, t, success_counter, best_ep_return = [], 0, 0, -np.inf
@@ -51,9 +50,8 @@ def dqn_train(env, num_episodes, max_steps, model_dir):
 if __name__=="__main__":
     args = get_args()
     rospy.init_node('dqn_train', anonymous=True)
-    yolo_dir = os.path.join(sys.path[0],'../policy/detection/yolo')
-    model_dir = os.path.join(sys.path[0],"../../saved_models/auto_charge/dqn", datetime.now().strftime("%Y-%m-%d-%H-%M"))
-    env = AutoChargeEnv(continuous=False, yolo_dir=yolo_dir, vision_type='binary')
+    model_dir = os.path.join(sys.path[0],"../../saved_models/door_open/dqn", datetime.now().strftime("%Y-%m-%d-%H-%M"))
+    env = DoorOpenEnv(continuous=False)
     ep_returns = dqn_train(env, args.max_ep, args.max_step, model_dir)
     env.close()
     plot_episodic_returns("dqn_train", ep_returns, model_dir)

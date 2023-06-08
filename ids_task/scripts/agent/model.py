@@ -4,13 +4,76 @@ from tensorflow import keras
 from tensorflow.keras import layers
 
 """
+vision force [joint] actor network
+"""
+def actor_network(image_shape,force_dim,output_dim,joint_dim=None):
+    v_input = keras.Input(shape=image_shape)
+    vh = layers.Conv2D(32,(3,3),padding='same',activation='relu')(v_input)
+    vh = layers.Conv2D(16,(3,3),padding='same',activation='relu')(vh)
+    vh = layers.Conv2D(8,(3,3),padding='same',activation='relu')(vh)
+    vh = layers.Flatten()(vh)
+    v_output = layers.Dense(32,activation='relu')(vh)
+
+    f_input = keras.Input(shape=(force_dim,))
+    fh = layers.Dense(32,activation='relu')(f_input)
+    f_output = layers.Dense(16,activation='relu')(fh)
+
+    if joint_dim is not None:
+        j_input = keras.Input(shape=(joint_dim,))
+        jh = layers.Dense(16,activation='relu')(j_input)
+        j_output = layers.Dense(8,activation='relu')(jh)
+
+        concat = layers.concatenate([v_output,f_output,j_output])
+        output = layers.Dense(128,activation='relu')(concat)
+        last_init = tf.random_uniform_initializer(minval=-3e-3,maxval=3e-3)
+        output = layers.Dense(output_dim, activation='linear',kernel_initializer=last_init)(output)
+        return keras.Model(inputs=[v_input,f_input,j_input],outputs=output,name='vfj_actor')
+    else:
+        concat = layers.concatenate([v_output,f_output])
+        output = layers.Dense(128,activation='relu')(concat)
+        last_init = tf.random_uniform_initializer(minval=-3e-3,maxval=3e-3)
+        output = layers.Dense(output_dim,activation='linear',kernel_initializer=last_init)(output)
+        return keras.Model(inputs=[v_input,f_input],outputs=output,name='vf_actor')
+
+"""
+vision force [joint] actor network
+"""
+def critic_network(image_shape, force_dim, joint_dim=None):
+    v_input = keras.Input(shape=image_shape)
+    vh = layers.Conv2D(32,(3,3),padding='same',activation='relu')(v_input)
+    vh = layers.Conv2D(16,(3,3),padding='same',activation='relu')(vh)
+    vh = layers.Conv2D(8,(3,3),padding='same',activation='relu')(vh)
+    vh = layers.Flatten()(vh)
+    v_output = layers.Dense(32,activation='relu')(vh)
+
+    f_input = keras.Input(shape=(force_dim,))
+    fh = layers.Dense(32,activation='relu')(f_input)
+    f_output = layers.Dense(16,activation='relu')(fh)
+
+    if joint_dim is not None:
+        j_input = keras.Input(shape=(joint_dim,))
+        jh = layers.Dense(16,activation='relu')(j_input)
+        j_output = layers.Dense(8,activation='relu')(jh)
+
+        concat = layers.concatenate([v_output,f_output,j_output])
+        output = layers.Dense(128,activation='relu')(concat)
+        output = layers.Dense(1,activation='linear')(output)
+        return keras.Model(inputs=[v_input,f_input,j_input],outputs=output,name='vfj_critic')
+    else:
+        concat = layers.concatenate([v_output, f_output])
+        output = layers.Dense(128,activation='relu')(concat)
+        output = layers.Dense(1,activation='linear')(output)
+        return keras.Model(inputs=[v_input,f_input],outputs=output,name='vf_critic')
+
+################################################################################
+"""
 force-vision fusion actor network
 """
 def fv_actor_network(image_shape,force_dim,output_dim):
     v_input = keras.Input(shape=image_shape)
     vh = layers.Conv2D(32,(3,3), padding='same', activation='relu')(v_input)
-    vh = layers.Conv2D(16, (3,3), padding='same', activation='relu')(vh)
-    vh = layers.Conv2D(8, (3,3), padding='same', activation='relu')(vh)
+    vh = layers.Conv2D(16,(3,3), padding='same', activation='relu')(vh)
+    vh = layers.Conv2D(8,(3,3), padding='same', activation='relu')(vh)
     vh = layers.Flatten()(vh)
     v_output = layers.Dense(32, activation='relu')(vh)
 
