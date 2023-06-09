@@ -25,7 +25,7 @@ def td3_train(env, num_episodes, max_steps, model_dir):
     noise = OUNoise(mu=np.zeros(action_dim),sigma=float(0.2*action_limit)*np.ones(action_dim))
     agent = TD3(image_shape,force_dim,action_dim,action_limit,joint_dim,noise)
 
-    ep_returns,t,warmup,success_counter,best_ep_return = [],0,3000,0,-np.inf
+    ep_returns,t,warmup,success_counter,best_ep_return = [],0,2000,0,-np.inf
     for ep in range(num_episodes):
         obs, ep_ret, step, done = env.reset(), 0, 0, False
         while not done and step < max_steps:
