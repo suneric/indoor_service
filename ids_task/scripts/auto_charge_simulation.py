@@ -7,7 +7,7 @@ import tensorflow as tf
 from robot.mrobot import MRobot
 from robot.detection import ObjectDetection
 from robot.sensors import BumpSensor
-from agent.model import jfv_actor_network
+from agent.dqn import DQN
 from navigation import *
 
 class ApproachTask:
@@ -83,12 +83,7 @@ class AlignTask:
             return False
         success = self.adjust_plug(idx=self.socketIdx)
         if not success:
-             print("fail to adjust plug.")
-             return False
-        success = self.initial_touch(idx=self.socketIdx)
-        if not success:
-             print("fail to initialize.")
-             return False
+             return self.initial_touch(idx=self.socketIdx)
         return True
 
     def align_socket(self, idx=0, speed=np.pi/5, target=10):
@@ -169,16 +164,10 @@ class InsertTask:
     def __init__(self, robot, yolo_dir, policy_dir, socketIdx):
         self.robot = robot
         self.ardDetect = ObjectDetection(robot.camARD1,yolo_dir,scale=1.0,wantDepth=False)
-        self.model = jfv_actor_network((64,64,1),3,2,8)
-        self.model.load_weights(os.path.join(policy_dir,'q_net/2000'))
+        self.model = DQN(image_shape=(64,64,1),force_dim=3,action_dim=8,joint_dim=2)
+        self.model.load(os.path.join(policy_dir,'q_net/6000'))
         self.socketIdx = socketIdx
         self.bumper = BumpSensor()
-
-    def policy(self,obs):
-        image = tf.expand_dims(tf.convert_to_tensor(obs['image']), 0)
-        force = tf.expand_dims(tf.convert_to_tensor(obs['force']), 0)
-        joint = tf.expand_dims(tf.convert_to_tensor(obs['joint']), 0)
-        return np.argmax(self.model([image, force, joint]))
 
     def get_action(self,idx):
         sh,sv = 0.001, 0.001 # 1 mm, scale for horizontal and vertical move
@@ -205,7 +194,7 @@ class InsertTask:
         connected, step = False, 0
         while not connected and step < max:
             obs = dict(image=image, force=force, joint=joint)
-            act = self.get_action(self.policy(obs))
+            act = self.get_action(self.model.policy(obs))
             self.robot.set_plug_joints(act[0],act[1])
             connected,force = self.insert_plug()
             joint += np.sign(act)
@@ -252,10 +241,10 @@ class InsertTask:
         self.robot.lock_joints(v=True,h=True,s=True,p=True)
         self.robot.move(speed,0.0)
         rate = rospy.Rate(10)
-        inserted = False
+        inserted,forces = False,self.robot.plug_forces()
         while self.robot.is_safe(max_force=f_max):
             rate.sleep()
-            forces= self.robot.plug_forces()
+            forces = self.robot.plug_forces()
             inserted = (self.robot.poseSensor.plug()[1] > self.robot.config.outletY)
             print("=== plug position y: ({:.4f})".format(self.robot.config.outletY-self.robot.poseSensor.plug()[1]), inserted)
             if inserted:

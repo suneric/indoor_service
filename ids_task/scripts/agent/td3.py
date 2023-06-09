@@ -130,6 +130,7 @@ class TD3:
             os.makedirs(os.path.dirname(critic_path))
         self.q.save_weights(critic_path)
 
-    def load(self, actor_path, critic_path):
+    def load(self, actor_path, critic_path = None):
         self.pi.load_weights(actor_path)
-        self.q.load_weights(critic_path)
+        if critic_path is not None:
+            self.q.load_weights(critic_path)

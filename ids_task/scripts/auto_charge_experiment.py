@@ -6,7 +6,8 @@ import pandas as pd
 import tensorflow as tf
 from robot.jrobot import JazzyRobot
 from robot.detection import ObjectDetection
-from agent.model import jfv_actor_network
+from agent.dqn import DQN
+from agent.td3 import TD3
 
 class ApproachTask:
     def __init__(self, robot, yolo_dir):
@@ -91,12 +92,12 @@ class AlignTask:
         #     return False
         success = self.adjust_plug()
         if not success:
-             print("fail to adjust plug.")
-             return False
-        success = self.initial_touch()
+            print("fail to align socket.")
+            return self.initial_touch()
+        success = self.visual_servo()
         if not success:
-             print("fail to initialize.")
-             return False
+            print("fail to visual servo.")
+            return self.initial_touch()
         return True
 
     def align_socket(self,speed=0.4,target=15):
@@ -131,7 +132,7 @@ class AlignTask:
         self.robot.stop()
         return True
 
-    def adjust_plug(self,speed=0.4,target=5):
+    def adjust_plug(self,speed=0.4,target=3):
         self.robot.move(speed,0.0)
         count, detect = self.ardDetect.socket()
         rate = rospy.Rate(10)
@@ -143,7 +144,7 @@ class AlignTask:
             print("socket is undetectable")
             return False
 
-        rate = rospy.Rate(2)
+        rate = rospy.Rate(1)
         err = (detect[1].t+detect[1].b)/2 - self.robot.camARD1.height/2
         print("adjusting, center v err: {:.4f}".format(err))
         while abs(err) > target:
@@ -155,7 +156,7 @@ class AlignTask:
             err = (detect[1].t+detect[1].b)/2 - self.robot.camARD1.height/2
             print("adjusting, center v err: {:.4f}".format(err))
 
-        err = (detect[0].l+detect[0].r)/2 - (self.robot.camARD1.width/2+25)
+        err = (detect[0].l+detect[0].r)/2 - (self.robot.camARD1.width/2)
         print("adjusting, center u err: {:.4f}".format(err))
         while abs(err) > target:
             self.robot.set_plug_joints(-np.sign(err)*1,0.0)
@@ -163,7 +164,7 @@ class AlignTask:
             count, detect = self.ardDetect.socket()
             if count < 2:
                 continue
-            err = (detect[0].l+detect[0].r)/2 - (self.robot.camARD1.width/2+25)
+            err = (detect[0].l+detect[0].r)/2 - (self.robot.camARD1.width/2)
             print("adjusting, center u err: {:.4f}".format(err))
         return True
 
@@ -181,27 +182,46 @@ class AlignTask:
         self.robot.stop()
         return False if count < 2 else True
 
+    def visual_servo(self,speed=0.4,target=0.13):
+        self.robot.move(speed,0.0)
+        count, detect = self.ardDetect.socket()
+        rate = rospy.Rate(10)
+        while self.robot.is_safe(max_force=15) :
+            rate.sleep()
+            count, detect = self.ardDetect.socket()
+            if count < 2:
+                continue
+            ratio = (detect[1].r-detect[1].l)/self.robot.camARD1.width
+            print("socket width/image width ratio {:.4f}".format(ratio))
+            if ratio > target:
+                break
+        if count < 2:
+            print("socket is undetectable")
+            return False
+        else:
+            return True
+
 """
 Plug Insertion Task
 """
 class InsertTask:
-    def __init__(self, robot, yolo_dir, policy_dir, socketIdx=0):
+    def __init__(self, robot, yolo_dir, policy_dir, socketIdx=0, continuous=False):
         self.robot = robot
         self.ardDetect = ObjectDetection(robot.camARD1,yolo_dir,scale=1.0,wantDepth=False)
-        self.model = jfv_actor_network((64,64,1),3,2,8)
-        self.model.load_weights(os.path.join(policy_dir,'q_net/2000'))
+        self.model = DQN(image_shape=(64,64,1),force_dim=3,action_dim=8,joint_dim=2)
+        self.model.load(os.path.join(policy_dir,'q_net/6000'))
+        # self.model = TD3(image_shape=(64,64,1),force_dim=3,action_dim=2,action_limit=3,joint_dim=2)
+        # self.model.load(os.path.join(policy_dir,'td3/pi_net/2000'))
         self.socketIdx = socketIdx
+        self.continuous = continuous
 
-    def policy(self,obs):
-        image = tf.expand_dims(tf.convert_to_tensor(obs['image']), 0)
-        force = tf.expand_dims(tf.convert_to_tensor(obs['force']), 0)
-        joint = tf.expand_dims(tf.convert_to_tensor(obs['joint']), 0)
-        return np.argmax(self.model([image, force, joint]))
-
-    def get_action(self,idx):
+    def get_action(self,action):
         sh,sv = 1, 3 # 1 mm, scale for horizontal and vertical move
-        act_list = [(sh,-sv),(sh,0),(sh,sv),(0,-sv),(0,sv),(-sh,-sv),(-sh,0),(-sh,sv)]
-        return act_list[idx]
+        if self.continuous:
+            return np.array([int(sh*action[0]),int(sv*action[1])])
+        else:
+            act_list = [[sh,-sv],[sh,0],[sh,sv],[0,-sv],[0,sv],[-sh,-sv],[-sh,0],[-sh,sv]]
+            return np.array(act_list[action])
 
     def perform(self, max_attempts=3):
         print("=== insert plug...")
@@ -216,24 +236,24 @@ class InsertTask:
                 break
         return connected
 
-    def plug(self,max=15):
+    def plug(self,max=20):
         detect = self.adjust_plug()
         image = self.robot.camARD1.binary_arr((64,64),detect[self.socketIdx])
         force = self.robot.plug_forces()
         joint = [0,0]
         connected, step = False, 0
         while not connected and step < max:
-            obs = dict(image=image, force=force, joint=joint)
-            act = self.get_action(self.policy(obs))
+            obs = dict(image=image, force=10*force, joint=joint)
+            act = self.get_action(self.model.policy(obs))
             #act = self.get_action(np.random.randint(8))
             self.robot.set_plug_joints(act[0],act[1])
             connected,force = self.insert_plug()
-            joint += np.sign(act)
+            joint = joint+act if self.continuous else joint+np.sign(act)
             step += 1
         print("connected", connected)
         return connected
 
-    def adjust_plug(self,speed=0.4,target=5):
+    def adjust_plug(self,speed=0.4,target=3,v_offset=60):
         self.robot.move(-speed,0.0)
         count, detect = self.ardDetect.socket()
         rate = rospy.Rate(10)
@@ -242,7 +262,7 @@ class InsertTask:
             count, detect = self.ardDetect.socket()
         self.robot.stop()
 
-        rate = rospy.Rate(2)
+        rate = rospy.Rate(1)
         err = (detect[1].t+detect[1].b)/2 - self.robot.camARD1.height/2
         print("center v err: {:.4f}".format(err))
         while abs(err) > target:
@@ -257,7 +277,7 @@ class InsertTask:
             err = (detect[1].t+detect[1].b)/2 - self.robot.camARD1.height/2
             print("center v err: {:.4f}".format(err))
 
-        err = (detect[0].l+detect[0].r)/2 - (self.robot.camARD1.width/2+25)
+        err = (detect[0].l+detect[0].r)/2 - (self.robot.camARD1.width/2+v_offset)
         print("center u err: {:.4f}".format(err))
         while abs(err) > target:
             self.robot.set_plug_joints(-np.sign(err)*1,0.0)
@@ -265,22 +285,26 @@ class InsertTask:
             count, detect = self.ardDetect.socket()
             if count < 2:
                 continue
-            err = (detect[0].l+detect[0].r)/2 - (self.robot.camARD1.width/2+25)
+            err = (detect[0].l+detect[0].r)/2 - (self.robot.camARD1.width/2+v_offset)
             print("center u err: {:.4f}".format(err))
         return detect
 
     def insert_plug(self,speed=0.4,f_max=15):
         self.robot.move(speed,0.0)
         rate = rospy.Rate(10)
-        inserted = False
+        inserted,forces = False,self.robot.plug_forces()
         while self.robot.is_safe(max_force=f_max):
             rate.sleep()
             forces = self.robot.plug_forces()
             print("forces: ({:.4f},{:.4f},{:.4f})".format(forces[0],forces[1],forces[2]))
-            inserted = (abs(forces[0]) > 5 and abs(forces[1]) > 5 and abs(forces[2]) > 5)
+            inserted = (abs(forces[0]) > 3 and abs(forces[0]) < 10 and abs(forces[1]) > 3 and abs(forces[2]) > 3)
             if inserted:
                 break
-        if not inserted:
+        if inserted:
+            self.robot.move(1.5*speed,0.0)
+            while self.robot.is_safe(max_force=f_max):
+                rate.sleep()
+        else:
             self.robot.move(-speed,0.0)
             while not self.robot.is_safe(max_force=5):
                 rate.sleep()
@@ -295,7 +319,7 @@ class JazzyAutoCharge:
         self.robot = robot
         self.approach = ApproachTask(robot,yolo_dir)
         self.align = AlignTask(robot,yolo_dir)
-        self.insert = InsertTask(robot,yolo_dir,policy_dir,socketIdx=0)
+        self.insert = InsertTask(robot,yolo_dir,policy_dir,socketIdx=0,continuous=False)
 
     def prepare(self):
         self.robot.terminate()

@@ -31,18 +31,17 @@ def ppo_train(env, num_episodes, train_freq, max_steps, model_dir):
             nobs, rew, done, info = env.step(act)
             buffer.add_experience(obs,act,rew,val,logp)
             obs, ep_ret, step, t = nobs, ep_ret+rew, step+1, t+1
-
-        success_counter = success_counter+1 if env.success else success_counter
         last_value = 0 if done else agent.value(obs)
         buffer.end_trajectry(last_value)
-        ep_returns.append(ep_ret)
-        print("Episode *{}*: Return {:.4f}, Total Step {}, Success Count {} ".format(ep+1,ep_ret,t,success_counter))
-
-        with summaryWriter.as_default():
-            tf.summary.scalar('episode reward', ep_ret, step=ep+1)
 
         if buffer.ptr >= train_freq or (ep+1) == num_episodes:
             agent.train(buffer)
+
+        ep_returns.append(ep_ret)
+        success_counter = success_counter+1 if env.success else success_counter
+        print("Episode *{}*: Return {:.4f}, Total Step {}, Success Count {} ".format(ep+1,ep_ret,t,success_counter))
+        with summaryWriter.as_default():
+            tf.summary.scalar('episode reward', ep_ret, step=ep+1)
 
         if (ep+1) >= 500 and ep_ret > best_ep_return:
             best_ep_return = ep_ret

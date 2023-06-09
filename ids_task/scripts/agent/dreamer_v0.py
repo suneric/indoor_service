@@ -48,7 +48,6 @@ class ActorCritic:
         self.gamma = gamma
         self.lambda_ = lambda_
 
-    @tf.function
     def train(self, wm, start, horizon=5, factor=0.1):
         print("train behavior")
         with tf.GradientTape() as actor_tape:
@@ -94,7 +93,7 @@ class WorldModel(keras.Model):
             tape.watch(self.trainable_variables)
             mu,sigma = self.encoder([img,frc])
             dist = mvnd_dist(mu,sigma)
-            mu1_prior,sigma1_prior = self.dynamics([dist.sample(),tf.one_hot(act)])
+            mu1_prior,sigma1_prior = self.dynamics([dist.sample(),tf.one_hot(act,self.action_dim)])
             prior_dist1 = mvnd_dist(mu1,sigma1)
             z1 = prior_dist1.sample()
             img1_pred,frc1_pred = self.decoder(z1)
@@ -140,7 +139,8 @@ class Agent:
     def policy(self,obs):
         img = tf.expand_dims(tf.convert_to_tensor(obs['image']), 0)
         frc = tf.expand_dims(tf.convert_to_tensor(obs['force']), 0)
-        z_mean,z_logv,z = self.wm.latent.encoder([img,frc])
+        mu,sigma = self.wm.encoder([img,frc])
+        z = mvnd_dist(mu,sigma).sample()
         pmf = tfd.Categorical(logits=self.ac.pi(z))
         return tf.squeeze(pmf.sample()).numpy()
 
@@ -153,16 +153,18 @@ class Agent:
     def encode(self,obs):
         img = tf.expand_dims(tf.convert_to_tensor(obs['image']), 0)
         frc = tf.expand_dims(tf.convert_to_tensor(obs['force']), 0)
-        z_mean,z_logv,z = self.wm.latent.encoder([img,frc])
+        mu,sigma = self.wm.encoder([img,frc])
+        z = mvnd_dist(mu,sigma).sample()
         return tf.squeeze(z).numpy()
 
     def decode(self,feature):
         z = tf.expand_dims(tf.convert_to_tensor(feature), 0)
-        image, force = self.wm.latent.decoder(z)
+        image, force = self.wm.decoder(z)
         return tf.squeeze(image).numpy(),tf.squeeze(force).numpy()
 
     def imagine(self,z,a):
         a = tf.expand_dims(tf.one_hot(a,self.action_dim),0)
         z = tf.expand_dims(tf.convert_to_tensor(z), 0)
-        z1_mean, z1_logv, z1 = self.wm.dynamics.transit([z,a])
+        mu1, sigma1 = self.wm.dynamics([z,a])
+        z1 = mvnd_dist(mu1,sigma1).sample()
         return tf.squeeze(z1).numpy()

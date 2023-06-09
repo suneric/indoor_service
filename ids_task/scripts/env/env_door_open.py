@@ -123,7 +123,6 @@ class DoorOpenEnv(GymGazeboEnv):
         self.robot.reset_joints(vpos=0.75,hpos=0.13,spos=0,ppos=0)
         self.robot.lock_joints(v=True,h=True,s=True,p=True)
         self.robot.reset_ft_sensors()
-        print("reset robot")
 
     def robot_init_pose(self,cx,cy,theta):
         """

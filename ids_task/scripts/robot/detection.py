@@ -18,24 +18,23 @@ from ids_detection.msg import DetectionInfo
 import warnings
 
 def display_observation(name, image):
-    cv.imshow(name,image)
+    cv.imshow(name, image)
     cv.waitKey(1) # delay for 1 milliseconds
 
 """
 Draw image with detected bounding boxes
 """
 def draw_detection(image, detect):
-    if image is None:
-        return None
-    names = ["door","lever","human","outlet","socket"]
-    colors = [(255,0,0),(255,255,0),(0,255,0),(0,255,255),(0,0,255)]
-    for i in range(len(detect)):
-        info = detect[i]
-        label = names[int(info.type)]
-        clr = colors[int(info.type)]
-        l,t,r,b = int(info.l),int(info.t),int(info.r),int(info.b)
-        cv.rectangle(image, (l,t), (r,b), clr, 2)
-        cv.putText(image, label, (l-10,t-10), cv.FONT_HERSHEY_SIMPLEX, 0.5, clr, 1)
+    if image is not None:
+        names = ["door","lever","human","outlet","socket"]
+        colors = [(255,0,0),(255,255,0),(0,255,0),(0,255,255),(0,0,255)]
+        for i in range(len(detect)):
+            info = detect[i]
+            label = names[int(info.type)]
+            clr = colors[int(info.type)]
+            l,t,r,b = int(info.l),int(info.t),int(info.r),int(info.b)
+            cv.rectangle(image, (l,t), (r,b), clr, 2)
+            cv.putText(image, label, (l-10,t-10), cv.FONT_HERSHEY_SIMPLEX, 0.5, clr, 1)
     return image
 
 """
