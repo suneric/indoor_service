@@ -44,7 +44,7 @@ class AutoChargeEnv(GymGazeboEnv):
         self.vision_type = vision_type
         self.observation_space = ((64,64,1),3,2) # image,force,joint
         if self.continuous:
-            self.action_space = Box(-5.0,5.0,(2,),dtype=np.float32)
+            self.action_space = Box(-3.0,3.0,(2,),dtype=np.float32)
         else:
             self.action_space = Discrete(8) #
         self.robot = MRobot()
@@ -79,12 +79,12 @@ class AutoChargeEnv(GymGazeboEnv):
         detect = self.detect_sockets(idx%2) # 0 for upper, 1 for lower
         self.obs_image = self.robot.camARD1.binary_arr((64,64),detect)
         self.obs_force = self.robot.plug_forces()
-        self.obs_joint = [0,0]
+        self.obs_joint = np.array([0,0])
 
     def _take_action(self, action):
         act = self.get_action(action)
         self.robot.set_plug_joints(act[0],act[1])
-        self.obs_joint += np.sign(act)
+        self.obs_joint = self.obs_joint+action if self.continuous else self.obs_joint+np.sign(act)
         self.robot.lock_joints(v=True,h=True,s=True,p=True)
         self.robot.move(0.5,0.0) # move forward for insertion
         rate = rospy.Rate(30)
@@ -127,13 +127,13 @@ class AutoChargeEnv(GymGazeboEnv):
         dist2 = np.sqrt((pos[0]-self.goal[0])**2 + (pos[2]-self.goal[2])**2)
         return dist1, dist2
 
-    def get_action(self, idx):
+    def get_action(self, action):
         sh,sv = 0.001, 0.001 # 1 mm, scale for horizontal and vertical move
         if self.continuous:
-            return (action[0]*sh, action[1]*sv)
+            return np.array([action[0]*sh, action[1]*sv])
         else:
-            act_list = [(sh,-sv),(sh,0),(sh,sv),(0,-sv),(0,sv),(-sh,-sv),(-sh,0),(-sh,sv)]
-            return act_list[idx]
+            act_list = [[sh,-sv],[sh,0],[sh,sv],[0,-sv],[0,sv],[-sh,-sv],[-sh,0],[-sh,sv]]
+            return np.array(act_list[action])
 
     def set_init_positions(self,goalIdx=None,rad=None,offset=0.5):
         self.initGoalIdx = goalIdx

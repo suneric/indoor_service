@@ -85,6 +85,29 @@ class DoorOpenEnv(GymGazeboEnv):
             self.prev_angle = self.curr_angle
         return reward
 
+    def is_failed(self):
+        """
+        Fail when the robot is not out of the room and the side bar is far away from the door
+        """
+        fp = self.poseSensor.robot_footprint()
+        robot_not_out = any(fp[key][0] > 0.0 for key in fp.keys())
+        if robot_not_out:
+            cam_r = np.sqrt(fp['camera'][0]**2+fp['camera'][1]**2)
+            cam_a = np.arctan2(fp['camera'][0],fp['camera'][1])
+            door_r = self.door_length
+            door_a = self.poseSensor.door_angle()
+            if cam_r > 1.1*door_r or cam_a > 1.1*door_a:
+                return True
+        return False
+
+    def get_action(self, action):
+        vx, vz = 1.0, np.pi/2 # scale of linear and angular velocity
+        if self.continuous:
+            return np.array([action[0]*vx, action[1]*vz])
+        else:
+            act_list = [[vx,-vz],[vx,0.0],[vx,vz],[0,-vz],[0,vz],[-vx,-vz],[-vx,0],[-vx,vz]]
+            return np.array(act_list[action])
+
     def reset_robot(self):
         self.robot.stop()
         rate = rospy.Rate(10)
@@ -114,26 +137,3 @@ class DoorOpenEnv(GymGazeboEnv):
         E = tft.euler_from_matrix(R[0:3,0:3],'rxyz')
         rx, ry, rt = R[0,3], R[1,3], E[2]
         return rx, ry, rt
-
-    def is_failed(self):
-        """
-        Fail when the robot is not out of the room and the side bar is far away from the door
-        """
-        fp = self.poseSensor.robot_footprint()
-        robot_not_out = any(fp[key][0] > 0.0 for key in fp.keys())
-        if robot_not_out:
-            cam_r = np.sqrt(fp['camera'][0]**2+fp['camera'][1]**2)
-            cam_a = np.arctan2(fp['camera'][0],fp['camera'][1])
-            door_r = self.door_length
-            door_a = self.poseSensor.door_angle()
-            if cam_r > 1.1*door_r or cam_a > 1.1*door_a:
-                return True
-        return False
-
-    def get_action(self, action):
-        vx, vz = 1.0, np.pi/2 # scale of linear and angular velocity
-        if self.continuous:
-            return (action[0]*vx, action[1]*vz)
-        else:
-            act_list = [(vx,-vz),(vx,0.0),(vx,vz),(0,-vz),(0,vz),(-vx,-vz),(-vx,0),(-vx,vz)]
-            return act_list[action]

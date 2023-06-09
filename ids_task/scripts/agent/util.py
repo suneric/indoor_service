@@ -1,6 +1,7 @@
 import numpy as np
 import scipy.signal
 from collections import deque
+from tensorflow_probability import distributions as tfpd
 
 def discount_cumsum(x,discount):
     """
@@ -40,3 +41,47 @@ def zero_seq(dim,len):
     for _ in range(len):
         dq.append(np.zeros(dim))
     return dq
+
+def mvnd_dist(mu,sigma):
+    return tfpd.MultivariateNormalDiag(loc=mu,scale_diag=sigma)
+
+def normal_dist(mu,sigma=1.0):
+    return tfpd.Normal(loc=mu,scale=sigma)
+
+class GSNoise:
+    """
+    Gaussian Noise added to Action for better exploration
+    DDPG trains a deterministic policy in an off-policy way. Because the policy is deterministic, if the
+    agent were to explore on-policy, int the beginning it would probably not try a wide ennough varienty
+    of actions to find useful learning signals. To make DDPG policies explore better, we add noise to their
+    actions at traiing time. Uncorreletaed, mean-zero Gaussian noise work perfectly well, and it is suggested
+    as it is simpler. At test time, to see how well the policy exploits what it has learned, we don not add
+    noise to the actions.
+    """
+    def __init__(self, mu, sigma):
+        self.mu = mu
+        self.sigma = sigma
+
+    def __call__(self):
+        return np.random.normal(self.mu, self.sigma)
+
+class OUNoise:
+    """
+    Ornstein-Uhlenbeck process, samples noise from a correlated normal distribution.
+    Formula taken from https://www.wikipedia.org/wiki/Ornstein-Uhlenbeck_process.
+    """
+    def __init__(self, mu, sigma, theta=0.15, dt=1e-2, x_init=None):
+        self.theta = theta
+        self.mu = mu
+        self.sigma = sigma
+        self.dt = dt
+        self.x_init = x_init
+        self.reset()
+
+    def __call__(self):
+        x = self.x_prev+self.theta*(self.mu-self.x_prev)*self.dt+self.sigma*np.sqrt(self.dt)*np.random.normal(size=self.mu.shape)
+        self.x_prev = x
+        return x
+
+    def reset(self):
+        self.x_prev = self.x_init if self.x_init is not None else np.zeros_like(self.mu)

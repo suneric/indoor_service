@@ -55,6 +55,12 @@ def save_ppo_model(agent, model_dir, name):
     agent.save(actor_path, critic_path)
     print("save {} weights so far to {}".format(name, model_dir))
 
+def save_td3_model(agent, model_dir, name):
+    actor_path = os.path.join(model_dir, 'pi_net', name)
+    critic_path = os.path.join(model_dir, 'tq_net', name)
+    agent.save(actor_path, critic_path)
+    print("save {} weights so far to {}".format(name, model_dir))
+
 def save_vae(vae, model_dir, name):
     encoder_path = os.path.join(model_dir,'encoder', name)
     decoder_path = os.path.join(model_dir,'decoder', name)
