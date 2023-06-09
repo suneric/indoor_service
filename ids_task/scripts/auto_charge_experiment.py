@@ -243,7 +243,7 @@ class InsertTask:
         joint = [0,0]
         connected, step = False, 0
         while not connected and step < max:
-            obs = dict(image=image, force=10*force, joint=joint)
+            obs = dict(image=image, force=force/np.linalg.norm(force), joint=joint)
             act = self.get_action(self.model.policy(obs))
             #act = self.get_action(np.random.randint(8))
             self.robot.set_plug_joints(act[0],act[1])

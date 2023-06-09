@@ -43,7 +43,10 @@ class DoorOpenEnv(GymGazeboEnv):
         self.robot.check_ready()
 
     def _get_observation(self):
-        return dict(image=self.obs_image, force=self.obs_force)
+        return dict(
+            image=self.obs_image,
+            force=self.obs_force/np.linalg.norm(self.obs_force)
+        )
 
     def _post_information(self):
         return dict(

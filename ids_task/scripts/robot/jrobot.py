@@ -47,13 +47,13 @@ class JazzyRobot:
         self.ftPlug.reset()
         self.ftHook.reset()
 
-    def plug_forces(self, max=100):
+    def plug_forces(self):
         forces = np.array(self.ftPlug.forces())
-        return forces.clip(-max,max)
+        return forces
 
-    def hook_forces(self, max=100):
+    def hook_forces(self):
         forces = np.array(self.ftHook.forces())
-        return forces.clip(-max,max)
+        return forces
 
     def set_plug_joints(self, hdata, vdata):
         if hdata != 0:
