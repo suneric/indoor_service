@@ -6,12 +6,12 @@ from .model import *
 from .util import *
 
 class ReplayBuffer:
-    def __init__(self,capacity,image_shape,force_dim):
+    def __init__(self,capacity,image_shape,force_dim, action_dim):
         self.image = np.zeros([capacity]+list(image_shape), dtype=np.float32)
         self.image1 = np.zeros([capacity]+list(image_shape), dtype=np.float32)
         self.force = np.zeros((capacity, force_dim),dtype=np.float32)
         self.force1 = np.zeros((capacity, force_dim),dtype=np.float32)
-        self.action = np.zeros(capacity, dtype=np.int32)
+        self.action = np.zeros((capacity, action_dim), dtype=np.float32)
         self.reward = np.zeros(capacity, dtype=np.float32)
         self.done = np.zeros(capacity, dtype=np.float32)
         self.ptr,self.size,self.capacity = 0,0,capacity
@@ -48,27 +48,20 @@ class ActorCritic(keras.Model):
         self.q_opt = keras.optimizers.Adam(q_lr)
         self.gamma = gamma # discount
         self.lambd = lambd # disclam
-        self.action_dim = action_dim
 
     def train(self, wm, z, done, horizon=5):
         with tf.GradientTape() as actor_tape:
             actor_tape.watch(self.pi.trainable_variables)
             # imagine
-            rew,val = [],[]
-            a = categ_dist(self.pi(z)).sample()
-            a = tf.one_hot(a,self.action_dim,dtype=tf.float32)
-            mu,sigma = wm.dynamics([z,a])
-            pmf = mvnd_dist(mu,sigma)
-
-            # # returns = normal_dist(wm.reward(z1)).mode()
-            # for i in range(horizon):
-            #     a = categ_dist(self.pi(z)).sample()
-            #     mu,sigma = wm.dynamics([z,tf.one_hot(a,self.action_dim)])
-            #     z = mvnd_dist(mu,sigma).sample()
-            #     rew.append(normal_dist(wm.reward(z)).mode())
-            #     val.append(normal_dist(self.q(z)).mode())
-            # returns = compute_returns(rew[:-1],val[:-1],val[-1],self.gamma,self.lambd)
-            pi_loss = -tf.reduce_mean(pmf.log_prob(pmf.sample()))
+            rew, val = [], []
+            for i in range(horizon):
+                a = normal_dist(self.pi(z)).sample()
+                mu,sigma = wm.dynamics([z,a])
+                z = mvnd_dist(mu,sigma).sample()
+                rew.append(normal_dist(wm.reward(z)).mode())
+                val.append(normal_dist(self.q(z)).mode())
+            returns = compute_returns(rew[:-1],val[:-1],val[-1],self.gamma,self.lambd)
+            pi_loss = -tf.reduce_mean(returns)
         pi_grad = actor_tape.gradient(pi_loss, self.pi.trainable_variables)
         self.pi_opt.apply_gradients(zip(pi_grad, self.pi.trainable_variables))
 
@@ -87,7 +80,6 @@ class ActorCritic(keras.Model):
 class WorldModel(keras.Model):
     def __init__(self,image_shape,force_dim,latent_dim,action_dim,lr=1e-4,free_nats=3.0):
         super().__init__()
-        self.action_dim = action_dim
         self.encoder = obs_encoder(image_shape,force_dim,latent_dim)
         self.decoder = obs_decoder(latent_dim)
         self.reward = latent_reward(latent_dim)
@@ -102,7 +94,7 @@ class WorldModel(keras.Model):
             # prior
             mu,sigma = self.encoder([img,frc])
             dist = mvnd_dist(mu,sigma)
-            mu1_prior,sigma1_prior = self.dynamics([dist.sample(),tf.one_hot(act,self.action_dim)])
+            mu1_prior,sigma1_prior = self.dynamics([dist.sample(),act])
             prior_dist = mvnd_dist(mu1_prior,sigma1_prior)
             z1_prior = prior_dist.sample()
             # posterior
@@ -151,7 +143,7 @@ class Agent:
         frc = tf.expand_dims(tf.convert_to_tensor(obs['force']), 0)
         mu,sigma = self.wm.encoder([img,frc])
         latent = mvnd_dist(mu,sigma).sample()
-        pmf = tfpd.Categorical(logits=self.ac.pi(latent))
+        pmf = normal_dist(self.ac.pi(latent))
         act = pmf.sample() if training else pmf.mode()
         return tf.squeeze(act).numpy()
 
@@ -191,8 +183,8 @@ class Agent:
         return tf.squeeze(image).numpy(),tf.squeeze(force).numpy()
 
     def imagine(self,z,a):
-        a = tf.expand_dims(tf.one_hot(a,self.action_dim),0)
-        z = tf.expand_dims(tf.convert_to_tensor(z), 0)
+        a = tf.expand_dims(tf.convert_to_tensor(a),0)
+        z = tf.expand_dims(tf.convert_to_tensor(z),0)
         mu1, sigma1 = self.wm.dynamics([z,a])
         z1 = mvnd_dist(mu1,sigma1).sample()
         return tf.squeeze(z1).numpy()

@@ -195,11 +195,11 @@ def latent_reward(latent_dim,act='elu',out_act='linear'):
 """
 z actor network
 """
-def latent_actor(latent_dim,output_dim,act='elu'):
+def latent_actor(latent_dim,output_dim,act='elu',out_act='tanh'):
     z_input = keras.Input(shape=(latent_dim,))
     h = layers.Dense(64, activation=act,kernel_initializer='random_normal')(z_input)
     h = layers.Dense(64, activation=act,kernel_initializer='random_normal')(h)
-    output = layers.Dense(output_dim)(h)
+    output = layers.Dense(output_dim,activation=out_act)(h)
     model = keras.Model(inputs=z_input,outputs=output,name='latent_actor')
     print(model.summary())
     return model
@@ -207,11 +207,11 @@ def latent_actor(latent_dim,output_dim,act='elu'):
 """
 z critic network
 """
-def latent_critic(latent_dim,act='elu'):
+def latent_critic(latent_dim,act='elu',out_act='linear'):
     z_input = keras.Input(shape=(latent_dim,))
     h = layers.Dense(64, activation=act)(z_input)
     h = layers.Dense(64, activation=act)(h)
-    output = layers.Dense(1)(h)
+    output = layers.Dense(1,activation=out_act)(h)
     model = keras.Model(inputs=z_input,outputs=output,name='latent_critic')
     print(model.summary())
     return model
