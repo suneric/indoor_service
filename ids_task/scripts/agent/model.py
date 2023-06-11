@@ -148,15 +148,15 @@ observation decoder
 def obs_decoder(latent_dim,act='elu'):
     z_input = keras.Input(shape=(latent_dim,))
     h = layers.Dense(32,activation=act)(z_input)
-    h = layers.Dense(4*4*8+16, activation=act)(h)
-    vh = layers.Lambda(lambda x: x[:,0:4*4*8])(h) # split layer
-    vh = layers.Reshape((4,4,8))(vh)
+    h = layers.Dense(512+16, activation=act)(h)
+    vh = layers.Lambda(lambda x: x[:,0:512])(h) # split layer
+    vh = layers.Reshape((8,8,8))(vh)
     vh = layers.Conv2DTranspose(filters=8,kernel_size=3,strides=2,padding='same',activation=act)(vh)
     vh = layers.Conv2DTranspose(filters=16,kernel_size=3,strides=2,padding='same',activation=act)(vh)
     vh = layers.Conv2DTranspose(filters=32,kernel_size=3,strides=2,padding='same',activation=act)(vh)
     v_output = layers.Conv2DTranspose(filters=1,kernel_size=3,padding='same',activation='sigmoid')(vh)
 
-    fh = layers.Lambda(lambda x: x[:,4*4*8:])(h) # split layer
+    fh = layers.Lambda(lambda x: x[:,512:])(h) # split layer
     fh = layers.Dense(32,activation=act)(fh)
     f_output = layers.Dense(3, activation='tanh')(fh)
 
@@ -185,8 +185,8 @@ latent reward
 """
 def latent_reward(latent_dim,act='elu',out_act='linear'):
     z_input = keras.Input(shape=(latent_dim,))
-    h = layers.Dense(64, activation=act)(z_input)
-    h = layers.Dense(64, activation=act)(h)
+    h = layers.Dense(64, activation=act,kernel_initializer='random_normal')(z_input)
+    h = layers.Dense(64, activation=act,kernel_initializer='random_normal')(h)
     output = layers.Dense(1,activation=out_act)(h)
     model = keras.Model(inputs=z_input,outputs=output,name='latent_reward')
     print(model.summary())
@@ -195,23 +195,23 @@ def latent_reward(latent_dim,act='elu',out_act='linear'):
 """
 z actor network
 """
-def latent_actor_network(latent_dim,output_dim,act='elu'):
+def latent_actor(latent_dim,output_dim,act='elu'):
     z_input = keras.Input(shape=(latent_dim,))
-    h = layers.Dense(64, activation=act)(z_input)
-    h = layers.Dense(64, activation=act)(h)
+    h = layers.Dense(64, activation=act,kernel_initializer='random_normal')(z_input)
+    h = layers.Dense(64, activation=act,kernel_initializer='random_normal')(h)
     output = layers.Dense(output_dim)(h)
-    model = keras.Model(inputs=z_input,outputs=output)
-    #print(model.summary())
+    model = keras.Model(inputs=z_input,outputs=output,name='latent_actor')
+    print(model.summary())
     return model
 
 """
 z critic network
 """
-def latent_critic_network(latent_dim,act='elu'):
+def latent_critic(latent_dim,act='elu'):
     z_input = keras.Input(shape=(latent_dim,))
     h = layers.Dense(64, activation=act)(z_input)
     h = layers.Dense(64, activation=act)(h)
     output = layers.Dense(1)(h)
-    model = keras.Model(inputs=z_input,outputs=output)
-    #print(model.summary())
+    model = keras.Model(inputs=z_input,outputs=output,name='latent_critic')
+    print(model.summary())
     return model

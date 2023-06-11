@@ -78,15 +78,15 @@ class PPO:
         self.target_kld = target_kld
         self.beta = beta
 
-    def policy(self,obs):
+    def policy(self,obs,training=True):
         img = tf.expand_dims(tf.convert_to_tensor(obs['image']),0)
         frc = tf.expand_dims(tf.convert_to_tensor(obs['force']),0)
         jnt = tf.expand_dims(tf.convert_to_tensor(obs['joint']),0) if self.wantJoint else None
         logits = self.pi([img,frc,jnt]) if self.wantJoint else self.pi([img,frc])
         pmf = tfpd.Categorical(logits=logits)
-        act = tf.squeeze(pmf.sample()).numpy()
-        logp = tf.squeeze(pmf.log_prob(act)).numpy()
-        return act, logp
+        act = pmf.sample() if training else pmf.mode()
+        logp = pmf.log_prob(act)
+        return tf.squeeze(act).numpy(), tf.squeeze(logp).numpy()
 
     def value(self,obs):
         img = tf.expand_dims(tf.convert_to_tensor(obs['image']),0)
@@ -109,8 +109,8 @@ class PPO:
             advantage = tf.convert_to_tensor(advantage_buf[idxs])
             joint = tf.convert_to_tensor(joint_buf[idxs]) if self.wantJoint else None
             kld = self.update_policy(image,force,action,logprob,advantage,joint)
-            if kld > self.target_kld:
-                break
+            # if kld > self.target_kld:
+            #     break
         for _ in range(q_iter):
             idxs = np.random.choice(size,batch_size)
             image = tf.convert_to_tensor(image_buf[idxs])
@@ -149,6 +149,7 @@ class PPO:
             os.makedirs(os.path.dirname(critic_path))
         self.q.save_weights(critic_path)
 
-    def load(self, actor_path, critic_path):
+    def load(self, actor_path, critic_path = None):
         self.pi.load_weights(actor_path)
-        self.q.load_weights(critic_path)
+        if critic_path is not None:
+            self.q.load_weights(critic_path)

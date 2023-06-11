@@ -3,6 +3,22 @@ import scipy.signal
 from collections import deque
 from tensorflow_probability import distributions as tfpd
 
+def compute_returns(reward,value,bootstrap,discount,lambd):
+    """
+    """
+    lambd_returns = []
+    num_steps = len(reward)
+    # compute temporal difference
+    td = [reward[t]+discount*value[t+1] - value[t] for t in range(num_steps-1)]
+    # compute lambda returns
+    lambd_ret = bootstrap
+    for t in reversed(range(num_steps-1)):
+        lambd_ret = td[t] + discount*lambd*lambd_ret
+        lambd_returns.append(lambd_ret)
+    # reverse the lambda returns
+    lambd_returns.reverse()
+    return lambd_returns
+
 def discount_cumsum(x,discount):
     """
     magic from rllab for computing discounted cumulative sums of vectors
@@ -47,6 +63,9 @@ def mvnd_dist(mu,sigma):
 
 def normal_dist(mu,sigma=1.0):
     return tfpd.Normal(loc=mu,scale=sigma)
+
+def categ_dist(logits):
+    return tfpd.Categorical(logits=logits)
 
 class GSNoise:
     """
