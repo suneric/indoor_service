@@ -62,7 +62,8 @@ def mvnd_dist(mu,sigma):
     return tfpd.MultivariateNormalDiag(loc=mu,scale_diag=sigma)
 
 def normal_dist(mu,sigma=1.0):
-    return tfpd.Normal(loc=mu,scale=sigma)
+    dist = tfpd.Normal(loc=mu,scale=sigma)
+    return tfpd.Independent(dist,1)
 
 def categ_dist(logits):
     return tfpd.Categorical(logits=logits)

@@ -105,7 +105,7 @@ class DoorOpenEnv(GymGazeboEnv):
     def get_action(self, action):
         vx, vz = 1.0, 0.5*np.pi # scale of linear and angular velocity
         if self.continuous:
-            return np.array([vx*(1+action[0]),vz*(1+action[1])])
+            return np.array([2*vx*action[0],2*vz*action[1]])
         else:
             act_list = [[vx,-vz],[vx,0.0],[vx,vz],[0,-vz],[0,vz],[-vx,-vz],[-vx,0],[-vx,vz]]
             return np.array(act_list[action])

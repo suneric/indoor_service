@@ -26,8 +26,7 @@ def dreamer_train(env, num_episodes, max_steps, model_dir):
     buffer = ReplayBuffer(capacity,image_shape,force_dim,action_dim)
     agent = Agent(image_shape,force_dim,action_dim,latent_dim)
 
-    ep_returns,t,success_counter,best_ep_return = [],0,0,-np.inf
-    warmup, update_after = 1000,64
+    ep_returns,t,warmup,success_counter,best_ep_return = [],0,2000,0,-np.inf
     for ep in range(num_episodes):
         obs, done, ep_ret, step = env.reset(), False, 0, 0
         while not done and step < max_steps:
@@ -35,8 +34,7 @@ def dreamer_train(env, num_episodes, max_steps, model_dir):
             nobs,rew,done,info = env.step(act)
             buffer.add_experience(obs,act,rew,nobs,done)
             obs,ep_ret,step,t = nobs,ep_ret+rew,step+1,t+1
-            if t > update_after:
-                agent.train(buffer)
+            agent.train(buffer)
 
         ep_returns.append(ep_ret)
         success_counter = success_counter+1 if env.success else success_counter

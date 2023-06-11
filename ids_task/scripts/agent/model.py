@@ -154,7 +154,8 @@ def obs_decoder(latent_dim,act='elu'):
     vh = layers.Conv2DTranspose(filters=8,kernel_size=3,strides=2,padding='same',activation=act)(vh)
     vh = layers.Conv2DTranspose(filters=16,kernel_size=3,strides=2,padding='same',activation=act)(vh)
     vh = layers.Conv2DTranspose(filters=32,kernel_size=3,strides=2,padding='same',activation=act)(vh)
-    v_output = layers.Conv2DTranspose(filters=1,kernel_size=3,padding='same',activation='sigmoid')(vh)
+    v_output = layers.Conv2DTranspose(filters=1,kernel_size=3,padding='same',activation='tanh')(vh)
+    v_output = 0.5*v_output # output in [-0.5,0.5]
 
     fh = layers.Lambda(lambda x: x[:,512:])(h) # split layer
     fh = layers.Dense(32,activation=act)(fh)
@@ -183,7 +184,7 @@ def latent_dynamics(latent_dim,action_dim,act='elu',out_act='linear'):
 """
 latent reward
 """
-def latent_reward(latent_dim,act='elu',out_act='linear'):
+def latent_reward(latent_dim,act='elu',out_act='tanh'):
     z_input = keras.Input(shape=(latent_dim,))
     h = layers.Dense(64, activation=act,kernel_initializer='random_normal')(z_input)
     h = layers.Dense(64, activation=act,kernel_initializer='random_normal')(h)

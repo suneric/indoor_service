@@ -52,7 +52,6 @@ class ActorCritic(keras.Model):
     def train(self, wm, z, done, horizon=5):
         with tf.GradientTape() as actor_tape:
             actor_tape.watch(self.pi.trainable_variables)
-            # imagine
             rew, val = [], []
             for i in range(horizon):
                 a = normal_dist(self.pi(z)).sample()
@@ -101,18 +100,19 @@ class WorldModel(keras.Model):
             mu1_post,sigma1_post = self.encoder([img1,frc1])
             post_dist = mvnd_dist(mu1_post,sigma1_post)
             z1_post = post_dist.sample()
-            # reconstruction
+            # obs reconstruction
             img1_pred,frc1_pred = self.decoder(z1_prior)
+            img_dist = normal_dist(img1_pred)
+            frc_dist = normal_dist(frc1_pred)
+            # reward prediction
             rew_pred = self.reward(z1_prior)
-            img_dist = normal_dist(mu=img1_pred)
-            frc_dist = normal_dist(mu=frc1_pred)
-            rew_dist = normal_dist(mu=rew_pred)
+            rew_dist = normal_dist(rew_pred)
             # loss
-            kl_loss = tf.reduce_mean(tfpd.kl_divergence(post_dist,prior_dist))
             img_likes = tf.reduce_mean(img_dist.log_prob(img1))
             frc_likes = tf.reduce_mean(frc_dist.log_prob(frc1))
             rew_likes = tf.reduce_mean(rew_dist.log_prob(rew))
-            # kl_loss = tf.maximum(kl_loss, self.free_nats)
+            kl_loss = tf.reduce_mean(tfpd.kl_divergence(post_dist,prior_dist))
+            kl_loss = tf.maximum(kl_loss, self.free_nats)
             loss = kl_loss-(img_likes+frc_likes+rew_likes)
         grad = tape.gradient(loss, self.trainable_variables)
         self.optimizer.apply_gradients(zip(grad, self.trainable_variables))
@@ -137,14 +137,19 @@ class Agent:
         self.img_horizon = img_horizon
         self.wm = WorldModel(image_shape,force_dim,latent_dim,action_dim)
         self.ac = ActorCritic(latent_dim,action_dim)
+        self.expl_noise = 0.3
 
     def policy(self,obs,training=True):
         img = tf.expand_dims(tf.convert_to_tensor(obs['image']), 0)
         frc = tf.expand_dims(tf.convert_to_tensor(obs['force']), 0)
         mu,sigma = self.wm.encoder([img,frc])
         latent = mvnd_dist(mu,sigma).sample()
-        pmf = normal_dist(self.ac.pi(latent))
-        act = pmf.sample() if training else pmf.mode()
+        dist = normal_dist(self.ac.pi(latent))
+        act = dist.sample()
+        if training:
+            act = tf.clip_by_value(tfpd.Normal(act,self.expl_noise).sample(),-1,1)
+        else:
+            act = dist.mode()
         return tf.squeeze(act).numpy()
 
     def train(self,buffer,batch_size=32):
@@ -154,27 +159,27 @@ class Agent:
         img1 = tf.convert_to_tensor(data['image1'])
         frc1 = tf.convert_to_tensor(data['force1'])
         act = tf.convert_to_tensor(data['action'])
-        rew = tf.convert_to_tensor(data['reward'])
+        rew = tf.convert_to_tensor(data['reward']/100.0)
         done = tf.convert_to_tensor(data['done'])
         info = self.wm.train((img,frc,img1,frc1,act,rew,done))
-        print("world model training loss: {:.4f},{:.4f}, likes: {:.4f},{:.4f},{:.4f}".format(
-            info['loss'],
-            info['kl_loss'],
-            info['likes']['image'],
-            info['likes']['force'],
-            info['likes']['reward']
-        ))
+        # print("world model training loss: {:.4f},{:.4f}, likes: {:.4f},{:.4f},{:.4f}".format(
+        #     info['loss'],
+        #     info['kl_loss'],
+        #     info['likes']['image'],
+        #     info['likes']['force'],
+        #     info['likes']['reward']
+        # ))
         info = self.ac.train(self.wm,info['post'],done,horizon=self.img_horizon)
-        print("behavior training pi loss: {:.4f}, q loss: {:.4f}".format(
-            info['actor_loss'],
-            info["critic_loss"]
-        ))
+        # print("behavior training pi loss: {:.4f}, q loss: {:.4f}".format(
+        #     info['actor_loss'],
+        #     info["critic_loss"]
+        # ))
 
     def encode(self,obs):
         img = tf.expand_dims(tf.convert_to_tensor(obs['image']), 0)
         frc = tf.expand_dims(tf.convert_to_tensor(obs['force']), 0)
         mu,sigma = self.wm.encoder([img,frc])
-        z = mvnd_dist(mu,sigma).sample()
+        z = mvnd_dist(mu,sigma).mode()
         return tf.squeeze(z).numpy()
 
     def decode(self,feature):
@@ -186,5 +191,5 @@ class Agent:
         a = tf.expand_dims(tf.convert_to_tensor(a),0)
         z = tf.expand_dims(tf.convert_to_tensor(z),0)
         mu1, sigma1 = self.wm.dynamics([z,a])
-        z1 = mvnd_dist(mu1,sigma1).sample()
+        z1 = mvnd_dist(mu1,sigma1).mode()
         return tf.squeeze(z1).numpy()
