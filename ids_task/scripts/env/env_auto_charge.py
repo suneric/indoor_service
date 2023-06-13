@@ -60,7 +60,7 @@ class AutoChargeEnv(GymGazeboEnv):
         # config the environment
         self.initGoalIdx = None
         self.initRandom = None
-        self.initOffset = 0.525
+        self.initOffset = 0.55
 
     def _check_all_systems_ready(self):
         self.robot.check_ready()
@@ -153,7 +153,7 @@ class AutoChargeEnv(GymGazeboEnv):
         rt = np.pi/2
         rad = np.random.uniform(size=4) if self.initRandom is None else self.initRandom
         rx += 0.01*(rad[0]-0.5) # 1cm
-        ry += 0.01*(rad[1]-0.5) # 1cm
+        ry += 0.1*(rad[1]-0.5) # 1cm
         rh += 0.01*(rad[2]-0.5) # 1cm
         rt += 0.02*(rad[3]-0.5) # 1.146 deg, 0.02 rad
         self.robot.reset_joints(vpos=rh,hpos=0,spos=1.57,ppos=0.03)

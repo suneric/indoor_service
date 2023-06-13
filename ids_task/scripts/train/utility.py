@@ -4,6 +4,7 @@ import argparse
 import numpy as np
 import tensorflow as tf
 import matplotlib.pyplot as plt
+import cv2 as cv
 
 """
 https://www.tensorflow.org/guide/gpu#limiting_gpu_memory_growth
@@ -98,3 +99,6 @@ def test_model(env,agent,model_dir,ep,action_dim,max_step=50):
         z = agent.encode(nobs)
         if done:
             break
+
+def save_image(file_path, array, binary=True):
+    cv.imwrite(file_path, array*255 if binary else array)

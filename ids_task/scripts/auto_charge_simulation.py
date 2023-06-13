@@ -9,6 +9,7 @@ from robot.detection import ObjectDetection
 from robot.sensors import BumpSensor
 from agent.dqn import DQN
 from navigation import *
+from train.utility import save_image
 
 class ApproachTask:
     def __init__(self, robot, yolo_dir):
@@ -165,7 +166,7 @@ class InsertTask:
         self.robot = robot
         self.ardDetect = ObjectDetection(robot.camARD1,yolo_dir,scale=1.0,wantDepth=False)
         self.model = DQN(image_shape=(64,64,1),force_dim=3,action_dim=8,joint_dim=2)
-        self.model.load(os.path.join(policy_dir,'q_net/6000'))
+        self.model.load(os.path.join(policy_dir,'q_net/4500'))
         self.socketIdx = socketIdx
         self.bumper = BumpSensor()
 
@@ -174,23 +175,31 @@ class InsertTask:
         act_list = [(sh,-sv),(sh,0),(sh,sv),(0,-sv),(0,sv),(-sh,-sv),(-sh,0),(-sh,sv)]
         return act_list[idx]
 
-    def perform(self, max_attempts=3):
+    def perform(self, max_attempts=2):
         print("=== insert plug...")
         connected = False
         for i in range(max_attempts):
-            connected, force_profile = self.plug()
-            file = os.path.join(sys.path[0],'../dump',"MFProf_{}.csv".format(i))
-            pd.DataFrame(force_profile).to_csv(file)
+            connected, experience = self.plug()
+            file = os.path.join(sys.path[0],'../dump',"image_{}.jpg".format(i))
+            save_image(file,experience['image'])
+            file = os.path.join(sys.path[0],'../dump',"force_{}.csv".format(i))
+            pd.DataFrame(experience['force']).to_csv(file)
+            file = os.path.join(sys.path[0],'../dump',"joint_{}.csv".format(i))
+            pd.DataFrame(experience['joint']).to_csv(file)
             if connected:
                 break
         return self.push_plug() if connected else False
 
     def plug(self,max=15):
-        self.robot.ftPlug.reset_temp()
+        # self.robot.ftPlug.reset_temp()
+        experience = {'image':None,'force':[],'joint':[]}
         detect = self.adjust_plug(self.socketIdx)
         image = self.robot.camARD1.binary_arr((64,64),detect[self.socketIdx])
         force = self.robot.plug_forces()
         joint = [0,0]
+        experience['image'] = image.copy()
+        experience['force'].append(force/np.linalg.norm(force))
+        experience['joint'].append(joint)
         connected, step = False, 0
         while not connected and step < max:
             obs = dict(image=image, force=force/np.linalg.norm(force), joint=joint)
@@ -198,10 +207,12 @@ class InsertTask:
             self.robot.set_plug_joints(act[0],act[1])
             connected,force = self.insert_plug()
             joint += np.sign(act)
+            experience['force'].append(force/np.linalg.norm(force))
+            experience['joint'].append(joint)
             step += 1
         print("connected", connected)
-        profile = self.robot.ftPlug.temp_record()
-        return connected, profile
+        # profile = self.robot.ftPlug.temp_record()
+        return connected, experience
 
     def adjust_plug(self, idx=0, speed=0.5, target=3):
         self.robot.move(-speed,0.0)
@@ -311,8 +322,8 @@ if __name__ == "__main__":
     policy_dir = os.path.join(sys.path[0],"policy/plugin/binary")
     task = AutoChargeTask(robot,yolo_dir,policy_dir)
     task.prepare()
-    nav = BasicNavigator(robot)
-    nav.move2goal(create_goal(1.63497,1.8,np.pi/2))
+    # nav = BasicNavigator(robot)
+    # nav.move2goal(create_goal(1.63497,1.8,np.pi/2))
     success = task.perform()
     if success:
         robot.stop()

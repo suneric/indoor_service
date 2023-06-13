@@ -4,10 +4,12 @@ import sys, os
 import numpy as np
 import pandas as pd
 import tensorflow as tf
+import cv2 as cv
 from robot.jrobot import JazzyRobot
 from robot.detection import ObjectDetection
 from agent.dqn import DQN
 from agent.td3 import TD3
+from train.utility import save_image
 
 class ApproachTask:
     def __init__(self, robot, yolo_dir):
@@ -132,7 +134,7 @@ class AlignTask:
         self.robot.stop()
         return True
 
-    def adjust_plug(self,speed=0.4,target=3):
+    def adjust_plug(self,speed=0.4,target=3,v_offset=0):
         self.robot.move(speed,0.0)
         count, detect = self.ardDetect.socket()
         rate = rospy.Rate(10)
@@ -145,7 +147,7 @@ class AlignTask:
             return False
 
         rate = rospy.Rate(1)
-        err = (detect[1].t+detect[1].b)/2 - self.robot.camARD1.height/2
+        err = (detect[1].t+detect[1].b)/2 - (self.robot.camARD1.height/2+v_offset)
         print("adjusting, center v err: {:.4f}".format(err))
         while abs(err) > target:
             self.robot.set_plug_joints(0.0,-np.sign(err)*2)
@@ -153,7 +155,7 @@ class AlignTask:
             count, detect = self.ardDetect.socket()
             if count < 2:
                 continue
-            err = (detect[1].t+detect[1].b)/2 - self.robot.camARD1.height/2
+            err = (detect[1].t+detect[1].b)/2 - (self.robot.camARD1.height/2+v_offset)
             print("adjusting, center v err: {:.4f}".format(err))
 
         err = (detect[0].l+detect[0].r)/2 - (self.robot.camARD1.width/2)
@@ -209,7 +211,7 @@ class InsertTask:
         self.robot = robot
         self.ardDetect = ObjectDetection(robot.camARD1,yolo_dir,scale=1.0,wantDepth=False)
         self.model = DQN(image_shape=(64,64,1),force_dim=3,action_dim=8,joint_dim=2)
-        self.model.load(os.path.join(policy_dir,'q_net/6000'))
+        self.model.load(os.path.join(policy_dir,'q_net/5000'))
         # self.model = TD3(image_shape=(64,64,1),force_dim=3,action_dim=2,action_limit=3,joint_dim=2)
         # self.model.load(os.path.join(policy_dir,'td3/pi_net/2000'))
         self.socketIdx = socketIdx
@@ -223,37 +225,45 @@ class InsertTask:
             act_list = [[sh,-sv],[sh,0],[sh,sv],[0,-sv],[0,sv],[-sh,-sv],[-sh,0],[-sh,sv]]
             return np.array(act_list[action])
 
-    def perform(self, max_attempts=3):
+    def perform(self, max_attempts=2):
         print("=== insert plug...")
         connected = False
         for i in range(max_attempts):
             self.robot.ftPlug.reset_temp()
-            connected = self.plug()
-            force_profile = self.robot.ftPlug.temp_record()
-            file = os.path.join(sys.path[0],'../dump',"JFProf_{}.csv".format(i))
-            pd.DataFrame(force_profile).to_csv(file)
+            connected, experience = self.plug()
+            file = os.path.join(sys.path[0],'../dump',"image_{}.jpg".format(i))
+            save_image(file,experience['image'])
+            file = os.path.join(sys.path[0],'../dump',"force_{}.csv".format(i))
+            pd.DataFrame(experience['force']).to_csv(file)
+            file = os.path.join(sys.path[0],'../dump',"joint_{}.csv".format(i))
+            pd.DataFrame(experience['joint']).to_csv(file)
             if connected:
                 break
         return connected
 
-    def plug(self,max=20):
+    def plug(self,max=15):
+        experience = {'image':None,'force':[],'joint':[]}
         detect = self.adjust_plug()
         image = self.robot.camARD1.binary_arr((64,64),detect[self.socketIdx])
         force = self.robot.plug_forces()
         joint = [0,0]
+        experience['image'] = image.copy()
+        experience['force'].append(force/np.linalg.norm(force))
+        experience['joint'].append(joint)
         connected, step = False, 0
         while not connected and step < max:
             obs = dict(image=image, force=force/np.linalg.norm(force), joint=joint)
             act = self.get_action(self.model.policy(obs))
-            #act = self.get_action(np.random.randint(8))
             self.robot.set_plug_joints(act[0],act[1])
-            connected,force = self.insert_plug()
+            connected, force = self.insert_plug()
             joint = joint+act if self.continuous else joint+np.sign(act)
+            experience['force'].append(force/np.linalg.norm(force))
+            experience['joint'].append(joint)
             step += 1
         print("connected", connected)
-        return connected
+        return connected, experience
 
-    def adjust_plug(self,speed=0.4,target=3,v_offset=60):
+    def adjust_plug(self,speed=0.4,target=3,v_offset=0):
         self.robot.move(-speed,0.0)
         count, detect = self.ardDetect.socket()
         rate = rospy.Rate(10)
