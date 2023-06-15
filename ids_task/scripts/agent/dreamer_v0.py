@@ -1,6 +1,7 @@
 import os
 import numpy as np
 import tensorflow as tf
+from copy import deepcopy
 from tensorflow_probability import distributions as tfpd
 from .model import *
 from .util import *
@@ -11,7 +12,7 @@ class ReplayBuffer:
         self.image1 = np.zeros([capacity]+list(image_shape), dtype=np.float32)
         self.force = np.zeros((capacity, force_dim),dtype=np.float32)
         self.force1 = np.zeros((capacity, force_dim),dtype=np.float32)
-        self.action = np.zeros((capacity, action_dim), dtype=np.float32)
+        self.action = np.zeros(capacity, dtype=np.int32)
         self.reward = np.zeros(capacity, dtype=np.float32)
         self.done = np.zeros(capacity, dtype=np.float32)
         self.ptr,self.size,self.capacity = 0,0,capacity
@@ -39,9 +40,48 @@ class ReplayBuffer:
             done = self.done[idxs],
         )
 
+class DQN(keras.Model):
+    def __init__(self,latent_dim,action_dim,gamma=0.99,lr=2e-4,update_freq=500):
+        super().__init__()
+        self.action_dim = action_dim
+        self.q = latent_actor(latent_dim,action_dim)
+        self.optimizer = tf.keras.optimizers.Adam(lr)
+        self.q_stable = deepcopy(self.q)
+        self.update_freq = update_freq
+        self.learn_iter = 0
+        self.gamma = gamma
+
+    def train(self,z,z1,act,rew,done):
+        self.learn_iter += 1
+        """
+        Optimal Q-function follows Bellman Equation:
+        Q*(s,a) = E [r + gamma*max(Q*(s',a'))]
+        """
+        with tf.GradientTape() as tape:
+            tape.watch(self.q.trainable_variables)
+            # compute current Q
+            logits = self.q(z)
+            oh_act = tf.one_hot(act,depth=self.action_dim)
+            pred_q = tf.math.reduce_sum(logits*oh_act,axis=-1)
+            # compute target Q
+            logits1 = self.q(z1)
+            oh_act1 = tf.one_hot(tf.math.argmax(logits1,axis=-1),depth=self.action_dim)
+            s_logits = self.q_stable(z1)
+            next_q = tf.math.reduce_sum(s_logits*oh_act1,axis=-1)
+            true_q = rew + (1-done) * self.gamma * next_q
+            loss = tf.keras.losses.MSE(true_q, pred_q)
+        grad = tape.gradient(loss, self.q.trainable_variables)
+        self.optimizer.apply_gradients(zip(grad, self.q.trainable_variables))
+        """
+        copy train network weights to stable network
+        """
+        if self.learn_iter % self.update_freq == 0:
+            copy_network_variables(self.q_stable.trainable_variables, self.q.trainable_variables)
+
 class ActorCritic(keras.Model):
     def __init__(self,latent_dim,action_dim,pi_lr=1e-4,q_lr=1e-3,gamma=0.99,lambd=0.95):
         super().__init__()
+        self.action_dim = action_dim
         self.pi = latent_actor(latent_dim,action_dim)
         self.q = latent_critic(latent_dim)
         self.pi_opt = keras.optimizers.Adam(pi_lr)
@@ -79,6 +119,7 @@ class ActorCritic(keras.Model):
 class WorldModel(keras.Model):
     def __init__(self,image_shape,force_dim,latent_dim,action_dim,lr=1e-4,free_nats=3.0):
         super().__init__()
+        self.action_dim = action_dim
         self.encoder = obs_encoder(image_shape,force_dim,latent_dim)
         self.decoder = obs_decoder(latent_dim)
         self.reward = latent_reward(latent_dim)
@@ -93,7 +134,8 @@ class WorldModel(keras.Model):
             # prior
             mu,sigma = self.encoder([img,frc])
             dist = mvnd_dist(mu,sigma)
-            mu1_prior,sigma1_prior = self.dynamics([dist.sample(),act])
+            z = dist.sample()
+            mu1_prior,sigma1_prior = self.dynamics([z,tf.one_hot(act,self.action_dim)])
             prior_dist = mvnd_dist(mu1_prior,sigma1_prior)
             z1_prior = prior_dist.sample()
             # posterior
@@ -117,8 +159,9 @@ class WorldModel(keras.Model):
         grad = tape.gradient(loss, self.trainable_variables)
         self.optimizer.apply_gradients(zip(grad, self.trainable_variables))
         return dict(
-            prior = z1_prior,
-            post = z1_post,
+            z = z,
+            z1_prior = z1_prior,
+            z1_post = z1_post,
             loss = loss,
             kl_loss = kl_loss,
             likes = {
@@ -136,7 +179,8 @@ class Agent:
         self.action_dim = action_dim
         self.img_horizon = img_horizon
         self.wm = WorldModel(image_shape,force_dim,latent_dim,action_dim)
-        self.ac = ActorCritic(latent_dim,action_dim)
+        # self.ac = ActorCritic(latent_dim,action_dim)
+        self.ac = DQN(latent_dim,action_dim)
         self.expl_noise = 0.3
 
     def policy(self,obs,training=True):
@@ -147,33 +191,37 @@ class Agent:
         dist = normal_dist(self.ac.pi(latent))
         act = dist.sample()
         if training:
-            act = tf.clip_by_value(tfpd.Normal(act,self.expl_noise).sample(),-1,1)
+            act = tfpd.Normal(act,self.expl_noise).sample()
         else:
             act = dist.mode()
+        act = tf.clip_by_value(act,-1.0,1.0)
         return tf.squeeze(act).numpy()
 
-    def train(self,buffer,batch_size=32):
-        data = buffer.sample(batch_size)
-        img = tf.convert_to_tensor(data['image'])
-        frc = tf.convert_to_tensor(data['force'])
-        img1 = tf.convert_to_tensor(data['image1'])
-        frc1 = tf.convert_to_tensor(data['force1'])
-        act = tf.convert_to_tensor(data['action'])
-        rew = tf.convert_to_tensor(data['reward']/100.0)
-        done = tf.convert_to_tensor(data['done'])
-        info = self.wm.train((img,frc,img1,frc1,act,rew,done))
-        # print("world model training loss: {:.4f},{:.4f}, likes: {:.4f},{:.4f},{:.4f}".format(
-        #     info['loss'],
-        #     info['kl_loss'],
-        #     info['likes']['image'],
-        #     info['likes']['force'],
-        #     info['likes']['reward']
-        # ))
-        info = self.ac.train(self.wm,info['post'],done,horizon=self.img_horizon)
-        # print("behavior training pi loss: {:.4f}, q loss: {:.4f}".format(
-        #     info['actor_loss'],
-        #     info["critic_loss"]
-        # ))
+    def policy_dqn(self,obs,epsilon=0.0):
+        if np.random.random() < epsilon:
+            return np.random.randint(self.action_dim)
+        else:
+            img = tf.expand_dims(tf.convert_to_tensor(obs['image']),0)
+            frc = tf.expand_dims(tf.convert_to_tensor(obs['force']),0)
+            mu,sigma = self.wm.encoder([img,frc])
+            latent = mvnd_dist(mu,sigma).sample()
+            logits = self.ac.q(latent)
+            return np.argmax(logits)
+
+    def train(self,buffer,batch_size=32,epochs=1):
+        info,act,rew,done = None,None,None,None
+        for _ in range(epochs):
+            data = buffer.sample(batch_size)
+            img = tf.convert_to_tensor(data['image'])
+            frc = tf.convert_to_tensor(data['force'])
+            img1 = tf.convert_to_tensor(data['image1'])
+            frc1 = tf.convert_to_tensor(data['force1'])
+            act = tf.convert_to_tensor(data['action'])
+            rew = tf.convert_to_tensor(data['reward']/100.0)
+            done = tf.convert_to_tensor(data['done'])
+            info = self.wm.train((img,frc,img1,frc1,act,rew,done))
+            print(info["loss"].numpy(),info["likes"]["image"].numpy())
+        self.ac.train(info['z'],info['z1_post'],act,rew,done)
 
     def encode(self,obs):
         img = tf.expand_dims(tf.convert_to_tensor(obs['image']), 0)
@@ -188,7 +236,7 @@ class Agent:
         return tf.squeeze(image).numpy(),tf.squeeze(force).numpy()
 
     def imagine(self,z,a):
-        a = tf.expand_dims(tf.convert_to_tensor(a),0)
+        a = tf.expand_dims(tf.convert_to_tensor(tf.one_hot(a,self.action_dim)),0)
         z = tf.expand_dims(tf.convert_to_tensor(z),0)
         mu1, sigma1 = self.wm.dynamics([z,a])
         z1 = mvnd_dist(mu1,sigma1).mode()

@@ -65,7 +65,7 @@ class DoorOpenEnv(GymGazeboEnv):
     def _take_action(self, action):
         act = self.get_action(action)
         self.robot.move(act[0],act[1])
-        rospy.sleep(1)
+        rospy.sleep(0.5)
         self.obs_image = self.robot.camARD2.grey_arr((64,64))
         self.obs_force = self.robot.hook_forces()
         self.curr_angle = self.poseSensor.door_angle()
@@ -79,11 +79,11 @@ class DoorOpenEnv(GymGazeboEnv):
         reward = -1 # step penalty
         if self.success:
             reward = 100
-
         elif self.fail:
             reward = -100
         else:
-            reward += 100*(self.curr_angle-self.prev_angle)
+            angle_change = (self.curr_angle-self.prev_angle)
+            reward = 100*angle_change + reward if abs(angle_change) > 0 else reward - 5
             self.prev_angle = self.curr_angle
         return reward
 
@@ -105,7 +105,10 @@ class DoorOpenEnv(GymGazeboEnv):
     def get_action(self, action):
         vx, vz = 1.0, 0.5*np.pi # scale of linear and angular velocity
         if self.continuous:
-            return np.array([2*vx*action[0],2*vz*action[1]])
+            # a discrete continuous space [[~-1.0],[~-0.5*pi]], [[1.0~],[0.5*pi~]]
+            act_x = (np.sign(action[0])+action[0])*vx
+            act_z = (np.sign(action[1])+action[1])*vz
+            return np.array([act_x,act_z])
         else:
             act_list = [[vx,-vz],[vx,0.0],[vx,vz],[0,-vz],[0,vz],[-vx,-vz],[-vx,0],[-vx,vz]]
             return np.array(act_list[action])

@@ -93,7 +93,7 @@ def test_model(env,agent,model_dir,ep,action_dim,max_step=50):
     plot_predict(agent,obs,None,None,os.path.join(ep_path,"step{}".format(0)))
     z = agent.encode(obs)
     for i in range(max_step):
-        a = agent.policy(obs)
+        a = agent.policy_dqn(obs)
         nobs,rew,done,info = env.step(a)
         plot_predict(agent,nobs,z,a,os.path.join(ep_path,"step{}".format(i+1)))
         z = agent.encode(nobs)
