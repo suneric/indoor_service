@@ -18,39 +18,38 @@ TEST socket plug
 class PlugingTest:
     def __init__(self,env,policy=None,index=None):
         self.env = env
-        self.agent = agent
         self.policy = policy
-        self.agent = self.load_model(agent,policy,index)
+        self.agent = self.load_model(policy,index)
 
-    def load_model(self,agent,policy,index):
-        agent = DQN(image_shape,force_dim,action_dim,joint_dim)
-
-        if agent == 'dqn' and policy != 'random':
-            model_path = os.path.join(sys.path[0],"../policy/socket_plug/")+policy+"/q_net/"+str(index)
+    def load_model(self,policy,index):
+        if policy != 'random':
+            model_path = os.path.join(sys.path[0],"../policy/plugin",policy,"q_net",str(index))
             print("load model from", model_path)
-            self.model = DQN((64,64,1),3,2,8,gamma=0.99,lr=2e-4,update_freq=500)
-            self.model.load(model_path)
+            agent = DQN((64,64,1),3,8,2)
+            agent.load(model_path)
+            return agent
         else:
             print("undefined agent")
-            self.model = None
-
+            return None
 
     def action(self,obs):
         if self.agent is None or self.policy == 'random':
             return np.random.randint(self.env.action_space.n)
         else:
-            return self.model.policy(obs)
+            return self.agent.policy(obs)
 
-    def run(self, init_rad, offset_dist=0.5):
+    def run(self,target,init_rad,offset_dist=0.55):
         positions = []
-        self.env.set_init_random(init_rad,offset_dist)
-        obs, info = self.env.reset()
-        init = info["plug"]
+        self.env.set_init_positions(target,init_rad,offset_dist)
+        obs = self.env.reset()
+        init = None
         positions.append(init)
         done, step = False, 0
         while not done and step < 50:
             act = self.action(obs)
             obs, rew, done, info = self.env.step(act)
+            if init is None:
+                init = info["plug"]
             positions.append(info["plug"])
             if step == 0:
                 self.env.robot.ftPlug.reset()
@@ -62,14 +61,14 @@ RUN a single plug test for a policy on a target
 """
 def run_plug_test(env, policy, index, target, init_rads):
     print("run plug test", policy, index, target)
-    data_dir = os.path.join(sys.path[0],'dump',policy+'_'+str(target))
+    data_dir = os.path.join(sys.path[0],'../../dump',policy+'_'+str(target))
     if not os.path.exists(data_dir):
         os.mkdir(data_dir)
     try_count = len(init_rads)
-    test = SocketPlugTest(env,policy,index)
+    test = PlugingTest(env,policy,index)
     success_steps, results = [],[]
     for i in range(try_count):
-        success, step, forces, positions, init = test.run(init_rads[i])
+        success, step, forces, positions, init = test.run(target,init_rads[i])
         pd.DataFrame(forces).to_csv(data_dir+'/forces_'+str(i)+'.csv', index=False)
         pd.DataFrame(positions).to_csv(data_dir+'/positions_'+str(i)+'.csv', index=False)
         if success:
@@ -87,15 +86,14 @@ def dqn_test(env,policies,indices,model_dir):
     for policy in policies:
         for index in indices:
             for i in range(target_count):
-                env.set_goal(i)
-                success_count, mean_steps = run_plug_test(env,policy,iters,i,rads[i])
+                success_count, mean_steps = run_plug_test(env,policy,index,i,rads[i])
                 result.append((policy,index,i,success_count,mean_steps))
     return result
 
 def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--policy', type=str, default=None) # binary, greyscale, blind
-    parser.add_argument('--index', type=int, default=10000) # binary 6850, raw 6700
+    parser.add_argument('--index', type=int, default=None) # binary 6850, raw 6700
     return parser.parse_args()
 
 if __name__ == '__main__':
@@ -108,4 +106,4 @@ if __name__ == '__main__':
     env = AutoChargeEnv(continuous=False, yolo_dir=yolo_dir, vision_type='binary')
     result = dqn_test(env,policies,indices,model_dir)
     for item in result:
-        print("{}_{} target outlet {}, success {}, average steps {}".format(item[0],item[1],item[2],item[3,item[4]))
+        print("{}_{} target outlet {}, success {}, average steps {}".format(item[0],item[1],item[2],item[3],item[4]))

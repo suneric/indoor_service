@@ -211,11 +211,10 @@ class InsertTask:
         self.robot = robot
         self.ardDetect = ObjectDetection(robot.camARD1,yolo_dir,scale=1.0,wantDepth=False)
         self.model = DQN(image_shape=(64,64,1),force_dim=3,action_dim=8,joint_dim=2)
-        self.model.load(os.path.join(policy_dir,'q_net/5000'))
-        # self.model = TD3(image_shape=(64,64,1),force_dim=3,action_dim=2,action_limit=3,joint_dim=2)
-        # self.model.load(os.path.join(policy_dir,'td3/pi_net/2000'))
+        self.model.load(os.path.join(policy_dir,'q_net/10000'))
         self.socketIdx = socketIdx
         self.continuous = continuous
+        self.speedx = 0.4 # m/s linear speed
 
     def get_action(self,action):
         sh,sv = 1, 3 # 1 mm, scale for horizontal and vertical move
@@ -263,8 +262,8 @@ class InsertTask:
         print("connected", connected)
         return connected, experience
 
-    def adjust_plug(self,speed=0.4,target=3,v_offset=0):
-        self.robot.move(-speed,0.0)
+    def adjust_plug(self,target=3,v_offset=0):
+        self.robot.move(-self.speedx,0.0)
         count, detect = self.ardDetect.socket()
         rate = rospy.Rate(10)
         while count < 2:
@@ -297,10 +296,11 @@ class InsertTask:
                 continue
             err = (detect[0].l+detect[0].r)/2 - (self.robot.camARD1.width/2+v_offset)
             print("center u err: {:.4f}".format(err))
+        rate.sleep()
         return detect
 
-    def insert_plug(self,speed=0.4,f_max=15):
-        self.robot.move(speed,0.0)
+    def insert_plug(self,f_max=15):
+        self.robot.move(self.speedx,0.0)
         rate = rospy.Rate(10)
         inserted,forces = False,self.robot.plug_forces()
         while self.robot.is_safe(max_force=f_max):
@@ -311,11 +311,11 @@ class InsertTask:
             if inserted:
                 break
         if inserted:
-            self.robot.move(1.5*speed,0.0)
+            self.robot.move(1.5*self.speedx,0.0)
             while self.robot.is_safe(max_force=f_max):
                 rate.sleep()
         else:
-            self.robot.move(-speed,0.0)
+            self.robot.move(-self.speedx,0.0)
             while not self.robot.is_safe(max_force=5):
                 rate.sleep()
         self.robot.stop()
