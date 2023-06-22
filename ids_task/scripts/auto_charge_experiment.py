@@ -7,6 +7,7 @@ import tensorflow as tf
 import cv2 as cv
 from robot.jrobot import JazzyRobot
 from robot.detection import ObjectDetection
+from robot.sensors import ConnectionSensor
 from agent.dqn import DQN
 from agent.td3 import TD3
 from train.utility import save_image
@@ -207,22 +208,19 @@ class AlignTask:
 Plug Insertion Task
 """
 class InsertTask:
-    def __init__(self, robot, yolo_dir, policy_dir, socketIdx=0, continuous=False):
+    def __init__(self, robot, yolo_dir, policy_dir, socketIdx=0):
         self.robot = robot
         self.ardDetect = ObjectDetection(robot.camARD1,yolo_dir,scale=1.0,wantDepth=False)
         self.model = DQN(image_shape=(64,64,1),force_dim=3,action_dim=8,joint_dim=2)
         self.model.load(os.path.join(policy_dir,'q_net/10000'))
+        self.connSensor = ConnectionSensor()
         self.socketIdx = socketIdx
-        self.continuous = continuous
         self.speedx = 0.4 # m/s linear speed
 
     def get_action(self,action):
         sh,sv = 1, 3 # 1 mm, scale for horizontal and vertical move
-        if self.continuous:
-            return np.array([int(sh*action[0]),int(sv*action[1])])
-        else:
-            act_list = [[sh,-sv],[sh,0],[sh,sv],[0,-sv],[0,sv],[-sh,-sv],[-sh,0],[-sh,sv]]
-            return np.array(act_list[action])
+        act_list = [[sh,-sv],[sh,0],[sh,sv],[0,-sv],[0,sv],[-sh,-sv],[-sh,0],[-sh,sv]]
+        return np.array(act_list[action])
 
     def perform(self, max_attempts=2):
         print("=== insert plug...")
@@ -255,12 +253,39 @@ class InsertTask:
             act = self.get_action(self.model.policy(obs))
             self.robot.set_plug_joints(act[0],act[1])
             connected, force = self.insert_plug()
-            joint = joint+act if self.continuous else joint+np.sign(act)
+            joint += np.sign(act)
             experience['force'].append(force/np.linalg.norm(force))
             experience['joint'].append(joint)
             step += 1
         print("connected", connected)
         return connected, experience
+
+    def insert_plug(self,f_max=15):
+        self.robot.move(self.speedx,0.0)
+        rate = rospy.Rate(10)
+        forces,inserted,aimed = self.robot.plug_forces(),False,False
+        while self.robot.is_safe(max_force=f_max):
+            rate.sleep()
+            forces = self.robot.plug_forces()
+            print("forces: ({:.4f},{:.4f},{:.4f})".format(forces[0],forces[1],forces[2]))
+            abs_forces = [abs(v) for v in forces]
+            aimed = abs_forces[0] < 10 and (abs_forces[1] > 3 or abs_forces[2] > 3)
+            inserted = self.connSensor.connected()
+            if aimed or inserted:
+                break
+        if aimed and not inserted: # push plug
+            self.robot.move(1.5*self.speedx,0.0)
+            while self.robot.is_safe(max_force=20):
+                rate.sleep()
+                inserted = self.connSensor.connected()
+                if inserted:
+                    break
+        if not inserted:
+            self.robot.move(-self.speedx,0.0)
+            while not self.robot.is_safe(max_force=2):
+                rate.sleep()
+        self.robot.stop()
+        return inserted, forces
 
     def adjust_plug(self,target=3,v_offset=0):
         self.robot.move(-self.speedx,0.0)
@@ -278,7 +303,7 @@ class InsertTask:
             self.robot.set_plug_joints(0.0,-np.sign(err)*2)
             rate.sleep()
             count, detect = self.ardDetect.socket()
-            self.robot.move(-speed,0.0)
+            self.robot.move(-self.speedx,0.0)
             while count < 2:
                 rate.sleep()
                 count, detect = self.ardDetect.socket()
@@ -299,28 +324,6 @@ class InsertTask:
         rate.sleep()
         return detect
 
-    def insert_plug(self,f_max=15):
-        self.robot.move(self.speedx,0.0)
-        rate = rospy.Rate(10)
-        inserted,forces = False,self.robot.plug_forces()
-        while self.robot.is_safe(max_force=f_max):
-            rate.sleep()
-            forces = self.robot.plug_forces()
-            print("forces: ({:.4f},{:.4f},{:.4f})".format(forces[0],forces[1],forces[2]))
-            inserted = (abs(forces[0]) > 3 and abs(forces[0]) < 10 and abs(forces[1]) > 3 and abs(forces[2]) > 3)
-            if inserted:
-                break
-        if inserted:
-            self.robot.move(1.5*self.speedx,0.0)
-            while self.robot.is_safe(max_force=f_max):
-                rate.sleep()
-        else:
-            self.robot.move(-self.speedx,0.0)
-            while not self.robot.is_safe(max_force=5):
-                rate.sleep()
-        self.robot.stop()
-        return inserted, forces
-
 """
 Real Robot Charging Task
 """
@@ -329,7 +332,7 @@ class JazzyAutoCharge:
         self.robot = robot
         self.approach = ApproachTask(robot,yolo_dir)
         self.align = AlignTask(robot,yolo_dir)
-        self.insert = InsertTask(robot,yolo_dir,policy_dir,socketIdx=0,continuous=False)
+        self.insert = InsertTask(robot,yolo_dir,policy_dir,socketIdx=0)
 
     def prepare(self):
         self.robot.terminate()

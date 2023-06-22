@@ -5,7 +5,7 @@ import cv2 as cv
 from cv_bridge import CvBridge, CvBridgeError
 import sensor_msgs.point_cloud2 as pc2
 from sensor_msgs.msg import Image, CameraInfo, PointCloud2, CompressedImage
-from std_msgs.msg import Float32, Float32MultiArray, MultiArrayDimension
+from std_msgs.msg import Int32, Float32, Float32MultiArray, MultiArrayDimension
 from geometry_msgs.msg import WrenchStamped
 from gazebo_msgs.msg import ContactsState, ModelStates, LinkStates
 import tf.transformations as tft
@@ -455,10 +455,35 @@ class BumpSensor:
         data = None
         while data is None and not rospy.is_shutdown():
             try:
-                data = rospy.wait_for_message("/bumper_plug", ContactsState, timeout=5.0)
+                data = rospy.wait_for_message("/"+self.topic, ContactsState, timeout=5.0)
                 rospy.logdebug("Current bumper sensor  READY=>")
             except:
                 rospy.logerr("Current bumper sensor  not ready yet, retrying for getting /"+self.topic)
+"""
+Connection Sensor for detecting plug insertion to socket
+"""
+class ConnectionSensor:
+    def __init__(self, topic='connection'):
+        self.topic = topic
+        self.connect_sub = rospy.Subscriber('/'+self.topic, Int32, self._connect_cb)
+        self.inserted = False
+
+    def connected(self):
+        return self.inserted
+
+    def _connect_cb(self, msg):
+        val = msg.data
+        self.inserted = True if val == 1 else False
+
+    def check_sensor_ready(self):
+        rospy.logdebug("Waiting for connection sensor to be READY...")
+        msg = None
+        while msg is None and not rospy.is_shutdown():
+            try:
+                msg = rospy.wait_for_message("/"+self.topic, Int32, timeout=5.0)
+                rospy.logdebug("Current connection sensor  READY=>")
+            except:
+                rospy.logerr("Current connection sensor  not ready yet, retrying for getting /"+self.topic)
 
 """
 pose sensor

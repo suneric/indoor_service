@@ -1,8 +1,10 @@
 <launch>
   <arg name="simulation" default="1"/>
-  <arg name="task" default="auto_charge"/>
+  <arg name="camera" default="1"/>
+  <arg name="force" default="1"/>
   <node pkg="ids_task" type="visualization.py" name="visualization" output="screen">
     <param name="simulation" value="$(arg simulation)"/>
-    <param name="task" value="$(arg task)"/>
+    <param name="camera" value="$(arg camera)"/>
+    <param name="force" value="$(arg force)"/>
   </node>
 </launch>
