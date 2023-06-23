@@ -1,15 +1,14 @@
 #!/usr/bin/env python3
 import rospy
 import sys, os
+import cv2 as cv
 import numpy as np
 import pandas as pd
 import tensorflow as tf
-import cv2 as cv
 from robot.jrobot import JazzyRobot
 from robot.detection import ObjectDetection
 from robot.sensors import ConnectionSensor
 from agent.dqn import DQN
-from agent.td3 import TD3
 from train.utility import save_image
 
 class ApproachTask:

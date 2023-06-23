@@ -25,16 +25,20 @@ def display_observation(name, image):
 Draw image with detected bounding boxes
 """
 def draw_detection(image, detect):
-    if image is not None:
-        names = ["door","lever","human","outlet","socket"]
-        colors = [(255,0,0),(255,255,0),(0,255,0),(0,255,255),(0,0,255)]
-        for i in range(len(detect)):
-            info = detect[i]
-            label = names[int(info.type)]
-            clr = colors[int(info.type)]
-            l,t,r,b = int(info.l),int(info.t),int(info.r),int(info.b)
-            cv.rectangle(image, (l,t), (r,b), clr, 2)
-            cv.putText(image, label, (l-10,t-10), cv.FONT_HERSHEY_SIMPLEX, 0.5, clr, 1)
+    if detect is None:
+        return image
+    count = len(detect)
+    if count == 0:
+        return image
+    names = ["door","lever","human","outlet","socket"]
+    colors = [(255,0,0),(255,255,0),(0,255,0),(0,255,255),(0,0,255)]
+    for i in range(count):
+        info = detect[i]
+        label = names[int(info.type)]
+        clr = colors[int(info.type)]
+        l,t,r,b = int(info.l),int(info.t),int(info.r),int(info.b)
+        cv.rectangle(image, (l,t), (r,b), clr, 2)
+        cv.putText(image, label, (l-10,t-10), cv.FONT_HERSHEY_SIMPLEX, 0.5, clr, 1)
     return image
 
 """
@@ -187,7 +191,7 @@ Object Detector with Distance and Normal Evaluation
 class ObjectDetector:
     def __init__(self,sensor,dir,scale=1.0,count=50,wantDepth=False):
         self.sensor = sensor
-        self.net = torch.hub.load('ultralytics/yolov5','custom',path=os.path.join(dir,'best.pt'))
+        self.net = torch.hub.load('/home/ubuntu/cv_ws/yolov5','custom',path=os.path.join(dir,'best.pt'),source='local',force_reload=True)
         self.scale = scale
         self.count = count
         self.wantDepth = wantDepth
@@ -267,31 +271,27 @@ class ObjectDetection:
 
     def socket(self):
         detected = self.detector.detect(type=4,confidence_threshold=0.5)
-        display_observation("detection", draw_detection(self.sensor.color_image(),detected))
         count = len(detected)
         if count == 0:
-            return count, None
+            return 0, None
         elif len(detected) == 1:
             return count, detected
         elif len(detected) == 2:
             upper,lower = detected[0],detected[1]
             if upper.t > detected[1].t:
                 lower, upper = detected[0], detected[1]
-            return count, (upper,lower)
+            return count, [upper,lower]
         else:
             return count, detected
 
     def outlet(self):
         detected = self.detector.detect(type=3,confidence_threshold=0.5)
-        display_observation("detection", draw_detection(self.sensor.color_image(),detected))
         return detected[-1] if len(detected) > 0 else None
 
     def lever(self):
         detected = self.detector.detect(type=1,confidence_threshold=0.5)
-        display_observation("detection", draw_detection(self.sensor.color_image(),detected))
         return detected[-1] if len(detected) > 0 else None
 
     def door(self):
         detected = self.detector.detect(type=0,confidence_threshold=0.5)
-        display_observation("detection", draw_detection(self.sensor.color_image(),detected))
         return detected[-1] if len(detected) > 0 else None

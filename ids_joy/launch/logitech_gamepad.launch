@@ -2,6 +2,7 @@
 
 <launch>
   <arg name="joy_dev" default="/dev/input/js0" />
+  <arg name="simulation" default="1"/>
   <node name="joy" pkg="joy" type="joy_node" output="screen" >
     <param name="dev" value="$(arg joy_dev)" />
     <param name="autorepeat_rate" value="10" />
@@ -9,20 +10,17 @@
   </node>
 
   <node name="teleop" pkg="ids_joy" type="ids_joy_node" output="screen">
+    <param name="simulation" value="$(arg simulation)"/>
     <rosparam subst_value="true">
-      linear_axis: 3
       angular_axis: 0
-      horizontal_axis: 4
-      vertical_axis: 5
+      linear_axis: 4
+      horizontal_axis: 6
+      vertical_axis: 7
       stop_btn : 0
-      forward_btn: 4
-      backward_btn: 5
-
-      linear_scale: 1.0
+      linear_scale: 0.5
       angular_scale: 1.0
       horizontal_scale: 1.0
       vertical_scale: 1.0
-
     </rosparam>
   </node>
 </launch>

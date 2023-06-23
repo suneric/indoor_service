@@ -1,17 +1,18 @@
 #!/usr/bin/env python3
 import rospy
-import numpy as np
+import math
+import skimage
 import cv2 as cv
-from cv_bridge import CvBridge, CvBridgeError
+import numpy as np
+import tf.transformations as tft
 import sensor_msgs.point_cloud2 as pc2
+from cv_bridge import CvBridge, CvBridgeError
 from sensor_msgs.msg import Image, CameraInfo, PointCloud2, CompressedImage
 from std_msgs.msg import Int32, Float32, Float32MultiArray, MultiArrayDimension
 from geometry_msgs.msg import WrenchStamped
 from gazebo_msgs.msg import ContactsState, ModelStates, LinkStates
-import tf.transformations as tft
-import math
-import skimage
 from ids_detection.msg import DetectionInfo
+from .detection import draw_detection
 
 """
 https://en.wikipedia.org/wiki/Kalman_filter
@@ -149,10 +150,12 @@ class ArduCam:
     def image_size(self):
         return self.height, self.width
 
-    def color_image(self, resolution=None, code=None):
+    def color_image(self, resolution=None, code=None, detect=None):
         if self.cv_color is None:
             return None
-        img = resize_image(self.cv_color,resolution)
+        img = self.cv_color
+        img = draw_detection(img,detect)
+        img = resize_image(img,resolution)
         if code == 'rgb':
             img = cv.cvtColor(img, cv.COLOR_BGR2RGB)
         return img
@@ -255,17 +258,12 @@ class RSD435:
     def depth_image(self):
         return self.cv_depth
 
-    def color_image(self, resolution=None, code=None, detector=None):
+    def color_image(self, resolution=None, code=None, detect=None):
         if self.cv_color is None:
             return None
         img = self.cv_color
-        if detector and detector.ready():
-            info = detector.info[-1]
-            label = detector.names[int(info.type)]
-            l,t,r,b = int(info.l),int(info.t),int(info.r),int(info.b)
-            cv.rectangle(img, (l,t), (r,b), (0,255,0), 2)
-            cv.putText(img, label, (l-10,t-10), cv.FONT_HERSHEY_SIMPLEX, 0.5, (0,255,0), 1)
-        img = resize_image(self.cv_color,resolution)
+        img = draw_detection(img,detect)
+        img = resize_image(img,resolution)
         if code == 'rgb':
             img = cv.cvtColor(img, cv.COLOR_BGR2RGB)
         return img

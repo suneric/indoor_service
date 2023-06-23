@@ -3,6 +3,8 @@
 # include <sensor_msgs/Joy.h>
 # include <std_msgs/Float32MultiArray.h>
 # include <std_msgs/Int32.h>
+# include <std_msgs/Float64.h>
+# include <control_msgs/JointControllerState.h>
 
 // refereces
 // -http://wiki.ros.org/ps3joy
@@ -46,42 +48,57 @@ private:
 
 
   void joyCallback(const sensor_msgs::Joy::ConstPtr& joy);
+  void jh_cb(const control_msgs::JointControllerState::ConstPtr& msg);
+  void jv_cb(const control_msgs::JointControllerState::ConstPtr& msg);
   void motorCallback(const std_msgs::Float32MultiArray::ConstPtr& status);
   double getAxis(const sensor_msgs::JoyConstPtr& joy, const Axis &axis);
   bool getButton(const sensor_msgs::JoyConstPtr& joy, const Button &button);
   void stop();
 
+  int simulation;
+  double jh, jv;
   ros::NodeHandle nh;
-  ros::Subscriber joy_sub, motor_sub;
-  ros::Publisher base_pub, robo1_pub, robo2_pub, robo3_pub;
+  ros::Subscriber joy_sub, hm_sub, vm_sub;
+  ros::Publisher base_pub, hm_pub, vm_pub;
+
 };
 
 
 TeleopIDS::TeleopIDS()
 {
+  ros::param::get("/teleop/simulation",simulation);
   ros::param::get("/teleop/linear_axis", axes.linear.axis);
   ros::param::get("/teleop/angular_axis", axes.angular.axis);
   ros::param::get("/teleop/vertical_axis", axes.vertical.axis);
   ros::param::get("/teleop/horizontal_axis", axes.horizontal.axis);
   ros::param::get("/teleop/stop_btn", buttons.stop.button);
-  ros::param::get("/teleop/forward_btn", buttons.forward.button);
-  ros::param::get("/teleop/backward_btn", buttons.backward.button);
   ros::param::get("/teleop/linear_scale", axes.linear.factor);
   ros::param::get("/teleop/angular_scale", axes.angular.factor);
   ros::param::get("/teleop/horizontal_scale", axes.horizontal.factor);
   ros::param::get("/teleop/vertical_scale", axes.vertical.factor);
 
-  joy_sub = nh.subscribe<sensor_msgs::Joy>("joy", 10, &TeleopIDS::joyCallback, this);
-  motor_sub = nh.subscribe<std_msgs::Float32MultiArray>("robomotor_status", 10, &TeleopIDS::motorCallback, this);
+  joy_sub = nh.subscribe<sensor_msgs::Joy>("joy",3,&TeleopIDS::joyCallback,this);
   base_pub = nh.advertise<geometry_msgs::Twist>("cmd_vel",1);
-  robo1_pub = nh.advertise<std_msgs::Int32>("robo1_cmd",1);
-  robo2_pub = nh.advertise<std_msgs::Int32>("robo2_cmd",1);
-  robo3_pub = nh.advertise<std_msgs::Int32>("robo3_cmd",1);
+  if (simulation) {
+    hm_pub = nh.advertise<std_msgs::Float64>("joint_hslider_controller/command",1);
+    vm_pub = nh.advertise<std_msgs::Float64>("joint_vslider_controller/command",1);
+    hm_sub = nh.subscribe<control_msgs::JointControllerState>("joint_hslider_controller/state",3,&TeleopIDS::jh_cb,this);
+    vm_sub = nh.subscribe<control_msgs::JointControllerState>("joint_vslider_controller/state",3,&TeleopIDS::jv_cb,this);
+  }
+  else {
+    hm_pub = nh.advertise<std_msgs::Int32>("robo1_cmd",1);
+    vm_pub = nh.advertise<std_msgs::Int32>("robo3_cmd",1);
+  }
 }
 
-void TeleopIDS::motorCallback(const std_msgs::Float32MultiArray::ConstPtr& status)
+void TeleopIDS::jh_cb(const control_msgs::JointControllerState::ConstPtr& msg)
 {
-  // std::cout << "status" << std::endl;
+  jh = double(msg->process_value);
+}
+
+void TeleopIDS::jv_cb(const control_msgs::JointControllerState::ConstPtr& msg)
+{
+  jv = double(msg->process_value);
 }
 
 void TeleopIDS::joyCallback(const sensor_msgs::Joy::ConstPtr& joy)
@@ -92,30 +109,34 @@ void TeleopIDS::joyCallback(const sensor_msgs::Joy::ConstPtr& joy)
     stop();
   }
 
-  // motor driving
-  bool push = getButton(joy, buttons.forward);
-  bool pull = getButton(joy, buttons.backward);
-  if (push || pull)
-  {
-    std_msgs::Int32 msg;
-    msg.data = push ? 1 : -1;
-    robo2_pub.publish(msg);
-  }
-
   double h = getAxis(joy, axes.horizontal);
   if (std::abs(h) > 0)
   {
-    std_msgs::Int32 msg;
-    msg.data = (h > 0) ? 1 : -1;
-    robo1_pub.publish(msg);
+    std::cout << "horizontally move" << h << "\n";
+    if (simulation) {
+      std_msgs::Float64 msg;
+      msg.data = (h > 0) ? jh+0.001 : jh-0.001;
+      hm_pub.publish(msg);
+    } else {
+      std_msgs::Int32 msg;
+      msg.data = (h > 0) ? 1 : -1;
+      hm_pub.publish(msg);
+    }
   }
 
   double v = getAxis(joy, axes.vertical);
   if (std::abs(v) > 0)
   {
-    std_msgs::Int32 msg;
-    msg.data = (v > 0) ? 1 : -1;
-    robo3_pub.publish(msg);
+    std::cout << "vertically move" << v << "\n";
+    if (simulation) {
+      std_msgs::Float64 msg;
+      msg.data = (v > 0) ? jv+0.001 : jv-0.001;
+      vm_pub.publish(msg);
+    } else {
+      std_msgs::Int32 msg;
+      msg.data = (v > 0) ? 1 : -1;
+      vm_pub.publish(msg);
+    }
   }
 
   // base driving
@@ -155,12 +176,18 @@ bool TeleopIDS::getButton(const sensor_msgs::JoyConstPtr &joy, const Button &but
 
 void TeleopIDS::stop()
 {
-  std_msgs::Int32 stop;
-  stop.data = 0;
-  robo1_pub.publish(stop);
-  robo2_pub.publish(stop);
-  robo3_pub.publish(stop);
-
+  if (simulation) {
+    std_msgs::Float64 msg;
+    msg.data = jv;
+    vm_pub.publish(msg);
+    msg.data = jh;
+    hm_pub.publish(msg);
+  } else {
+    std_msgs::Int32 msg;
+    msg.data = 0;
+    vm_pub.publish(msg);
+    hm_pub.publish(msg);
+  }
   geometry_msgs::Twist twist;
   twist.angular.z = 0;
   twist.linear.x = 0;
