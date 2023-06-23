@@ -198,7 +198,7 @@ class ObjectDetector:
 
     def detect(self, type, confidence_threshold=0.5):
         if not self.sensor.ready():
-            print("sensor is not ready.")
+            print("detection: sensor is not ready.")
             return []
         img,W,H = self.sensor.cv_color, self.sensor.width, self.sensor.height
         boxes, labels = self.object_boxes(img)
@@ -271,6 +271,7 @@ class ObjectDetection:
 
     def socket(self):
         detected = self.detector.detect(type=4,confidence_threshold=0.5)
+        display_observation("detection", draw_detection(self.sensor.color_image(),detected))
         count = len(detected)
         if count == 0:
             return 0, None

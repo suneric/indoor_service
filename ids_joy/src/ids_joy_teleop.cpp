@@ -112,7 +112,7 @@ void TeleopIDS::joyCallback(const sensor_msgs::Joy::ConstPtr& joy)
   double h = getAxis(joy, axes.horizontal);
   if (std::abs(h) > 0)
   {
-    std::cout << "horizontally move" << h << "\n";
+    // std::cout << "horizontally move" << h << "\n";
     if (simulation) {
       std_msgs::Float64 msg;
       msg.data = (h > 0) ? jh+0.001 : jh-0.001;
@@ -127,7 +127,7 @@ void TeleopIDS::joyCallback(const sensor_msgs::Joy::ConstPtr& joy)
   double v = getAxis(joy, axes.vertical);
   if (std::abs(v) > 0)
   {
-    std::cout << "vertically move" << v << "\n";
+    // std::cout << "vertically move" << v << "\n";
     if (simulation) {
       std_msgs::Float64 msg;
       msg.data = (v > 0) ? jv+0.001 : jv-0.001;

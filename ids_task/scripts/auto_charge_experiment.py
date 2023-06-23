@@ -225,37 +225,43 @@ class InsertTask:
         print("=== insert plug...")
         connected = False
         for i in range(max_attempts):
-            self.robot.ftPlug.reset_temp()
             connected, experience = self.plug()
-            file = os.path.join(sys.path[0],'../dump',"image_{}.jpg".format(i))
-            save_image(file,experience['image'])
-            file = os.path.join(sys.path[0],'../dump',"force_{}.csv".format(i))
-            pd.DataFrame(experience['force']).to_csv(file)
-            file = os.path.join(sys.path[0],'../dump',"joint_{}.csv".format(i))
-            pd.DataFrame(experience['joint']).to_csv(file)
+            self.dump_data(connected,experience,i)
             if connected:
                 break
         return connected
 
+    def dump_data(self,connected,experience,idx):
+        raw = os.path.join(sys.path[0],'../dump',"image_raw_{}.jpg".format(idx))
+        binary = os.path.join(sys.path[0],'../dump',"image_bin_{}.jpg".format(idx))
+        action = os.path.join(sys.path[0],'../dump',"action_{}_{}.csv".format(idx,'success' if connected else 'fail'))
+        profile = os.path.join(sys.path[0],'../dump',"force_profile_{}.csv".format(idx))
+        save_image(raw,experience['image'])
+        save_image(binary,experience['imageb'])
+        pd.DataFrame(experience['action']).to_csv(action)
+        pd.DataFrame(experience['profile']).to_csv(profile)
+
     def plug(self,max=15):
-        experience = {'image':None,'force':[],'joint':[]}
+        experience = {'image':None,'imageb':None,'profile':None,'action':[]}
         detect = self.adjust_plug()
+        experience['image'] = self.robot.camARD1.color_image((64,64),detect=detect)
         image = self.robot.camARD1.binary_arr((64,64),detect[self.socketIdx])
+        experience['imageb'] = image.copy()
         force = self.robot.plug_forces()
         joint = [0,0]
-        experience['image'] = image.copy()
-        experience['force'].append(force/np.linalg.norm(force))
-        experience['joint'].append(joint)
         connected, step = False, 0
+        self.robot.ftPlug.reset_temp()
         while not connected and step < max:
-            obs = dict(image=image, force=force/np.linalg.norm(force), joint=joint)
+            force_n = force/np.linalg.norm(force)
+            obs = dict(image=image, force=force_n, joint=joint)
             act = self.get_action(self.model.policy(obs))
             self.robot.set_plug_joints(act[0],act[1])
+            step_action = [force[0],force[1],force[2],force_n[0],force_n[1],force_n[2],joint[0],joint[1],act[0],act[1]]
+            experience['action'].append(step_action)
             connected, force = self.insert_plug()
             joint += np.sign(act)
-            experience['force'].append(force/np.linalg.norm(force))
-            experience['joint'].append(joint)
             step += 1
+        experience['profile'] = self.robot.ftPlug.temp_record()
         print("connected", connected)
         return connected, experience
 
@@ -299,7 +305,7 @@ class InsertTask:
         err = (detect[1].t+detect[1].b)/2 - self.robot.camARD1.height/2
         print("center v err: {:.4f}".format(err))
         while abs(err) > target:
-            self.robot.set_plug_joints(0.0,-np.sign(err)*2)
+            self.robot.set_plug_joints(0.0,-np.sign(err)*2 if abs(err) < 10 else int(-0.1*err))
             rate.sleep()
             count, detect = self.ardDetect.socket()
             self.robot.move(-self.speedx,0.0)
@@ -336,6 +342,11 @@ class JazzyAutoCharge:
     def prepare(self):
         self.robot.terminate()
         print("== prepare for battery charging.")
+        if self.robot.camRSD.ready() and self.robot.camARD1.ready():
+            return True
+        else:
+            print("sensor is not ready.")
+            return False
 
     def perform(self):
         # success = self.approach.perform()
@@ -362,6 +373,11 @@ if __name__ == "__main__":
     yolo_dir = os.path.join(sys.path[0],'policy/detection/yolo')
     policy_dir = os.path.join(sys.path[0],"policy/plugin/binary")
     task = JazzyAutoCharge(robot, yolo_dir, policy_dir)
-    task.prepare()
-    task.perform()
+    ok = task.prepare()
+    if not ok:
+        print("fail to prepare.")
+    else:
+        ok = task.perform()
+        if not ok:
+            print("failed to perform.")
     task.terminate()
