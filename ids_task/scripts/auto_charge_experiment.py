@@ -134,7 +134,7 @@ class AlignTask:
         self.robot.stop()
         return True
 
-    def adjust_plug(self,speed=0.4,target=3,v_offset=0):
+    def adjust_plug(self,speed=0.4,target=3):
         self.robot.move(speed,0.0)
         count, detect = self.ardDetect.socket()
         rate = rospy.Rate(10)
@@ -147,7 +147,7 @@ class AlignTask:
             return False
 
         rate = rospy.Rate(1)
-        err = (detect[1].t+detect[1].b)/2 - (self.robot.camARD1.height/2+v_offset)
+        err = (detect[1].t+detect[1].b)/2 - (self.robot.camARD1.height/2)
         print("adjusting, center v err: {:.4f}".format(err))
         while abs(err) > target:
             self.robot.set_plug_joints(0.0,-np.sign(err)*2)
@@ -155,7 +155,7 @@ class AlignTask:
             count, detect = self.ardDetect.socket()
             if count < 2:
                 continue
-            err = (detect[1].t+detect[1].b)/2 - (self.robot.camARD1.height/2+v_offset)
+            err = (detect[1].t+detect[1].b)/2 - (self.robot.camARD1.height/2)
             print("adjusting, center v err: {:.4f}".format(err))
 
         err = (detect[0].l+detect[0].r)/2 - (self.robot.camARD1.width/2)
@@ -244,7 +244,7 @@ class InsertTask:
     def plug(self,max=15):
         experience = {'image':None,'imageb':None,'profile':None,'action':[]}
         detect = self.adjust_plug()
-        experience['image'] = self.robot.camARD1.color_image((64,64),detect=detect)
+        experience['image'] = self.robot.camARD1.color_image((64,64),detect=detect,code='rgb')
         image = self.robot.camARD1.binary_arr((64,64),detect[self.socketIdx])
         experience['imageb'] = image.copy()
         force = self.robot.plug_forces()
@@ -292,7 +292,7 @@ class InsertTask:
         self.robot.stop()
         return inserted, forces
 
-    def adjust_plug(self,target=3,v_offset=0):
+    def adjust_plug(self,target=3):
         self.robot.move(-self.speedx,0.0)
         count, detect = self.ardDetect.socket()
         rate = rospy.Rate(10)
@@ -305,7 +305,7 @@ class InsertTask:
         err = (detect[1].t+detect[1].b)/2 - self.robot.camARD1.height/2
         print("center v err: {:.4f}".format(err))
         while abs(err) > target:
-            self.robot.set_plug_joints(0.0,-np.sign(err)*2 if abs(err) < 10 else int(-0.1*err))
+            self.robot.set_plug_joints(0.0,-np.sign(err)*2)
             rate.sleep()
             count, detect = self.ardDetect.socket()
             self.robot.move(-self.speedx,0.0)
@@ -316,7 +316,7 @@ class InsertTask:
             err = (detect[1].t+detect[1].b)/2 - self.robot.camARD1.height/2
             print("center v err: {:.4f}".format(err))
 
-        err = (detect[0].l+detect[0].r)/2 - (self.robot.camARD1.width/2+v_offset)
+        err = (detect[0].l+detect[0].r)/2 - (self.robot.camARD1.width/2)
         print("center u err: {:.4f}".format(err))
         while abs(err) > target:
             self.robot.set_plug_joints(-np.sign(err)*1,0.0)
@@ -324,7 +324,7 @@ class InsertTask:
             count, detect = self.ardDetect.socket()
             if count < 2:
                 continue
-            err = (detect[0].l+detect[0].r)/2 - (self.robot.camARD1.width/2+v_offset)
+            err = (detect[0].l+detect[0].r)/2 - (self.robot.camARD1.width/2)
             print("center u err: {:.4f}".format(err))
         rate.sleep()
         return detect
