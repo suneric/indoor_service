@@ -5,11 +5,12 @@
 2. plug horizontal position (along X): -10cm, 0, 10cm
 3. orientation (about Z): (-5 degree, 5 degree)
 4. wall outlet height (along Z): 24.5cm, 37.5cm
-5. socket type: type B (white, zinc, brown), type B with dash (zinc-)
+5. socket type: type B (white, zinc, brown), type B with dash (zinc-, zinc-u)
 6. cover color: white, black, metal   
 7. light condition: normal, dark
 
 ## Test
+
 |No.|Light|Socket|Cover|Height|Plug Y (cm)|Plug X (cm)|Plug Z(cm)|Plug RZ (degree)|First Try|Second Try|
 |:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
 | 1 | normal | white | white | 37.5 | 30.2 | -2.1 | 39.2 | 0 | Fail | Success|
@@ -42,7 +43,6 @@
 | 28 | dark | zinc- | metal | 37.5 | 33.3 | -0.5 | 39.4 | 0 | Fail | Success |
 | 29 | dark | zinc- | metal | 37.5 | 44.6 | -2.8 | 42.7 | -2 | Fail | Fail |
 | 30 | dark | zinc- | metal | 37.5 | 36.5 | 1.5 | 38.3 | 1 | Success | - |
-
 | 31 | normal | zinc | black | 37.5 | 35.2 | -2.7 | 39.4 | -2 | Fail | Success |
 | 32 | normal | zinc | black | 37.5 | 30.5 | -4.1 | 38.2 | 1 | Fail | Success |
 | 33 | normal | zinc | black | 37.5 | 44.8 | -3.5 | 39.7 | -1 | Fail | Fail |
@@ -53,3 +53,14 @@
 | 38 | dark | zinc | black | 37.5 | 32.3 | 1.9 | 38.9 | -2 | Success | - |
 | 39 | dark | zinc | black | 37.5 | 47.6 | -0.9 | 42.6 | 1 | Success | - |
 | 40 | dark | zinc | black | 37.5 | 29.5 | -3.2 | 38.2 | 0 | Fail | Success |
+| 41 | normal | brown | metal | 37.5 | 31.8 | -2.3 | 39.3 | 0 | Success | - |
+| 42 | normal | zinc- | metal | 34.5 | 29.2 | -4.1 | 36.5 | -1 | Success | - |
+| 43 | normal | zinc- | metal | 34.5 | 38.6 | -3.5 | 37.2 | 2 | Success | - |
+| 44 | normal | zinc- | metal | 34.5 | 34.0 | 2.3 | 35.8 | -3 | Success | - |
+| 45 | dark | zinc- | metal | 34.5 | 36.3 | -1.1 | 36.9 | 1 | Success | - |
+| 46 | dark | zinc- | metal | 34.5 | 44.7 | 0.2 | 36.6 | 0 | Fail | Success |
+| 47 | dark | zinc- | metal | 34.5 | 37.1 | 1.1 | 35.7 | -2 | Success | - |
+| 48 | normal | zinc-u | metal | 37.5 | 32.2 | 1.6 | 38.2 | 0 | Success | - |
+| 49 | normal | zinc-u | metal | 37.5 | 45.0 | -0.9 | 39.6 | 2 | Fail | Success |
+| 50 | normal | zinc-u | white | 37.5 | 39.5 | -2.3| 42.2 | -2 | Fail | Success |
+| Total | - | - | - | - | - | - | - | - | 28/50 | 44/50 |  

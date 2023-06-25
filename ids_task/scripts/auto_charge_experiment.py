@@ -214,7 +214,7 @@ class InsertTask:
         self.model.load(os.path.join(policy_dir,'q_net/10000'))
         self.connSensor = ConnectionSensor()
         self.socketIdx = socketIdx
-        self.speedx = 0.4 # m/s linear speed
+        self.speedx = 0.5 # m/s linear speed
 
     def get_action(self,action):
         sh,sv = 1, 3 # 1 mm, scale for horizontal and vertical move
@@ -302,7 +302,7 @@ class InsertTask:
         self.robot.stop()
 
         rate = rospy.Rate(1)
-        err = (detect[1].t+detect[1].b)/2 - self.robot.camARD1.height/2
+        err = (detect[1].t+detect[1].b)/2 - self.robot.camARD1.height/2+10
         print("center v err: {:.4f}".format(err))
         while abs(err) > target:
             self.robot.set_plug_joints(0.0,-np.sign(err)*2)
@@ -313,7 +313,7 @@ class InsertTask:
                 rate.sleep()
                 count, detect = self.ardDetect.socket()
             self.robot.stop()
-            err = (detect[1].t+detect[1].b)/2 - self.robot.camARD1.height/2
+            err = (detect[1].t+detect[1].b)/2 - self.robot.camARD1.height/2+10
             print("center v err: {:.4f}".format(err))
 
         err = (detect[0].l+detect[0].r)/2 - (self.robot.camARD1.width/2)
