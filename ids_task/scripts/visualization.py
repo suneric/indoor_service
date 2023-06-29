@@ -31,13 +31,13 @@ class Visualizer:
             plt.ion()
             start = time.time()
             fig,cam,lineX,lineY,lineZ = self.initialize()
-            rate = rospy.Rate(2)
+            rate = rospy.Rate(1)
             while not rospy.is_shutdown():
                 # fig.suptitle("Sensor Information {:.2f} s".format(time.time()-start))
-                img = self.camera.color_image((200,200),code='rgb')
+                img = self.camera.color_image((400,400),code='rgb')
                 if img is not None:
                     cam.imshow(img)
-                profile = self.loadcell.profile(size=1000).clip(-30,30)
+                profile = self.loadcell.profile(size=1000)
                 lineX.set_ydata(profile[:,0])
                 lineY.set_ydata(profile[:,1])
                 lineZ.set_ydata(profile[:,2])
@@ -48,50 +48,49 @@ class Visualizer:
             pass
 
     def initialize(self):
-        fig = plt.figure(figsize=(9,3), constrained_layout = True)
+        fig = plt.figure(figsize=(9,3), constrained_layout=True)
         gs = fig.add_gridspec(1,2,width_ratios=[1,2])
-        gs1 = gs[1].subgridspec(3,1)
+        image = self.camera.color_image((400,400),code='rgb')
         cam = fig.add_subplot(gs[0])
         cam.set_title(self.cameraName)
         cam.set_xticks([])
         cam.set_yticks([])
-        img = self.camera.color_image((200,200),code='rgb')
-        if img is not None:
-            cam.imshow(img)
-        frcX = fig.add_subplot(gs1[0])
-        frcY = fig.add_subplot(gs1[1])
-        frcZ = fig.add_subplot(gs1[2])
-        frcX.set_title(self.forceName)
-        frcX.set_ylim(-30,30)
-        frcY.set_ylim(-30,30)
-        frcZ.set_ylim(-30,30)
-        frcX.set_ylabel("X (N)")
-        frcY.set_ylabel("Y (N)")
-        frcZ.set_ylabel("Z (N)")
-        profile = self.loadcell.profile(size=1000).clip(-30,30)
-        lineX = frcX.plot([f[0] for f in profile],color='red',label="X")
-        lineY = frcY.plot([f[1] for f in profile],color='green',label="Y")
-        lineZ = frcZ.plot([f[2] for f in profile],color='blue',label="Z")
-        # plt.legend()
+        if image is not None:
+            cam.imshow(image)
+        forces = self.loadcell.profile(size=1000)
+        frc = fig.add_subplot(gs[1])
+        frc.set_title(self.forceName)
+        frc.set_xticks([])
+        frc.set_ylim(-50,50)
+        frc.set_yticks([-50,-20,0,20,50])
+        frc.set_ylabel("Force (N)")
+        lineX = frc.plot([f[0] for f in forces],color='red',label="X")
+        lineY = frc.plot([f[1] for f in forces],color='green',label="Y")
+        lineZ = frc.plot([f[2] for f in forces],color='blue',label="Z")
+        plt.legend()
+        frc.plot([0,1000],[-20,-20],color='black',linestyle='dashed',linewidth=1)
+        frc.plot([0,1000],[20,20],color='black',linestyle='dashed',linewidth=1)
+        # gs1 = gs[1].subgridspec(3,1)
+        # frcX = fig.add_subplot(gs1[0])
+        # frcY = fig.add_subplot(gs1[1])
+        # frcZ = fig.add_subplot(gs1[2])
+        # frcX.set_title(self.forceName)
+        # frcX.set_ylim(-50,50)
+        # frcY.set_ylim(-50,50)
+        # frcZ.set_ylim(-50,50)
+        # frcX.set_xticks([])
+        # frcY.set_xticks([])
+        # frcZ.set_xticks([])
+        # frcX.set_ylabel("X (N)")
+        # frcY.set_ylabel("Y (N)")
+        # frcZ.set_ylabel("Z (N)")
+        # frcX.set_yticks([-50,-20,0,20,50])
+        # frcY.set_yticks([-50,-20,0,20,50])
+        # frcZ.set_yticks([-50,-20,0,20,50])
+        # lineX = frcX.plot([f[0] for f in profile],color='red',label="X")
+        # lineY = frcY.plot([f[1] for f in profile],color='green',label="Y")
+        # lineZ = frcZ.plot([f[2] for f in profile],color='blue',label="Z")
         return fig,cam,lineX[0],lineY[0],lineZ[0]
-
-    def get_detect(self):
-        if self.detector is None:
-            return []
-        detected_list = []
-        count, socket = self.detector.socket()
-        if socket is not None:
-            detected_list += socket
-        outlet = self.detector.outlet()
-        if outlet is not None:
-            detected_list.append(outlet)
-        door = self.detector.door()
-        if door is not None:
-            detected_list.append(door)
-        lever = self.detector.lever()
-        if lever is not None:
-            detected_list.append(lever)
-        return detected_list
 
 def get_args():
     parser = argparse.ArgumentParser()

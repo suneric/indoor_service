@@ -16,4 +16,6 @@ if __name__ == '__main__':
     #print(data)
     subset = args.scale*data[['0','1','2']]#.iloc[-200:]
     subset.plot()
+    plt.legend(["X","Y","Z"])
+    plt.title("Plug Forces")
     plt.show()
