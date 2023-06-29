@@ -154,7 +154,7 @@ class WorldModel(keras.Model):
             frc_likes = tf.reduce_mean(frc_dist.log_prob(frc1))
             rew_likes = tf.reduce_mean(rew_dist.log_prob(rew))
             kl_loss = tf.reduce_mean(tfpd.kl_divergence(post_dist,prior_dist))
-            kl_loss = tf.maximum(kl_loss, self.free_nats)
+            # kl_loss = tf.maximum(kl_loss, self.free_nats)
             loss = kl_loss-(img_likes+frc_likes+rew_likes)
         grad = tape.gradient(loss, self.trainable_variables)
         self.optimizer.apply_gradients(zip(grad, self.trainable_variables))

@@ -65,7 +65,7 @@ class DoorOpenEnv(GymGazeboEnv):
     def _take_action(self, action):
         act = self.get_action(action)
         self.robot.move(act[0],act[1])
-        rospy.sleep(0.5)
+        rospy.sleep(1)
         self.obs_image = self.robot.camARD2.grey_arr((64,64))
         self.obs_force = self.robot.hook_forces()
         self.curr_angle = self.poseSensor.door_angle()
@@ -82,8 +82,8 @@ class DoorOpenEnv(GymGazeboEnv):
         elif self.fail:
             reward = -100
         else:
-            angle_change = (self.curr_angle-self.prev_angle)
-            reward = 100*angle_change + reward if abs(angle_change) > 0 else reward - 5
+            angle_change = (self.curr_angle-self.prev_angle)/(np.pi/2)
+            reward += 100*angle_change
             self.prev_angle = self.curr_angle
         return reward
 

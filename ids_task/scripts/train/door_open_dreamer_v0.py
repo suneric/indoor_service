@@ -26,7 +26,7 @@ def dreamer_train(env, num_episodes, max_steps, model_dir):
     agent = Agent(image_shape,force_dim,action_dim,latent_dim)
 
     epsilon, epsilon_stop, decay = 0.99, 0.01, 0.999
-    ep_returns,t,warmup,success_counter,best_ep_return = [],0,500,0,-np.inf
+    ep_returns,t,warmup,success_counter,best_ep_return = [],0,1000,0,-np.inf
     for ep in range(num_episodes):
         epsilon = max(epsilon_stop, epsilon*decay)
         obs, done, ep_ret, step = env.reset(), False, 0, 0
@@ -35,8 +35,8 @@ def dreamer_train(env, num_episodes, max_steps, model_dir):
             nobs,rew,done,info = env.step(act)
             buffer.add_experience(obs,act,rew,nobs,done)
             obs,ep_ret,step,t = nobs,ep_ret+rew,step+1,t+1
-            agent.train(buffer)
-
+            if t > warmup:
+                agent.train(buffer)
         ep_returns.append(ep_ret)
         success_counter = success_counter+1 if env.success else success_counter
         print("Episode *{}*: Return {:.4f}, Total Step {}, Success Count {} ".format(ep+1,ep_ret,t,success_counter))

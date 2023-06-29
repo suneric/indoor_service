@@ -20,6 +20,10 @@ def ppo_train(env, num_episodes, train_freq, max_steps, model_dir):
 
     buffer = ReplayBuffer(train_freq+max_steps,image_shape,force_dim)
     agent = PPO(image_shape,force_dim,action_dim)
+    # continue training
+    actor_path = os.path.join(sys.path[0],"../policy/pulling/force_vision/pi_net/5000")
+    critic_path = os.path.join(sys.path[0],"../policy/pulling/force_vision/q_net/5000")
+    agent.load(actor_path, critic_path)
 
     ep_returns, t, success_counter, best_ep_return = [], 0, 0, -np.inf
     for ep in range(num_episodes):
