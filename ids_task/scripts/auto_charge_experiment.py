@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 import tensorflow as tf
 from robot.jrobot import JazzyRobot
-from robot.detection import ObjectDetection
+from robot.detection import *
 from robot.sensors import ConnectionSensor
 from task.approch import ApproachTask
 from agent.dqn import DQN
@@ -34,11 +34,11 @@ class InsertionTask:
         success = self.adjust_plug(speedx=self.speedx)
         if not success:
             print("Fail to adjust the plug position.")
-            return self.initial_touch()
+            success = self.initial_touch()
         success = self.visual_servo()
         if not success:
             print("Fail to moving closer with visual servo.")
-            return initial_touch()
+            success = self.initial_touch()
         success = self.insert_plug()
         if not success:
             print("Fail to insert plug into wall outlet.")
@@ -156,7 +156,7 @@ class InsertionTask:
 
         rate = rospy.Rate(1)
         # use lower socket for vertical alignment
-        err = (detect[1].t+detect[1].b)/2 - self.robot.camARD1.height/2
+        err = (detect[1].t+detect[1].b)/2 - self.robot.camARD1.height/2+20
         print("adjusting, center v err: {:.2f}".format(err))
         while abs(err) > target:
             self.robot.set_plug_joints(0.0,-np.sign(err)*3)
@@ -164,7 +164,7 @@ class InsertionTask:
             count, detect = self.ardDetect.socket()
             while count < 2:
                 continue
-            err = (detect[1].t+detect[1].b)/2 - self.robot.camARD1.height/2
+            err = (detect[1].t+detect[1].b)/2 - self.robot.camARD1.height/2+20
             print("adjusting, center v err: {:.2f}".format(err))
         # use upper socket for horizontal alignment
         err = (detect[0].l+detect[0].r)/2 - (self.robot.camARD1.width/2)
@@ -230,7 +230,11 @@ if __name__ == "__main__":
     if not ok:
         print("Fail to prepare for charging.")
     else:
-        ok = task.perform()
-        if not ok:
-            print("Fail to perform autonomous charging.")
+        for i in range(10):
+            output = os.path.join(sys.path[0],'../dump',"detection_{}.png".format(i))
+            plot_vision(robot.camARD1,task.insert.ardDetect,output)
+            rospy.sleep(1)
+        # ok = task.perform()
+        # if not ok:
+        #     print("Fail to perform autonomous charging.")
     task.terminate()

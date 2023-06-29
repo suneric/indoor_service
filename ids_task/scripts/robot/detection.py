@@ -16,6 +16,29 @@ import torch
 from ids_detection.msg import DetectionInfo
 import warnings
 
+def plot_vision(camera, detection=None, output=None):
+    if not camera.ready():
+        return
+    detect = []
+    if detection is not None:
+        count, sockets = detection.socket()
+        if sockets is not None:
+            detect = sockets
+        outlet = detection.outlet()
+        if outlet is not None:
+            detect.append(outlet)
+        lever = detection.lever()
+        if lever is not None:
+            detect.append(lever)
+        door = detection.door()
+        if door is not None:
+            detect.append(door)
+    image = camera.color_image((400,400),code='bgr',detect=detect)
+    # image = 255*camera.binary_arr((400,400),detectInfo=detect[0])
+    cv.imshow('detection',image)
+    cv.waitKey(1)
+    cv.imwrite(output, image)
+
 def display_observation(name, image):
     cv.imshow(name, image)
     cv.waitKey(1) # delay for 1 milliseconds
@@ -337,7 +360,8 @@ class ObjectDetection:
         elif type == 3 or type == "outlet":
             return self.outlet()
         elif type == 4 or type == "socket":
-            return self.socket()
+            count, detected = self.socket()
+            return detected
         else:
             print("undefined target of object detection")
             return None
