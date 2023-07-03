@@ -70,8 +70,8 @@ class ReplayBuffer:
 class PPO:
     def __init__(self,image_shape,force_dim,action_dim,joint_dim=None,actor_lr=3e-4,critic_lr=2e-4,clip_ratio=0.2,beta=1e-3,target_kld=0.01):
         self.wantJoint = False if joint_dim is None else True
-        self.pi = actor_network(image_shape,force_dim,action_dim,joint_dim)
-        self.q = critic_network(image_shape,force_dim,joint_dim)
+        self.pi = actor_network(image_shape,force_dim,action_dim,joint_dim,maxpool=True)
+        self.q = critic_network(image_shape,force_dim,joint_dim,maxpool=True)
         self.pi_optimizer = tf.keras.optimizers.Adam(actor_lr)
         self.q_optimizer = tf.keras.optimizers.Adam(critic_lr)
         self.clip_ratio = clip_ratio
@@ -109,8 +109,8 @@ class PPO:
             advantage = tf.convert_to_tensor(advantage_buf[idxs])
             joint = tf.convert_to_tensor(joint_buf[idxs]) if self.wantJoint else None
             kld = self.update_policy(image,force,action,logprob,advantage,joint)
-            # if kld > self.target_kld:
-            #     break
+            if kld > 1.5*self.target_kld:
+                break
         for _ in range(q_iter):
             idxs = np.random.choice(size,batch_size)
             image = tf.convert_to_tensor(image_buf[idxs])

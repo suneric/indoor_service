@@ -28,7 +28,7 @@ class DoorOpenEnv(GymGazeboEnv):
         if self.continuous:
             self.action_space = Box(-1.0,1.0,(2,),dtype=np.float32)
         else:
-            self.action_space = Discrete(8)
+            self.action_space = Discrete(4)
         self.robot = MRobot()
         self.poseSensor = PoseSensor()
         self.success = False
@@ -103,14 +103,15 @@ class DoorOpenEnv(GymGazeboEnv):
         return False
 
     def get_action(self, action):
-        vx, vz = 1.0, 0.5*np.pi # scale of linear and angular velocity
+        vx, vz = 1.0, np.pi # scale of linear and angular velocity
         if self.continuous:
             # a discrete continuous space [[~-1.0],[~-0.5*pi]], [[1.0~],[0.5*pi~]]
             act_x = (np.sign(action[0])+action[0])*vx
             act_z = (np.sign(action[1])+action[1])*vz
             return np.array([act_x,act_z])
         else:
-            act_list = [[vx,-vz],[vx,0.0],[vx,vz],[0,-vz],[0,vz],[-vx,-vz],[-vx,0],[-vx,vz]]
+            # act_list = [[vx,-vz],[vx,0.0],[vx,vz],[0,-vz],[0,vz],[-vx,-vz],[-vx,0],[-vx,vz]]
+            act_list = [[vx,0.0],[0,-vz],[0,vz],[-vx,0]]
             return np.array(act_list[action])
 
     def reset_robot(self):
