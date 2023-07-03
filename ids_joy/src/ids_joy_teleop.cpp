@@ -35,15 +35,15 @@ private:
   {
     Axis linear;
     Axis angular;
-    Axis horizontal;
-    Axis vertical;
   } axes;
 
   struct
   {
     Button stop;
-    Button forward;
-    Button backward;
+    Button up;
+    Button down;
+    Button left;
+    Button right;
   } buttons;
 
 
@@ -69,13 +69,13 @@ TeleopIDS::TeleopIDS()
   ros::param::get("/teleop/simulation",simulation);
   ros::param::get("/teleop/linear_axis", axes.linear.axis);
   ros::param::get("/teleop/angular_axis", axes.angular.axis);
-  ros::param::get("/teleop/vertical_axis", axes.vertical.axis);
-  ros::param::get("/teleop/horizontal_axis", axes.horizontal.axis);
   ros::param::get("/teleop/stop_btn", buttons.stop.button);
+  ros::param::get("/teleop/up_btn", buttons.up.button);
+  ros::param::get("/teleop/down_btn", buttons.down.button);
+  ros::param::get("/teleop/left_btn", buttons.left.button);
+  ros::param::get("/teleop/right_btn", buttons.right.button);
   ros::param::get("/teleop/linear_scale", axes.linear.factor);
   ros::param::get("/teleop/angular_scale", axes.angular.factor);
-  ros::param::get("/teleop/horizontal_scale", axes.horizontal.factor);
-  ros::param::get("/teleop/vertical_scale", axes.vertical.factor);
 
   joy_sub = nh.subscribe<sensor_msgs::Joy>("joy",3,&TeleopIDS::joyCallback,this);
   base_pub = nh.advertise<geometry_msgs::Twist>("cmd_vel",1);
@@ -108,34 +108,52 @@ void TeleopIDS::joyCallback(const sensor_msgs::Joy::ConstPtr& joy)
   {
     stop();
   }
-
-  double h = getAxis(joy, axes.horizontal);
-  if (std::abs(h) > 0)
+  else if (getButton(joy, buttons.up))
   {
-    // std::cout << "horizontally move" << h << "\n";
     if (simulation) {
       std_msgs::Float64 msg;
-      msg.data = (h > 0) ? jh+0.001 : jh-0.001;
+      msg.data = jv+0.001;
+      vm_pub.publish(msg);
+    } else {
+      std_msgs::Int32 msg;
+      msg.data = 1;
+      vm_pub.publish(msg);
+    }
+  }
+  else if (getButton(joy, buttons.down))
+  {
+    if (simulation) {
+      std_msgs::Float64 msg;
+      msg.data = jv-0.001;
+      vm_pub.publish(msg);
+    } else {
+      std_msgs::Int32 msg;
+      msg.data = -1;
+      vm_pub.publish(msg);
+    }
+  }
+  else if (getButton(joy, buttons.left))
+  {
+    if (simulation) {
+      std_msgs::Float64 msg;
+      msg.data = jh+0.001;
       hm_pub.publish(msg);
     } else {
       std_msgs::Int32 msg;
-      msg.data = (h > 0) ? 1 : -1;
+      msg.data = 1;
       hm_pub.publish(msg);
     }
   }
-
-  double v = getAxis(joy, axes.vertical);
-  if (std::abs(v) > 0)
+  else if (getButton(joy, buttons.right))
   {
-    // std::cout << "vertically move" << v << "\n";
     if (simulation) {
       std_msgs::Float64 msg;
-      msg.data = (v > 0) ? jv+0.001 : jv-0.001;
-      vm_pub.publish(msg);
+      msg.data = jh-0.001;
+      hm_pub.publish(msg);
     } else {
       std_msgs::Int32 msg;
-      msg.data = (v > 0) ? 1 : -1;
-      vm_pub.publish(msg);
+      msg.data = -1;
+      hm_pub.publish(msg);
     }
   }
 

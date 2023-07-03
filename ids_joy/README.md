@@ -24,3 +24,12 @@ The axis and button mapping
   - LT: Axis 2
   - RT: Axis 5
   - dpad: Axis 6 (left->right), Axis 7(up->down)
+
+## Jazzy Robot Controller
+- Stop: button 1 (A)
+- Endeffector up: button 3 (Y)
+- Endeffector down: button 1 (B)
+- Endeffector left: button 4 (LB)
+- Endeffector right: button 5 (RB)
+- Base linear move: Axis 4 (Right Analog Stick, up<->down)
+- base angular move: Axis 0 (Left Analog Stick, left<->right)

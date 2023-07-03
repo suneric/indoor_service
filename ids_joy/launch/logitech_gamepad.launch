@@ -14,13 +14,13 @@
     <rosparam subst_value="true">
       angular_axis: 0
       linear_axis: 4
-      horizontal_axis: 6
-      vertical_axis: 7
-      stop_btn : 0
-      linear_scale: 0.5
+      stop_btn : 1
+      up_btn: 3
+      down_btn: 0
+      left_btn: 4
+      right_btn: 5
+      linear_scale: 1.0
       angular_scale: 1.0
-      horizontal_scale: 1.0
-      vertical_scale: 1.0
     </rosparam>
   </node>
 </launch>
