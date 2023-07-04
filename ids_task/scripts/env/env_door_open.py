@@ -133,8 +133,8 @@ class DoorOpenEnv(GymGazeboEnv):
         """
         given a camera pose, evaluate robot pose, only for reset robot
         """
-        camera_offset = (0.49,-0.19)
-        robot_length = 0.5
+        #camera_offset = (0.49,-0.19)
+        camera_offset = (0.63,-0.23) # longer sidebar
         cam_pose = [[np.cos(theta),np.sin(theta),0,cx],[-np.sin(theta),np.cos(theta),0,cy],[0,0,1,0.75],[0,0,0,1]]
         robot_to_cam_mat = [[1,0,0,camera_offset[0]],[0,1,0,camera_offset[1]],[0,0,1,0],[0,0,0,1]]
         R = np.dot(np.array(cam_pose),np.linalg.inv(np.array(robot_to_cam_mat)))

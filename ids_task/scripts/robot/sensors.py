@@ -93,7 +93,7 @@ def noise_image(image, var):
 ArduCam looks up for observing door open status
 """
 class ArduCam:
-    def __init__(self, name, compressed=False,flipCode=None):
+    def __init__(self,name,compressed=False,flipCode=None,fixSize=None):
         print("create {} instance...".format(name))
         self.name = name
         self.bridge=CvBridge()
@@ -104,9 +104,10 @@ class ArduCam:
             self.color_sub = rospy.Subscriber('/'+name+'/image', Image, self._color_callback)
         self.cameraInfoUpdate = False
         self.cv_color = None
-        self.width = 400
-        self.height = 400
+        self.width = 500
+        self.height = 500
         self.flipCode = flipCode
+        self.fixSize = fixSize
 
     def image_arr(self, resolution, noise_var = None):
         img = self.cv_color
@@ -162,19 +163,21 @@ class ArduCam:
 
     def _caminfo_callback(self, data):
         if self.cameraInfoUpdate == False:
-            self.width = data.width
-            self.height = data.height
+            self.width = data.width if self.fixSize is None else self.fixSize[0]
+            self.height = data.height if self.fixSize is None else self.fixSize[1]
             self.cameraInfoUpdate = True
 
     def _color_callback(self, data):
         if self.cameraInfoUpdate:
             try:
+                img = None
                 if data._type == 'sensor_msgs/CompressedImage':
-                    self.cv_color = self._convertCompressedColorToCV2(data)
+                    img = self._convertCompressedColorToCV2(data)
                 else:
-                    self.cv_color = self.bridge.imgmsg_to_cv2(data, "bgr8")
+                    img = self.bridge.imgmsg_to_cv2(data, "bgr8")
                 if self.flipCode is not None:
-                    self.cv_color = cv.flip(self.cv_color,self.flipCode)
+                    img = cv.flip(img,self.flipCode)
+                self.cv_color = img if self.fixSize is None else resize_image(img,self.fixSize)
             except CvBridgeError as e:
                 print(e)
 
@@ -390,9 +393,9 @@ class LCSensor:
     def _force_cb(self,data):
         self.filtered = data.data # raw LC_x,LC_y,LC_z
         if self.topic == 'loadcell1_forces': # for plug, x=-LC_z, y=LC_y, z=LC_x
-            self.filtered = np.array([-self.filtered[2],self.filtered[1],self.filtered[0]])
+            self.filtered = np.array([-self.filtered[2],self.filtered[1],-self.filtered[0]])
         elif self.topic == 'loadcell2_forces': # for sidebar, x=LC_z, y=-LC_y, z=LC_x
-            self.filtered = np.array([self.filtered[2],-self.filtered[1],self.filtered[0]])
+            self.filtered = np.array([-self.filtered[2],-self.filtered[1],self.filtered[0]])
         self.record.append(self.filtered)
         self.record_temp.append(self.filtered)
 
@@ -510,7 +513,8 @@ class PoseSensor():
         lr_trans = [[1,0,0,-0.25],[0,1,0,0.25],[0,0,1,0],[0,0,0,1]]
         rf_trans = [[1,0,0,0.25],[0,1,0,-0.25],[0,0,1,0],[0,0,0,1]]
         rr_trans = [[1,0,0,-0.25],[0,1,0,-0.25],[0,0,1,0],[0,0,0,1]]
-        cam_trans = [[1,0,0,0.49],[0,1,0,-0.19],[0,0,1,0],[0,0,0,1]]
+        # cam_trans = [[1,0,0,0.49],[0,1,0,-0.19],[0,0,1,0],[0,0,0,1]]
+        cam_trans = [[1,0,0,0.63],[0,1,0,-0.23],[0,0,1,0],[0,0,0,1]] # longer sidebar
         lf_mat = np.dot(robot_mat,np.array(lf_trans))
         lr_mat = np.dot(robot_mat,np.array(lr_trans))
         rf_mat = np.dot(robot_mat,np.array(rf_trans))

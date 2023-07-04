@@ -1,6 +1,6 @@
 <launch>
   <arg name="world" default="office_room"/>
-  <arg name="model" default="$(find ids_description)/urdf/mrobot.urdf.xacro"/>
+  <arg name="model" default="$(find ids_description)/urdf/jrobot.urdf.xacro"/>
   <arg name="x" default="1.5"/>
   <arg name="y" default="0.5"/>
   <arg name="z" default="0.075"/>

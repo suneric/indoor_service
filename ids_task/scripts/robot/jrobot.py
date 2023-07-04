@@ -15,12 +15,12 @@ class RobotConfig:
     plug2rsd_Z = 0.15 # plug offset to rsd camera center along camera's z
 
 class JazzyRobot:
-    def __init__(self):
+    def __init__(self, flipCam=None):
         print("create robot for experiment.")
         self.driver = RobotDriver(speed_scale=1.0)
         self.fdController = MotorController()
         self.camRSD = RSD435(name='camera', compressed=True)
-        self.camARD1 = ArduCam(name='arducam', compressed=True, flipCode=-1) # flip vertically
+        self.camARD1 = ArduCam(name='arducam', compressed=True, flipCode=flipCam) # flip vertically
         self.ftPlug = LCSensor('loadcell1_forces')
         self.ftHook = LCSensor('loadcell2_forces')
         self.config = RobotConfig()

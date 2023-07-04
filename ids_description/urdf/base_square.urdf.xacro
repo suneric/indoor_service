@@ -273,7 +273,7 @@
         <rightRearJoint>joint_chassis_rrwheel</rightRearJoint>
         <wheelSeparation>${wheelbase}</wheelSeparation>
         <wheelDiameter>2*${wheel_r}</wheelDiameter>
-        <torque>30</torque>
+        <torque>100</torque>
         <topicName>cmd_vel</topicName>
         <commandTopic>cmd_vel</commandTopic>
         <odometryTopic>odom</odometryTopic>

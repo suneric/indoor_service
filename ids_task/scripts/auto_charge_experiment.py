@@ -222,7 +222,7 @@ class JazzyAutoCharge:
 
 if __name__ == "__main__":
     rospy.init_node("experiment", anonymous=True, log_level=rospy.INFO)
-    robot = JazzyRobot()
+    robot = JazzyRobot(flipCam=-1)
     yolo_dir = os.path.join(sys.path[0],'policy/detection/yolo')
     policy_dir = os.path.join(sys.path[0],"policy/plugin/binary")
     task = JazzyAutoCharge(robot, yolo_dir, policy_dir)
