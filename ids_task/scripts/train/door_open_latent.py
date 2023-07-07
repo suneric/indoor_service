@@ -87,7 +87,7 @@ if __name__=="__main__":
     args = get_args()
     rospy.init_node('latent_ppo_train', anonymous=True)
     model_dir = os.path.join(sys.path[0],"../../saved_models/door_open/latent", datetime.now().strftime("%Y-%m-%d-%H-%M"))
-    env = DoorOpenEnv(continuous=False)
+    env = DoorOpenEnv(continuous=False,name='jrobot')
     ep_returns = lppo_train(env,args.max_ep,args.train_freq,args.max_step,args.warmup,model_dir)
     env.close()
     plot_episodic_returns("latent_ppo_train", ep_returns, model_dir)

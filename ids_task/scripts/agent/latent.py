@@ -58,8 +58,8 @@ class LatentRep(keras.Model):
     def __init__(self,image_shape,force_dim,latent_dim,action_dim,lr=1e-4):
         super().__init__()
         self.action_dim = action_dim
-        self.encoder = fv_encoder(image_shape,force_dim,latent_dim)
-        self.decoder = fv_decoder(latent_dim)
+        self.encoder = obs_encoder(image_shape,force_dim,latent_dim)
+        self.decoder = obs_decoder(latent_dim)
         self.optimizer = tf.keras.optimizers.Adam(lr)
 
     def train(self,buffer,size,epochs=100,batch_size=32):
