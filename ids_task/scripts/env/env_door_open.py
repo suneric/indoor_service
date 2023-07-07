@@ -17,7 +17,7 @@ register(
   entry_point='envs.door_open_env:DoorOpenEnv')
 
 class DoorOpenEnv(GymGazeboEnv):
-    def __init__(self, continuous = False, door_length=0.9):
+    def __init__(self, continuous = False, door_length=0.9, name='mrobot'):
         super(DoorOpenEnv, self).__init__(
             start_init_physics_parameters=False,
             reset_world_or_sim="WORLD"
@@ -30,7 +30,8 @@ class DoorOpenEnv(GymGazeboEnv):
         else:
             self.action_space = Discrete(4)
         self.robot = MRobot()
-        self.poseSensor = PoseSensor()
+        self.name = name
+        self.poseSensor = PoseSensor(name)
         self.success = False
         self.fail = False
         self.obs_image = None
@@ -65,7 +66,7 @@ class DoorOpenEnv(GymGazeboEnv):
     def _take_action(self, action):
         act = self.get_action(action)
         self.robot.move(act[0],act[1])
-        rospy.sleep(1)
+        rospy.sleep(0.5)
         self.obs_image = self.robot.camARD2.grey_arr((64,64))
         self.obs_force = self.robot.hook_forces()
         self.curr_angle = self.poseSensor.door_angle()
@@ -103,7 +104,7 @@ class DoorOpenEnv(GymGazeboEnv):
         return False
 
     def get_action(self, action):
-        vx, vz = 1.0, np.pi # scale of linear and angular velocity
+        vx, vz = 2.0, 2*np.pi # scale of linear and angular velocity
         if self.continuous:
             # a discrete continuous space [[~-1.0],[~-0.5*pi]], [[1.0~],[0.5*pi~]]
             act_x = (np.sign(action[0])+action[0])*vx
@@ -133,8 +134,9 @@ class DoorOpenEnv(GymGazeboEnv):
         """
         given a camera pose, evaluate robot pose, only for reset robot
         """
-        #camera_offset = (0.49,-0.19)
-        camera_offset = (0.63,-0.23) # longer sidebar
+        camera_offset = (0.49,-0.19)
+        if self.name == 'jrobot':
+            camera_offset = (0.63,-0.23) # longer sidebar
         cam_pose = [[np.cos(theta),np.sin(theta),0,cx],[-np.sin(theta),np.cos(theta),0,cy],[0,0,1,0.75],[0,0,0,1]]
         robot_to_cam_mat = [[1,0,0,camera_offset[0]],[0,1,0,camera_offset[1]],[0,0,1,0],[0,0,0,1]]
         R = np.dot(np.array(cam_pose),np.linalg.inv(np.array(robot_to_cam_mat)))

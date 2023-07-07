@@ -24,7 +24,7 @@ def get_args():
     parser.add_argument('--max_step', type=int, default=30)
     parser.add_argument('--train_freq', type=int, default=300)
     parser.add_argument('--seq_len', type=int, default=None)
-    parser.add_argument('--warmup_ep', type=int, default=0)
+    parser.add_argument('--warmup', type=int, default=1000)
     return parser.parse_args()
 
 def plot_episodic_returns(name,ep_returns,dir,weight=0.99):
@@ -68,37 +68,16 @@ def save_vae(vae, model_dir, name):
     vae.save(encoder_path, decoder_path)
     print("save vae {} weights to {}".format(name, model_dir))
 
-def plot_predict(agent,obs,prev_z,prev_a,filepath):
-    fig, axs = plt.subplots(1,3)
-    z = agent.encode(obs)
-    r_image,r_force = agent.decode(z)
+def plot_predict(encode_func,decode_func,obs,filepath):
+    fig, axs = plt.subplots(1,2)
+    z = encode_func(obs)
+    r_image,r_force = decode_func(z)
     axs[0].imshow(obs['image'],cmap='gray')
     axs[0].set_title("[{:.2f},{:.2f},{:.2f}]".format(obs['force'][0],obs['force'][1],obs['force'][2]))
     axs[1].imshow(r_image,cmap='gray')
     axs[1].set_title("[{:.2f},{:.2f},{:.2f}]".format(r_force[0],r_force[1],r_force[2]))
-    if prev_z is not None:
-        z1 = agent.imagine(prev_z,prev_a)
-        p_image,p_force = agent.decode(z1)
-        axs[2].imshow(p_image,cmap='gray')
-        axs[2].set_title("[{:.2f},{:.2f},{:.2f}]".format(p_force[0],p_force[1],p_force[2]))
-    else:
-        axs[2].imshow(np.zeros((64,64)),cmap='gray')
     plt.savefig(filepath)
     plt.close(fig)
-
-def test_model(env,agent,model_dir,ep,action_dim,max_step=50):
-    ep_path = os.path.join(model_dir,"ep{}".format(ep))
-    os.mkdir(ep_path)
-    obs, done = env.reset(),False
-    plot_predict(agent,obs,None,None,os.path.join(ep_path,"step{}".format(0)))
-    z = agent.encode(obs)
-    for i in range(max_step):
-        a = agent.policy_dqn(obs)
-        nobs,rew,done,info = env.step(a)
-        plot_predict(agent,nobs,z,a,os.path.join(ep_path,"step{}".format(i+1)))
-        z = agent.encode(nobs)
-        if done:
-            break
 
 def save_image(file_path, array, binary=True):
     cv.imwrite(file_path, array*255 if binary else array)

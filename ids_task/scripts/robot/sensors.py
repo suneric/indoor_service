@@ -490,7 +490,7 @@ class ConnectionSensor:
 pose sensor
 """
 class PoseSensor():
-    def __init__(self, noise=0.0):
+    def __init__(self, name='mrobot',noise=0.0):
         self.noise = noise
         self.link_pose_sub = rospy.Subscriber('/gazebo/link_states', LinkStates, self._link_pose_cb)
         self.model_pos_sub = rospy.Subscriber('/gazebo/model_states', ModelStates, self._model_pose_cb)
@@ -498,6 +498,7 @@ class PoseSensor():
         self.door_pose = None
         self.plug_pose = None
         self.rsd_pose = None
+        self.name = name
 
     def _link_pose_cb(self,data):
         self.door_pose = data.pose[data.name.index('hinged_door::door')]
@@ -513,8 +514,9 @@ class PoseSensor():
         lr_trans = [[1,0,0,-0.25],[0,1,0,0.25],[0,0,1,0],[0,0,0,1]]
         rf_trans = [[1,0,0,0.25],[0,1,0,-0.25],[0,0,1,0],[0,0,0,1]]
         rr_trans = [[1,0,0,-0.25],[0,1,0,-0.25],[0,0,1,0],[0,0,0,1]]
-        # cam_trans = [[1,0,0,0.49],[0,1,0,-0.19],[0,0,1,0],[0,0,0,1]]
-        cam_trans = [[1,0,0,0.63],[0,1,0,-0.23],[0,0,1,0],[0,0,0,1]] # longer sidebar
+        cam_trans = [[1,0,0,0.49],[0,1,0,-0.19],[0,0,1,0],[0,0,0,1]]
+        if self.name == 'jrobot':
+            cam_trans = [[1,0,0,0.63],[0,1,0,-0.23],[0,0,1,0],[0,0,0,1]] # longer sidebar
         lf_mat = np.dot(robot_mat,np.array(lf_trans))
         lr_mat = np.dot(robot_mat,np.array(lr_trans))
         rf_mat = np.dot(robot_mat,np.array(rf_trans))

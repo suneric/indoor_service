@@ -1,23 +1,32 @@
 import numpy as np
 import scipy.signal
+import tensorflow as tf
 from collections import deque
+from tensorflow.keras import layers
 from tensorflow_probability import distributions as tfpd
 
-def compute_returns(reward,value,bootstrap,discount,lambd):
-    """
-    """
-    lambd_returns = []
-    num_steps = len(reward)
-    # compute temporal difference
-    td = [reward[t]+discount*value[t+1] - value[t] for t in range(num_steps-1)]
-    # compute lambda returns
-    lambd_ret = bootstrap
-    for t in reversed(range(num_steps-1)):
-        lambd_ret = td[t] + discount*lambd*lambd_ret
-        lambd_returns.append(lambd_ret)
-    # reverse the lambda returns
-    lambd_returns.reverse()
-    return lambd_returns
+"""
+Use logvar rather than sigma
+https://stats.stackexchange.com/questions/353220/why-in-variational-auto-encoder-gaussian-variational-family-we-model-log-sig
+it brings stability and ease of training. by definition sigma has to be a positive real number.
+one way to enforce this would be to use a ReLU funtion to obtain its value, but the gradient is not well defined around zero.
+in addition, the standard deviation values are usually very small 1>>sigma>0. the optimization has to work with very small numbers,
+where the floating point arithmetic and the poorly defined gradient bring numerical instabilities.
+if you use the log transform, you map the numerically unstable very small numbers in [1,0] interval to [log(1), -inf],
+where you have a lot more space to work with. calculating log and exp are numerically stable and easy, so you basically gain space
+where your optimization variable can move within.
+please do not confuse: people do not use the log(sigma) value as the sigma value,
+but always transform it back to the original space. also in VAEs, you need the log(sigma) value in the Kullback-Leibler divergence term,
+so you need to calculate it anyways...
+"""
+class Sampling(layers.Layer):
+    """Uses (z_mean, z_log_var) to sample z, the vector encoding a digit."""
+    def call(self, inputs):
+        z_mean, z_log_var = inputs
+        batch = tf.shape(z_mean)[0]
+        dim = tf.shape(z_mean)[1]
+        epsilon = tf.random.normal(shape=(batch, dim))
+        return z_mean + tf.exp(0.5 * z_log_var) * epsilon
 
 def discount_cumsum(x,discount):
     """

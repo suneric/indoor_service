@@ -2,6 +2,7 @@ import numpy as np
 import tensorflow as tf
 from tensorflow import keras
 from tensorflow.keras import layers
+from .util import Sampling
 
 """
 vision force [joint] actor network
@@ -122,7 +123,7 @@ def twin_critic_network(image_shape,force_dim,action_dim,joint_dim=None,act='rel
 """
 observation encoder
 """
-def obs_encoder(image_shape,force_dim,latent_dim,act='elu',out_act='linear'):
+def obs_encoder(image_shape,force_dim,latent_dim,act='relu'):
     v_input = keras.Input(shape=image_shape)
     vh = layers.Conv2D(filters=32,kernel_size=(3,3),strides=2,padding='same',activation=act)(v_input)
     vh = layers.Conv2D(filters=16,kernel_size=(3,3),strides=2,padding='same',activation=act)(vh)
@@ -136,9 +137,10 @@ def obs_encoder(image_shape,force_dim,latent_dim,act='elu',out_act='linear'):
 
     h = layers.concatenate([v_output, f_output])
     h = layers.Dense(128,activation=act)(h)
-    mu = layers.Dense(latent_dim,activation=out_act)(h)
-    sigma = layers.Dense(latent_dim,activation=out_act)(h)
-    model = keras.Model(inputs=[v_input,f_input],outputs=[mu,sigma],name='obs_encoder')
+    mu = layers.Dense(latent_dim,name="z_mean")(h)
+    logv = layers.Dense(latent_dim,name="z_logv")(h)
+    z = Sampling()([mu,logv])
+    model = keras.Model(inputs=[v_input,f_input],outputs=[mu,logv,z],name='obs_encoder')
     print(model.summary())
     return model
 
@@ -166,6 +168,30 @@ def obs_decoder(latent_dim,act='elu'):
     return model
 
 """
+z actor network
+"""
+def latent_actor(latent_dim,output_dim,act='relu'):
+    z_input = keras.Input(shape=(latent_dim,))
+    h = layers.Dense(32, activation=act)(z_input)
+    h = layers.Dense(32, activation=act)(h)
+    output = layers.Dense(output_dim,activation='linear')(h)
+    model = keras.Model(inputs=z_input,outputs=output,name='latent_actor')
+    print(model.summary())
+    return model
+
+"""
+z critic network
+"""
+def latent_critic(latent_dim,act='relu'):
+    z_input = keras.Input(shape=(latent_dim,))
+    h = layers.Dense(32, activation=act)(z_input)
+    h = layers.Dense(32, activation=act)(h)
+    output = layers.Dense(1,activation='linear')(h)
+    model = keras.Model(inputs=z_input,outputs=output,name='latent_critic')
+    print(model.summary())
+    return model
+
+"""
 z dynamics model z_t | z_{t-1}, a_{t-1}
 output z1 distribution mean and log variance
 """
@@ -184,35 +210,59 @@ def latent_dynamics(latent_dim,action_dim,act='elu',out_act='linear'):
 """
 latent reward
 """
-def latent_reward(latent_dim,act='elu',out_act='tanh'):
+def latent_reward(latent_dim,act='relu',out_act='tanh'):
     z_input = keras.Input(shape=(latent_dim,))
-    h = layers.Dense(64, activation=act,kernel_initializer='random_normal')(z_input)
-    h = layers.Dense(64, activation=act,kernel_initializer='random_normal')(h)
+    h = layers.Dense(32, activation=act,kernel_initializer='random_normal')(z_input)
+    h = layers.Dense(32, activation=act,kernel_initializer='random_normal')(h)
     output = layers.Dense(1,activation=out_act)(h)
     model = keras.Model(inputs=z_input,outputs=output,name='latent_reward')
     print(model.summary())
     return model
 
-"""
-z actor network
-"""
-def latent_actor(latent_dim,output_dim,act='elu',out_act='tanh'):
-    z_input = keras.Input(shape=(latent_dim,))
-    h = layers.Dense(64, activation=act,kernel_initializer='random_normal')(z_input)
-    h = layers.Dense(64, activation=act,kernel_initializer='random_normal')(h)
-    output = layers.Dense(output_dim,activation=out_act)(h)
-    model = keras.Model(inputs=z_input,outputs=output,name='latent_actor')
+def fv_encoder(image_shape,force_dim,latent_dim,act='relu'):
+    v_input = keras.Input(shape=image_shape)
+    vh = layers.Conv2D(filters=32,kernel_size=(3,3),strides=2,padding='same',activation='relu')(v_input)
+    vh = layers.MaxPool2D((2,2))(vh)
+    vh = layers.Conv2D(filters=16,kernel_size=(3,3),strides=2,padding='same',activation='relu')(vh)
+    vh = layers.MaxPool2D((2,2))(vh)
+    vh = layers.Conv2D(filters=8,kernel_size=(3,3),strides=2,padding='same',activation='relu')(vh)
+    vh = layers.Flatten()(vh)
+    v_output = layers.Dense(32,activation='relu')(vh)
+
+    f_input = keras.Input(shape=(force_dim))
+    fh = layers.Dense(32, activation='relu')(f_input)
+    f_output = layers.Dense(16, activation='relu')(fh)
+
+    h = layers.concatenate([v_output, f_output])
+    h = layers.Dense(128,activation='relu')(h)
+    mean = layers.Dense(latent_dim, name='z_mean')(h)
+    logv = layers.Dense(latent_dim,name='z_log_var')(h)
+    z = Sampling()([mean,logv])
+    model = keras.Model(inputs=[v_input,f_input],outputs=[mean,logv,z],name='encoder')
     print(model.summary())
     return model
 
 """
-z critic network
+force-vision fusion decoder
 """
-def latent_critic(latent_dim,act='elu',out_act='linear'):
+def fv_decoder(latent_dim):
     z_input = keras.Input(shape=(latent_dim,))
-    h = layers.Dense(64, activation=act)(z_input)
-    h = layers.Dense(64, activation=act)(h)
-    output = layers.Dense(1,activation=out_act)(h)
-    model = keras.Model(inputs=z_input,outputs=output,name='latent_critic')
+    h = layers.Dense(32,activation='relu')(z_input)
+    h = layers.Dense(32+16, activation='relu')(h)
+    vh = layers.Lambda(lambda x: x[:,0:32])(h) # split layer
+    vh = layers.Reshape((2,2,8))(vh)
+    vh = layers.Conv2DTranspose(filters=8,kernel_size=3,strides=2,padding='same',activation='relu')(vh)
+    vh = layers.UpSampling2D((2,2))(vh)
+    vh = layers.Conv2DTranspose(filters=16,kernel_size=3,strides=2,padding='same',activation='relu')(vh)
+    vh = layers.UpSampling2D((2,2))(vh)
+    vh = layers.Conv2DTranspose(filters=32,kernel_size=3,strides=2,padding='same',activation='relu')(vh)
+    v_output = layers.Conv2DTranspose(filters=1,kernel_size=3,padding='same',activation='tanh')(vh)
+    v_output = 0.5*v_output # output in [-0.5,0.5]
+
+    fh = layers.Lambda(lambda x: x[:,32:])(h) # split layer
+    fh = layers.Dense(32,activation='relu')(fh)
+    f_output = layers.Dense(3, activation='tanh')(fh)
+
+    model = keras.Model(inputs=z_input,outputs=[v_output,f_output],name='decoder')
     print(model.summary())
     return model
