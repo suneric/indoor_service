@@ -157,7 +157,7 @@
 
       <!--hook for door opening-->
       <joint name="joint_frame_hook" type="revolute">
-        <origin xyz="0.31 -0.23 0.3" rpy="0 0 0"/>
+        <origin xyz="0.31 -0.23 0.05" rpy="0 0 0"/>
         <parent link="link_frame"/>
         <child link="link_hook"/>
         <axis xyz="0 -1 0"/>

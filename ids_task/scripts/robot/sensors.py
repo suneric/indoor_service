@@ -93,7 +93,7 @@ def noise_image(image, var):
 ArduCam looks up for observing door open status
 """
 class ArduCam:
-    def __init__(self,name,compressed=False,flipCode=None,fixSize=None):
+    def __init__(self,name,compressed=False,flipCode=None):
         print("create {} instance...".format(name))
         self.name = name
         self.bridge=CvBridge()
@@ -107,7 +107,6 @@ class ArduCam:
         self.width = 500
         self.height = 500
         self.flipCode = flipCode
-        self.fixSize = fixSize
 
     def image_arr(self, resolution, noise_var = None):
         img = self.cv_color
@@ -163,8 +162,8 @@ class ArduCam:
 
     def _caminfo_callback(self, data):
         if self.cameraInfoUpdate == False:
-            self.width = data.width if self.fixSize is None else self.fixSize[0]
-            self.height = data.height if self.fixSize is None else self.fixSize[1]
+            self.width = data.width
+            self.height = data.height
             self.cameraInfoUpdate = True
 
     def _color_callback(self, data):
@@ -175,9 +174,7 @@ class ArduCam:
                     img = self._convertCompressedColorToCV2(data)
                 else:
                     img = self.bridge.imgmsg_to_cv2(data, "bgr8")
-                if self.flipCode is not None:
-                    img = cv.flip(img,self.flipCode)
-                self.cv_color = img if self.fixSize is None else resize_image(img,self.fixSize)
+                self.cv_color = img if self.flipCode is None else cv.flip(img,self.flipCode)
             except CvBridgeError as e:
                 print(e)
 

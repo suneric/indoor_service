@@ -170,11 +170,11 @@ class PullingTask:
     def __init__(self, robot, policy_dir):
         self.robot = robot
         self.model = PPO((64,64,1),3,4)
-        self.model.load(os.path.join(policy_dir,'pi_net/2000'))
+        self.model.load(os.path.join(policy_dir,'pi_net/5000'))
         self.openAngle = 0.45*np.pi # 81 degree
 
     def get_action(self,idx):
-        vx, vz = 1.0, np.pi
+        vx, vz = 2.0, 2*np.pi
         act_list = [(vx,0.0),(0,-vz),(0,vz),(-vx,0)]
         return act_list[idx]
 
@@ -191,7 +191,7 @@ class PullingTask:
             act = self.get_action(action)
             print(act)
             self.robot.move(act[0],act[1])
-            rospy.sleep(1)
+            rospy.sleep(0.5)
             angle = self.robot.poseSensor.door_angle()
             failed = angle == 0
             opened = angle > self.openAngle
@@ -222,7 +222,7 @@ class DoorOpeningTask:
         # self.robot.reset_joints(vpos=0.8,hpos=0,spos=1.57,ppos=0)
         self.robot.reset_joints(vpos=0.8,hpos=0.13,spos=0,ppos=0)
         self.robot.lock_joints(v=False,h=False,s=False,p=True)
-        # self.robot.reset_robot(1.0,1.0,np.pi)
+        self.robot.reset_robot(0.67,0.8,np.pi+0.1)
 
     def perform(self):
         # success = self.approach.perform()

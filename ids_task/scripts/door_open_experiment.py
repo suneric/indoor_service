@@ -13,7 +13,7 @@ class PullingTask:
     def __init__(self, robot, policy_dir):
         self.robot = robot
         self.model = PPO((64,64,1),3,4)
-        self.model.load(os.path.join(policy_dir,'pi_net/2000'))
+        self.model.load(os.path.join(policy_dir,'pi_net/5000'))
 
     def get_action(self,action):
         vx, vz = 0.5, np.pi/2
@@ -37,7 +37,7 @@ class PullingTask:
             act = self.get_action(action)
             print(act)
             self.robot.move(act[0],act[1])
-            rospy.sleep(1)
+            rospy.sleep(0.5)
             step += 1
         self.robot.stop()
 """

@@ -7,8 +7,8 @@
     <xacro:property name="location_r" value="0" />
     <xacro:property name="location_p" value="0" />
     <xacro:property name="location_y" value="0" />
-    <xacro:property name="camera_width" value="400" />
-    <xacro:property name="camera_height" value="400" />
+    <xacro:property name="camera_width" value="500" />
+    <xacro:property name="camera_height" value="500" />
     <xacro:property name="camera_link" value="0.02" />
     <xacro:property name="camera_name" value="front_cam" />
 
@@ -44,7 +44,7 @@
       <sensor type="camera" name="${camera_name}">
         <update_rate>30.0</update_rate>
         <camera name="head">
-          <horizontal_fov>1.3962634</horizontal_fov>
+          <horizontal_fov>0.61</horizontal_fov>
           <image>
             <width>${camera_width}</width>
             <height>${camera_height}</height>
@@ -62,7 +62,7 @@
         </camera>
         <plugin name="camera_controller" filename="libgazebo_ros_camera.so">
           <alwaysOn>true</alwaysOn>
-          <updateRate>60</updateRate>
+          <updateRate>30</updateRate>
           <cameraName>/$(arg ns)/${camera_name}</cameraName>
           <imageTopicName>image</imageTopicName>
           <cameraInfoTopicName>cam_info</cameraInfoTopicName>
