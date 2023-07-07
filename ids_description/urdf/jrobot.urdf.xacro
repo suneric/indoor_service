@@ -5,10 +5,7 @@
   <xacro:arg name="tf_prefix" default=""/>
 
   <xacro:include filename="$(find ids_description)/urdf/base_square.urdf.xacro" />
-  <xacro:fourwheeler_base_macro>
-    <xacro:property name="mu" value="0.9"/>
-    <xacro:property name="mu2" value="0.9"/>
-  </xacro:fourwheeler_base_macro>
+  <xacro:fourwheeler_base_macro/>
 
   <!--frame 3DOF-->
   <xacro:include filename="$(find ids_description)/urdf/jframe.urdf.xacro" />

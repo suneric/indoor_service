@@ -198,15 +198,15 @@
       </joint>
       <link name="link_tip">
         <visual>
-          <origin rpy="0 0 0" xyz="0.01 0.01 0"/>
+          <origin rpy="0 0 0" xyz="0.01 0.02 0"/>
           <geometry>
-            <box size="0.02 0.04 0.01"/>
+            <box size="0.02 0.06 0.01"/>
           </geometry>
         </visual>
         <collision>
-          <origin rpy="0 0 0" xyz="0.01 0.01 0"/>
+          <origin rpy="0 0 0" xyz="0.01 0.02 0"/>
           <geometry>
-            <box size="0.02 0.04 0.01"/>
+            <box size="0.02 0.06 0.01"/>
           </geometry>
         </collision>
         <inertial>
