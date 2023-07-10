@@ -17,6 +17,7 @@ class ReplayBuffer:
         self.adv = np.zeros(capacity, dtype=np.float32)
         self.gamma, self.lamda = gamma, lamda
         self.ptr,self.traj_idx,self.capacity = 0,0,capacity
+        self.idx_list = [self.traj_idx]
 
     def add_experience(self,obs,act,rew,val,logp):
         self.image[self.ptr] = obs['image']
@@ -35,13 +36,16 @@ class ReplayBuffer:
         self.adv[path_slice] = discount_cumsum(deltas, self.gamma*self.lamda) # GAE
         self.ret[path_slice] = discount_cumsum(rews, self.gamma)[:-1] # rewards-to-go,
         self.traj_idx = self.ptr
+        self.idx_list.append(self.traj_idx)
 
     def all_experiences(self):
         size = self.ptr
         s = slice(0,size)
         adv_mean, adv_std = np.mean(self.adv[s]), np.std(self.adv[s])
         self.adv[s] = (self.adv[s]-adv_mean) / adv_std
+        traj_indices = self.idx_list.copy()
         self.ptr, self.traj_idx = 0, 0
+        self.idx_list = [self.traj_idx]
         return dict(
             image = self.image[s],
             force = self.force[s],
@@ -49,7 +53,8 @@ class ReplayBuffer:
             action = self.action[s],
             ret = self.ret[s],
             adv = self.adv[s],
-            logprob = self.logprob[s]
+            logprob = self.logprob[s],
+            index = traj_indices, #trajectory indices
         ), size
 
 """Representation Model in Latent Space, VAE
@@ -65,6 +70,7 @@ class LatentRep(keras.Model):
     def train(self,buffer,size,epochs=100,batch_size=32):
         print("training latent representation model, epoches {}, batch size {}".format(epochs, batch_size))
         image_buf, force_buf = buffer
+        prev_loss = 0
         for _ in range(epochs):
             idxs = np.random.choice(size,batch_size)
             image = tf.convert_to_tensor(image_buf[idxs])
@@ -76,8 +82,11 @@ class LatentRep(keras.Model):
                 info['pred_loss'].numpy(),
                 info['kl_loss'].numpy(),
             ))
-            if info['total_loss'].numpy() < 0.1:
+            loss = info['total_loss'].numpy()
+            if abs(loss-prev_loss) < 0.1:
                 break
+            else:
+                prev_loss = loss
 
     def update_representation(self,img,frc):
         with tf.GradientTape() as tape:
@@ -114,10 +123,10 @@ class LatentRep(keras.Model):
 """Latent PPO with input of latent z
 """
 class LatentPPO(keras.Model):
-    def __init__(self,latent_dim,action_dim,actor_lr=1e-3,critic_lr=2e-3,clip_ratio=0.2,beta=1e-3,target_kld=0.1):
+    def __init__(self,latent_dim,action_dim,seq_len=None,actor_lr=1e-3,critic_lr=2e-3,clip_ratio=0.2,beta=1e-3,target_kld=0.1):
         super().__init__()
-        self.pi = latent_actor(latent_dim,action_dim)
-        self.q = latent_critic(latent_dim)
+        self.pi = latent_actor(latent_dim,action_dim) if seq_len is None else latent_recurrent_actor(latent_dim,action_dim,seq_len)
+        self.q = latent_critic(latent_dim) if seq_len is None else latent_recurrent_critic(latent_dim,seq_len)
         self.pi_optimizer = tf.keras.optimizers.Adam(actor_lr)
         self.q_optimizer = tf.keras.optimizers.Adam(critic_lr)
         self.clip_ratio = clip_ratio
@@ -181,10 +190,13 @@ class LatentPPO(keras.Model):
 """RL Agent
 """
 class Agent:
-    def __init__(self,image_shape,force_dim,action_dim,latent_dim):
+    def __init__(self,image_shape,force_dim,action_dim,latent_dim,seq_len=None):
+        self.latent_dim = latent_dim
         self.action_dim = action_dim
+        self.seq_len = seq_len
         self.rep = LatentRep(image_shape,force_dim,latent_dim,action_dim)
-        self.ppo = LatentPPO(latent_dim,action_dim)
+        self.ppo = LatentPPO(latent_dim,action_dim,seq_len)
+        self.recurrent = False if seq_len is None else True
 
     def encode(self,obs):
         frc = tf.expand_dims(tf.convert_to_tensor(obs['force']), 0)
@@ -196,14 +208,12 @@ class Agent:
         img_pred,frc_pred = self.rep.decoder(tf.expand_dims(tf.convert_to_tensor(z), 0))
         return tf.squeeze(img_pred).numpy(), tf.squeeze(frc_pred).numpy()
 
-    def policy(self,obs,training=True):
-        frc = tf.expand_dims(tf.convert_to_tensor(obs['force']), 0)
-        img = tf.expand_dims(tf.convert_to_tensor(obs['image']), 0)
-        mu,logv,z = self.rep.encoder([img,frc])
-        pmf = tfpd.Categorical(logits=self.ppo.pi(z))
+    def policy(self,z,training=True):
+        logits = self.ppo.pi(tf.expand_dims(tf.convert_to_tensor(z),0))
+        pmf = tfpd.Categorical(logits=logits)
         act = pmf.sample() if training else pmf.mode()
         logp = pmf.log_prob(act)
-        return tf.squeeze(act).numpy(),tf.squeeze(logp).numpy(),tf.squeeze(z).numpy()
+        return tf.squeeze(act).numpy(),tf.squeeze(logp).numpy()
 
     def value(self,z):
         val = self.ppo.q(tf.expand_dims(tf.convert_to_tensor(z), 0))
@@ -217,6 +227,9 @@ class Agent:
         image_buf, force_buf = data['image'], data['force']
         mu,sigma,z = self.rep.encoder([tf.convert_to_tensor(image_buf),tf.convert_to_tensor(force_buf)])
         z_buf = tf.squeeze(z).numpy()
+        if self.recurrent:
+            idxs = data['index']
+            z_buf = latent_seq(self.latent_dim,self.seq_len,z_buf,idxs)
         act_buf,ret_buf,adv_buf,logp_buf= data['action'],data['ret'],data['adv'],data['logprob']
         self.ppo.train((z_buf,act_buf,ret_buf,adv_buf,logp_buf),size,pi_iter=pi_iter,q_iter=q_iter)
 

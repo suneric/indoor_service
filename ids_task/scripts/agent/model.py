@@ -179,6 +179,15 @@ def latent_actor(latent_dim,output_dim,act='relu'):
     print(model.summary())
     return model
 
+def latent_recurrent_actor(latent_dim,output_dim,seq_len,act='relu'):
+    z_input = keras.Input(shape=(seq_len,latent_dim))
+    h = layers.LSTM(32,activation=act,return_sequences=False)(z_input)
+    h = layers.Dense(32,activation=act)(h)
+    output = layers.Dense(output_dim,activation='linear')(h)
+    model = keras.Model(inputs=z_input,outputs=output,name='latent_recurrent_actor')
+    print(model.summary())
+    return model
+
 """
 z critic network
 """
@@ -188,6 +197,15 @@ def latent_critic(latent_dim,act='relu'):
     h = layers.Dense(32, activation=act)(h)
     output = layers.Dense(1,activation='linear')(h)
     model = keras.Model(inputs=z_input,outputs=output,name='latent_critic')
+    print(model.summary())
+    return model
+
+def latent_recurrent_critic(latent_dim,seq_len,act='relu'):
+    z_input = keras.Input(shape=(seq_len,latent_dim))
+    h = layers.LSTM(32,activation=act,return_sequences=False)(z_input)
+    h = layers.Dense(32,activation=act)(h)
+    output = layers.Dense(1,activation='linear')(h)
+    model = keras.Model(inputs=z_input,outputs=output,name='latent_recurrent_critic')
     print(model.summary())
     return model
 

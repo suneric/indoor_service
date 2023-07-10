@@ -67,6 +67,18 @@ def zero_seq(dim,len):
         dq.append(np.zeros(dim))
     return dq
 
+"""
+create a latent obsevation buffer
+"""
+def latent_seq(latent_dim,seq_len,z,idxs):
+    z_seq = []
+    for i in range(len(idxs)-1):
+        seq = zero_seq(latent_dim,seq_len)
+        for j in range(idxs[i],idxs[i+1]):
+            seq.append(z[j])
+            z_seq.append(np.array(seq.copy()))
+    return np.array(z_seq)
+
 def mvnd_dist(mu,sigma):
     return tfpd.MultivariateNormalDiag(loc=mu,scale_diag=sigma)
 
