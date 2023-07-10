@@ -68,7 +68,7 @@ class ReplayBuffer:
             ), size
 
 class PPO:
-    def __init__(self,image_shape,force_dim,action_dim,joint_dim=None,actor_lr=3e-4,critic_lr=2e-4,clip_ratio=0.2,beta=1e-3,target_kld=0.01):
+    def __init__(self,image_shape,force_dim,action_dim,joint_dim=None,actor_lr=3e-4,critic_lr=2e-4,clip_ratio=0.2,beta=1e-3,target_kld=0.1):
         self.wantJoint = False if joint_dim is None else True
         self.pi = actor_network(image_shape,force_dim,action_dim,joint_dim,maxpool=False)
         self.q = critic_network(image_shape,force_dim,joint_dim,maxpool=False)
