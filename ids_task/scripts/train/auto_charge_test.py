@@ -107,3 +107,4 @@ if __name__ == '__main__':
     result = dqn_test(env,policies,indices,model_dir)
     for item in result:
         print("{}_{} target outlet {}, success {}, average steps {}".format(item[0],item[1],item[2],item[3],item[4]))
+    env.close()

@@ -38,6 +38,7 @@ class DoorOpenEnv(GymGazeboEnv):
         self.obs_force = None
         self.prev_angle = 0
         self.curr_angle = 0
+        self.initRandom = None
 
     def _check_all_systems_ready(self):
         self.robot.check_ready()
@@ -62,6 +63,9 @@ class DoorOpenEnv(GymGazeboEnv):
         self.curr_angle = self.prev_angle
         self.obs_image = self.robot.camARD2.grey_arr((64,64))
         self.obs_force = self.robot.hook_forces()
+
+    def set_init_positions(self,rad=None):
+        self.initRandom = rad
 
     def _take_action(self, action):
         act = self.get_action(action)
@@ -121,7 +125,7 @@ class DoorOpenEnv(GymGazeboEnv):
         while self.poseSensor.door_angle() > 0.11:
             rate.sleep() # wait door close
         # reset robot position with a random camera position
-        rad = np.random.uniform(size=3)
+        rad = np.random.uniform(size=3) if self.initRandom is None else self.initRandom
         cx = 0.01*(rad[0]-0.5) + 0.025
         cy = 0.01*(rad[1]-0.5) + self.door_length + 0.045
         theta = 0.1*np.pi*(rad[2]-0.5) + np.pi

@@ -141,7 +141,7 @@ def obs_encoder(image_shape,force_dim,latent_dim,act='relu'):
     logv = layers.Dense(latent_dim,name="z_logv")(h)
     z = Sampling()([mu,logv])
     model = keras.Model(inputs=[v_input,f_input],outputs=[mu,logv,z],name='obs_encoder')
-    print(model.summary())
+    # print(model.summary())
     return model
 
 """
@@ -164,7 +164,7 @@ def obs_decoder(latent_dim,act='elu'):
     f_output = layers.Dense(3, activation='tanh')(fh)
 
     model = keras.Model(inputs=z_input,outputs=[v_output,f_output],name='obs_decoder')
-    print(model.summary())
+    # print(model.summary())
     return model
 
 """
@@ -176,7 +176,7 @@ def latent_actor(latent_dim,output_dim,act='relu'):
     h = layers.Dense(32, activation=act)(h)
     output = layers.Dense(output_dim,activation='linear')(h)
     model = keras.Model(inputs=z_input,outputs=output,name='latent_actor')
-    print(model.summary())
+    # print(model.summary())
     return model
 
 def latent_recurrent_actor(latent_dim,output_dim,seq_len,act='relu'):
@@ -185,7 +185,7 @@ def latent_recurrent_actor(latent_dim,output_dim,seq_len,act='relu'):
     h = layers.Dense(32,activation=act)(h)
     output = layers.Dense(output_dim,activation='linear')(h)
     model = keras.Model(inputs=z_input,outputs=output,name='latent_recurrent_actor')
-    print(model.summary())
+    # print(model.summary())
     return model
 
 """
@@ -197,7 +197,7 @@ def latent_critic(latent_dim,act='relu'):
     h = layers.Dense(32, activation=act)(h)
     output = layers.Dense(1,activation='linear')(h)
     model = keras.Model(inputs=z_input,outputs=output,name='latent_critic')
-    print(model.summary())
+    # print(model.summary())
     return model
 
 def latent_recurrent_critic(latent_dim,seq_len,act='relu'):
@@ -206,7 +206,7 @@ def latent_recurrent_critic(latent_dim,seq_len,act='relu'):
     h = layers.Dense(32,activation=act)(h)
     output = layers.Dense(1,activation='linear')(h)
     model = keras.Model(inputs=z_input,outputs=output,name='latent_recurrent_critic')
-    print(model.summary())
+    # print(model.summary())
     return model
 
 """
@@ -222,7 +222,7 @@ def latent_dynamics(latent_dim,action_dim,act='elu',out_act='linear'):
     mu = layers.Dense(latent_dim,activation=out_act)(h)
     sigma = layers.Dense(latent_dim,activation=out_act)(h)
     model = keras.Model(inputs=[z_input,a_input],outputs=[mu,sigma],name='latent_dynamics')
-    print(model.summary())
+    # print(model.summary())
     return model
 
 """
@@ -234,7 +234,7 @@ def latent_reward(latent_dim,act='relu',out_act='tanh'):
     h = layers.Dense(32, activation=act,kernel_initializer='random_normal')(h)
     output = layers.Dense(1,activation=out_act)(h)
     model = keras.Model(inputs=z_input,outputs=output,name='latent_reward')
-    print(model.summary())
+    # print(model.summary())
     return model
 
 def fv_encoder(image_shape,force_dim,latent_dim,act='relu'):
@@ -257,7 +257,7 @@ def fv_encoder(image_shape,force_dim,latent_dim,act='relu'):
     logv = layers.Dense(latent_dim,name='z_log_var')(h)
     z = Sampling()([mean,logv])
     model = keras.Model(inputs=[v_input,f_input],outputs=[mean,logv,z],name='encoder')
-    print(model.summary())
+    # print(model.summary())
     return model
 
 """
@@ -282,5 +282,5 @@ def fv_decoder(latent_dim):
     f_output = layers.Dense(3, activation='tanh')(fh)
 
     model = keras.Model(inputs=z_input,outputs=[v_output,f_output],name='decoder')
-    print(model.summary())
+    # print(model.summary())
     return model

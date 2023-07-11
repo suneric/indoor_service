@@ -33,7 +33,7 @@ class PullingTask:
             force = self.robot.hook_forces()
             print(force)
             obs = dict(image=image, force=force/np.linalg.norm(force))
-            action, _ = self.model.policy(obs)
+            action, _ = self.model.policy(obs,training=False)
             act = self.get_action(action)
             print(act)
             self.robot.move(act[0],act[1])

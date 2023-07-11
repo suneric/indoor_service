@@ -70,7 +70,6 @@ class LatentRep(keras.Model):
     def train(self,buffer,size,epochs=100,batch_size=32):
         print("training latent representation model, epoches {}, batch size {}".format(epochs, batch_size))
         image_buf, force_buf = buffer
-        prev_loss = 0
         for _ in range(epochs):
             idxs = np.random.choice(size,batch_size)
             image = tf.convert_to_tensor(image_buf[idxs])
@@ -82,11 +81,6 @@ class LatentRep(keras.Model):
                 info['pred_loss'].numpy(),
                 info['kl_loss'].numpy(),
             ))
-            loss = info['total_loss'].numpy()
-            if abs(loss-prev_loss) < 0.1:
-                break
-            else:
-                prev_loss = loss
 
     def update_representation(self,img,frc):
         with tf.GradientTape() as tape:
