@@ -33,7 +33,7 @@ def lppo_train(env, num_episodes, train_freq, max_steps, seq_len, warmup, model_
     print("create door open environment for latent ppo", image_shape, force_dim, action_dim)
     summaryWriter = tf.summary.create_file_writer(model_dir)
 
-    latent_dim = 5
+    latent_dim = 3
     capacity = train_freq+max_steps
     buffer = ReplayBuffer(capacity,image_shape,force_dim)
     agent = Agent(image_shape,force_dim,action_dim,latent_dim,seq_len)
@@ -49,7 +49,7 @@ def lppo_train(env, num_episodes, train_freq, max_steps, seq_len, warmup, model_
         obs = nobs
         if done:
             obs, done = env.reset(), False
-    agent.train_rep(dict(image=warmup_images,force=warmup_forces),warmup,rep_iter=2*warmup)
+    agent.train_rep(dict(image=warmup_images,force=warmup_forces),warmup,rep_iter=warmup)
 
     # start
     ep_returns, t, success_counter, best_ep_return = [], 0, 0, -np.inf
@@ -77,8 +77,8 @@ def lppo_train(env, num_episodes, train_freq, max_steps, seq_len, warmup, model_
 
         if buffer.ptr >= train_freq or (ep+1) == num_episodes:
             data, size = buffer.all_experiences()
-            agent.train_rep(data,size,rep_iter=2*train_freq)
-            agent.train_ppo(data,size)
+            agent.train_rep(data,size,rep_iter=300)
+            agent.train_ppo(data,size,pi_iter=100,q_iter=100)
 
         ep_returns.append(ep_ret)
         success_counter = success_counter+1 if env.success else success_counter

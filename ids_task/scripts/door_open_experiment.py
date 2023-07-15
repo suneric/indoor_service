@@ -7,16 +7,19 @@ import pandas as pd
 import tensorflow as tf
 from robot.jrobot import JazzyRobot
 from agent.ppo import PPO
-from train.utility import save_image
+from agent.latent import Agent
+from train.utility import *
 
 class PullingTask:
     def __init__(self, robot, policy_dir):
         self.robot = robot
-        self.model = PPO((64,64,1),3,4)
-        self.model.load(os.path.join(policy_dir,'pi_net/5000'))
+        # self.agent = PPO((64,64,1),3,4)
+        # self.agent.load(os.path.join(policy_dir,'ppo/pi_net/2900'))
+        self.agent = Agent((64,64,1),3,4,3)
+        self.agent.load(os.path.join(policy_dir,"l3ppo"))
 
     def get_action(self,action):
-        vx, vz = 0.5, np.pi/2
+        vx, vz = 0.5, np.pi/3
         act_list = [[vx,0.0],[0,-vz],[0,vz],[-vx,0]]
         return act_list[action]
 
@@ -25,7 +28,7 @@ class PullingTask:
         return True
 
     def pulling(self, max_step=30):
-        step = 0
+        step, latent = 0, []
         while step < max_step:
             cv.imshow("up",self.robot.camARD1.color_image())
             cv.waitKey(1)
@@ -33,13 +36,20 @@ class PullingTask:
             force = self.robot.hook_forces()
             print(force)
             obs = dict(image=image, force=force/np.linalg.norm(force))
-            action, _ = self.model.policy(obs,training=False)
+            dump_path = os.path.join(sys.path[0],"../dump/test/experiment/step{}".format(step))
+            z = plot_predict(self.agent.encode,self.agent.decode,obs,dump_path)
+            latent.append(z)
+            action, _ = self.agent.policy(z,training=False)
             act = self.get_action(action)
             print(act)
             self.robot.move(act[0],act[1])
             rospy.sleep(0.5)
+            self.robot.stop()
+            rospy.sleep(1)
             step += 1
         self.robot.stop()
+        latent_path = os.path.join(sys.path[0],"../dump/test/experiment/latent")
+        plot_latent(np.array(latent), latent_path)
 """
 Real Robot Door Open Task
 """
@@ -72,7 +82,7 @@ if __name__ == "__main__":
     rospy.init_node("experiment", anonymous=True, log_level=rospy.INFO)
     robot = JazzyRobot()
     yolo_dir = os.path.join(sys.path[0],'policy/detection/yolo')
-    policy_dir = os.path.join(sys.path[0],"policy/pulling/force_vision")
+    policy_dir = os.path.join(sys.path[0],"policy/pulling")
     task = JazzyDoorOpen(robot, yolo_dir, policy_dir)
     ok = task.prepare()
     if not ok:

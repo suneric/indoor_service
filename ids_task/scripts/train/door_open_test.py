@@ -12,7 +12,7 @@ from env.env_door_open import DoorOpenEnv
 from utility import *
 import pandas as pd
 import csv
-
+# INITRANDOM = [[3.24664058e-01, 6.79799544e-01, 5.81612962e-01]]
 INITRANDOM = [[3.24664058e-01, 6.79799544e-01, 5.81612962e-01],
        [6.66692138e-01, 2.53539286e-01, 1.58832957e-01],
        [8.68552677e-03, 9.45616753e-01, 5.39334735e-01],
@@ -73,11 +73,25 @@ class DoorOpenTest:
         agent = None
         if policy == 'ppo':
             agent = PPO((64,64,1),3,4)
-            agent.load(os.path.join(model_dir,"ppo/pi_net/3000"))
+            agent.load(os.path.join(model_dir,"ppo/pi_net/2900"))
         elif policy == 'latent':
-            agent = Agent((64,64,1),3,4,5)
-            agent.load(os.path.join(model_dir,"lppo"))
+            agent = Agent((64,64,1),3,4,3)
+            agent.load(os.path.join(model_dir,"l3ppo"))
         return agent
+
+    def retrain_representation(self,env,warmup):
+        obs = env.reset()
+        warmup_images = np.zeros((warmup,64,64,1), dtype=np.float32)
+        warmup_forces = np.zeros((warmup, 3), dtype=np.float32)
+        obs, done = env.reset(), False
+        for i in range(warmup):
+            warmup_images[i] = obs['image']
+            warmup_forces[i] = obs['force']
+            act = self.action(obs)
+            obs, rew, done, info = env.step(act)
+            if done:
+                obs, done = env.reset(), False
+        self.agent.train_rep(dict(image=warmup_images,force=warmup_forces),warmup,rep_iter=2000)
 
     def action(self,obs):
         if self.policy == 'ppo':
@@ -91,17 +105,27 @@ class DoorOpenTest:
 
     def run(self,env,init_rad,max_step=50):
         env.set_init_positions(init_rad)
+        latent = [] if self.policy == 'latent' else None
         obs, done, step = env.reset(),False, 0
         while not done and step < max_step:
+            if self.policy == 'latent':
+                dump_path = os.path.join(sys.path[0],"../../dump/test/env/step{}".format(step))
+                z = plot_predict(self.agent.encode,self.agent.decode,obs,dump_path)
+                latent.append(z)
             act = self.action(obs)
             obs, rew, done, info = env.step(act)
             step += 1
+        if self.policy == 'latent':
+            latent_path = os.path.join(sys.path[0],"../../dump/test/env/latent")
+            plot_latent(np.array(latent), latent_path)
         return env.success, step
 
-def run_pulling_test(env,policies,model_dir):
+def run_pulling_test(env,policies,model_dir,retrain=False):
     res = []
     for policy in policies:
         test = DoorOpenTest(policy,model_dir)
+        if policy == 'latent' and retrain:
+            test.retrain_representation(env,500)
         successCount,numStep,count = 0,[],len(INITRANDOM)
         for i in range(count):
             initRads = INITRANDOM[i]
@@ -109,21 +133,24 @@ def run_pulling_test(env,policies,model_dir):
             if success:
                 successCount += 1
                 numStep.append(step)
-            print("{}/{} {}, total success count {}, average step {:.3f}".format(i,count,policy,successCount,np.mean(numStep)))
+            print("{}/{} {}, total success count {}, average step {:.3f}".format(i+1,count,policy,successCount,np.mean(numStep)))
         res.append([policy, successCount, np.mean(numStep)])
     return res
 
 def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--length', type=float, default=0.9)
+    parser.add_argument('--policy', type=str, default=None)
+    parser.add_argument('--retrain', type=int, default=0)
     return parser.parse_args()
 
 if __name__ == '__main__':
     args = get_args()
     rospy.init_node('door_pull_test', anonymous=True)
-    policies = ['ppo','latent']
+    policies = ['ppo','latent'] if args.policy is None else [args.policy]
+    retrain = False if args.retrain == 0 else True
     model_dir = os.path.join(sys.path[0],"../policy/pulling/")
     env = DoorOpenEnv(continuous=False, door_length=args.length, name='jrobot')
-    results = run_pulling_test(env,policies,model_dir)
+    results = run_pulling_test(env,policies,model_dir,retrain)
     print(results)
     env.close()
