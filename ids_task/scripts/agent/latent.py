@@ -82,6 +82,28 @@ class LatentRep(keras.Model):
                 info['kl_loss'].numpy(),
             ))
 
+    def retrain(self,obs_buf,baseline,epochs=100):
+        img = tf.convert_to_tensor(obs_buf['image'])
+        frc = tf.convert_to_tensor(obs_buf['force'])
+        img_base = tf.convert_to_tensor(baseline['image'])
+        frc_base = tf.convert_to_tensor(baseline['force'])
+        _,_,z_base = self.encoder([img_base,frc_base])
+        img_base,frc_base = self.decoder(z_base)
+        print(img.shape,frc.shape,img_base.shape,frc_base.shape)
+        self.decoder.trainable = False # freeze decoder
+        for _ in range(epochs):
+            with tf.GradientTape() as tape:
+                mu,logv,z = self.encoder([img,frc])
+                img_pred,frc_pred = self.decoder(z) # reconstruction
+                img_loss = tf.reduce_sum(keras.losses.MSE(img_pred,img_base), axis=(1,2))
+                img_loss = tf.reduce_mean(img_loss)
+                frc_loss = keras.losses.MSE(frc_pred,frc_base)
+                frc_loss = tf.reduce_mean(frc_loss)
+                loss = img_loss+frc_loss
+            grad = tape.gradient(loss, self.trainable_variables)
+            self.optimizer.apply_gradients(zip(grad, self.trainable_variables))
+            print("loss {:.3f}, image loss {:.3f}, force loss {:.3f}".format(loss,img_loss,frc_loss))
+
     def update_representation(self,img,frc):
         with tf.GradientTape() as tape:
             mu,logv,z = self.encoder([img,frc])

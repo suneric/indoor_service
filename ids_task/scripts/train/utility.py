@@ -4,6 +4,7 @@ import argparse
 import numpy as np
 import tensorflow as tf
 import matplotlib.pyplot as plt
+import pandas as pd
 import cv2 as cv
 
 """
@@ -124,3 +125,23 @@ def plot_latent(latent,filepath):
 
 def save_image(file_path, array, binary=True):
     cv.imwrite(file_path, array*255 if binary else array)
+
+def save_observation(file_path, obs_cache):
+    obs_len = len(obs_cache)
+    data = np.zeros((obs_len,3+64*64),dtype=np.float32)
+    for i in range(obs_len):
+        force, image = obs_cache[i]['force'], obs_cache[i]['image'].flatten()
+        data[i][:3] = force
+        data[i][3:] = image
+    df = pd.DataFrame(data)
+    df.to_csv(file_path+".csv")
+
+def load_observation(file_path):
+    data = pd.read_csv(file_path+".csv")
+    obs_len = len(data.index)
+    images, forces = np.zeros((obs_len,64,64)), np.zeros((obs_len,3))
+    for i in range(obs_len):
+        row = data.iloc[i]
+        forces[i] = row[1:4]
+        images[i] = np.reshape(np.array(row[4:4100]),(64,64))
+    return dict(image=images,force=forces)
