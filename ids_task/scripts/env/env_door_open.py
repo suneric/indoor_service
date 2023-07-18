@@ -16,6 +16,9 @@ register(
   id='DoorOpen-v0',
   entry_point='envs.door_open_env:DoorOpenEnv')
 
+def normalize(force):
+    return force/np.linalg.norm(force)
+
 class DoorOpenEnv(GymGazeboEnv):
     def __init__(self, continuous = False, door_length=0.9, name='mrobot'):
         super(DoorOpenEnv, self).__init__(
@@ -46,7 +49,7 @@ class DoorOpenEnv(GymGazeboEnv):
     def _get_observation(self):
         return dict(
             image=self.obs_image,
-            force=self.obs_force/np.linalg.norm(self.obs_force)
+            force=normalize(self.obs_force)
         )
 
     def _post_information(self):
@@ -81,14 +84,16 @@ class DoorOpenEnv(GymGazeboEnv):
         return self.success or self.fail
 
     def _compute_reward(self):
-        reward = -1 # step penalty
+        reward = 0 # step penalty
         if self.success:
             reward = 100
         elif self.fail:
             reward = -100
         else:
+            cam_r,_,door_r,_ = self.camera_door_pose()
+            penalty = 5 if cam_r < 0.7*door_r else 0
             angle_change = (self.curr_angle-self.prev_angle)/(np.pi/2)
-            reward += 100*angle_change
+            reward = 100*angle_change-penalty-1
             self.prev_angle = self.curr_angle
         return reward
 
@@ -99,13 +104,18 @@ class DoorOpenEnv(GymGazeboEnv):
         fp = self.poseSensor.robot_footprint()
         robot_not_out = any(fp[key][0] > 0.0 for key in fp.keys())
         if robot_not_out:
-            cam_r = np.sqrt(fp['camera'][0]**2+fp['camera'][1]**2)
-            cam_a = np.arctan2(fp['camera'][0],fp['camera'][1])
-            door_r = self.door_length
-            door_a = self.poseSensor.door_angle()
+            cam_r,cam_a,door_r,door_a = self.camera_door_pose()
             if cam_r > 1.1*door_r or cam_a > 1.1*door_a:
                 return True
         return False
+
+    def camera_door_pose(self):
+        fp = self.poseSensor.robot_footprint()
+        cam_r = np.sqrt(fp['camera'][0]**2+fp['camera'][1]**2)
+        cam_a = np.arctan2(fp['camera'][0],fp['camera'][1])
+        door_r = self.door_length
+        door_a = self.poseSensor.door_angle()
+        return (cam_r,cam_a,door_r,door_a)
 
     def get_action(self, action):
         vx, vz = 2.0, 2*np.pi # scale of linear and angular velocity

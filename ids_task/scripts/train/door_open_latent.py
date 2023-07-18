@@ -41,15 +41,18 @@ def lppo_train(env, num_episodes, train_freq, max_steps, seq_len, warmup, model_
     # warmup for training representation model
     warmup_images = np.zeros([warmup]+list(image_shape), dtype=np.float32)
     warmup_forces = np.zeros((warmup, force_dim), dtype=np.float32)
+    warmup_rewards = np.zeros(warmup, dtype=np.float32)
     obs, done = env.reset(), False
     for i in range(warmup):
+        print("pre train step {}".format(i))
         warmup_images[i] = obs['image']
         warmup_forces[i] = obs['force']
         nobs, rew, done, info = env.step(env.action_space.sample())
+        warmup_rewards[i] = info["door"][1]/(0.5*np.pi)
         obs = nobs
         if done:
             obs, done = env.reset(), False
-    agent.train_rep(dict(image=warmup_images,force=warmup_forces),warmup,rep_iter=warmup)
+    agent.train_rep(dict(image=warmup_images,force=warmup_forces,reward=warmup_rewards),warmup,rep_iter=warmup)
 
     # start
     ep_returns, t, success_counter, best_ep_return = [], 0, 0, -np.inf
@@ -63,7 +66,8 @@ def lppo_train(env, num_episodes, train_freq, max_steps, seq_len, warmup, model_
             act, logp = agent.policy(z_seq.copy()) if recurrent else agent.policy(z)
             val = agent.value(z_seq.copy()) if recurrent else agent.value(z)
             nobs, rew, done, info = env.step(act)
-            buffer.add_experience(obs,act,rew,val,logp)
+            door_angle = info["door"][1]/(0.5*np.pi)
+            buffer.add_experience(obs,act,door_angle,val,logp)
             obs, ep_ret, step, t = nobs, ep_ret+rew, step+1, t+1
 
         last_value = 0

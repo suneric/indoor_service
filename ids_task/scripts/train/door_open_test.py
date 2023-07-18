@@ -84,14 +84,21 @@ class DoorOpenLatent:
         self.saveDir = os.path.join(sys.path[0],"../../dump/test/env")
 
     def run(self,env,maxStep=50):
+        env.robot.ftHook.reset_temp()
+        normal_forces = []
         obs, done, step, latent = env.reset(),False, 0, []
         while not done and step < maxStep:
+            normal_forces.append(obs["force"])
             imagePath = os.path.join(self.saveDir,"step{}".format(step))
             z = plot_predict(self.agent.encode,self.agent.decode,obs,imagePath)
-            act,_ = self.agent.policy(z,training=False)
-            obs, rew, done, info = env.step(act)
             latent.append(z)
+            act,_ = self.agent.policy(z,training=False)
+            obs, _, done, _ = env.step(act)
+            print("step",step,"reward",self.agent.reward(z),"action",act)
             step += 1
+        #forces = env.robot.ftHook.temp_record()
+        forcesPath = os.path.join(self.saveDir,"forces.csv")
+        pd.DataFrame(np.array(normal_forces)).to_csv(forcesPath)
         latentPath = os.path.join(self.saveDir,"latent")
         plot_latent(np.array(latent), latentPath)
         return env.success, step
@@ -134,9 +141,8 @@ def pulling_collect(env,model_dir,save_dir):
         obs_cache.append(obs)
         imagePath = os.path.join(save_dir,"step{}".format(i))
         z = plot_predict(agent.encode,agent.decode,obs,imagePath)
-        print(actions[i])
-        obs, rew, done, info = env.step(actions[i])
         latent.append(z)
+        obs, rew, done, info = env.step(actions[i])
     latentPath = os.path.join(save_dir,"latent")
     save_observation(latentPath,obs_cache)
     plot_latent(np.array(latent), latentPath)
