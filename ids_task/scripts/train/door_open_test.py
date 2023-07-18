@@ -84,23 +84,19 @@ class DoorOpenLatent:
         self.saveDir = os.path.join(sys.path[0],"../../dump/test/env")
 
     def run(self,env,maxStep=50):
+        obsCache = []
         env.robot.ftHook.reset_temp()
-        normal_forces = []
-        obs, done, step, latent = env.reset(),False, 0, []
+        obs, done, step = env.reset(),False, 0
         while not done and step < maxStep:
-            normal_forces.append(obs["force"])
-            imagePath = os.path.join(self.saveDir,"step{}".format(step))
-            z = plot_predict(self.agent.encode,self.agent.decode,obs,imagePath)
-            latent.append(z)
+            z = plot_predict(self.agent,obs,self.saveDir,step)
             act,_ = self.agent.policy(z,training=False)
+            r = self.agent.reward(z)
+            obsCache.append(save_environment(env,z,act,r,self.saveDir,step))
+            print("step",step,"reward",r,"action",act)
             obs, _, done, _ = env.step(act)
-            print("step",step,"reward",self.agent.reward(z),"action",act)
             step += 1
-        #forces = env.robot.ftHook.temp_record()
-        forcesPath = os.path.join(self.saveDir,"forces.csv")
-        pd.DataFrame(np.array(normal_forces)).to_csv(forcesPath)
-        latentPath = os.path.join(self.saveDir,"latent")
-        plot_latent(np.array(latent), latentPath)
+        forceProfile = env.robot.ftHook.temp_record()
+        plot_trajectory(forceProfile,obsCache,self.saveDir)
         return env.success, step
 
     def retrain(self,baselinePath,currentPath,epochs=500):

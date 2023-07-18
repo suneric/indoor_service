@@ -38,6 +38,7 @@ class Visualizer:
                 if img is not None:
                     cam.imshow(img)
                 profile = self.loadcell.profile(size=1000)
+                # print(self.loadcell.forces())
                 lineX.set_ydata(profile[:,0])
                 lineY.set_ydata(profile[:,1])
                 lineZ.set_ydata(profile[:,2])

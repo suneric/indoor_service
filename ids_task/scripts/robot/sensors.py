@@ -324,8 +324,9 @@ class RSD435:
 Force Sensor for measuring the force exerted on endeffector or side bar
 """
 class FTSensor():
-    def __init__(self, topic):
+    def __init__(self, topic, z_comp=6.8):
         self.topic=topic
+        self.z_comp=z_comp
         self.force_sub = rospy.Subscriber('/'+self.topic, WrenchStamped, self._force_cb)
         self.kfx = KalmanFilter()
         self.kfy = KalmanFilter()
@@ -338,7 +339,7 @@ class FTSensor():
         force = data.wrench.force
         x = self.kfx.update(force.x)
         y = self.kfy.update(force.y)
-        z = self.kfz.update(force.z)+10.5
+        z = self.kfz.update(force.z)+self.z_comp
         self.filtered = [x,y,z]
         self.record.append(self.filtered)
         self.record_temp.append(self.filtered)
@@ -388,11 +389,19 @@ class LCSensor:
         self.record_temp = []
 
     def _force_cb(self,data):
-        self.filtered = data.data # raw LC_x,LC_y,LC_z
+        force = data.data # raw LC_x,LC_y,LC_z
+        x = force[0]
+        y = force[1]
+        z = force[2]
         if self.topic == 'loadcell1_forces': # for plug, x=-LC_z, y=LC_y, z=LC_x
-            self.filtered = np.array([-self.filtered[2],self.filtered[1],-self.filtered[0]])
+            x = -force[2]+0.1 # bias caused by installation
+            y = force[1]-0.5
+            z = -force[0]-1.1
         elif self.topic == 'loadcell2_forces': # for sidebar, x=LC_z, y=-LC_y, z=LC_x
-            self.filtered = np.array([-self.filtered[2],-self.filtered[1],self.filtered[0]])
+            x = -force[2]-4.8 # bias caused by installation
+            y = -force[1]-0.7
+            z = force[0]+8.8
+        self.filtered = [x,y,z]
         self.record.append(self.filtered)
         self.record_temp.append(self.filtered)
 
