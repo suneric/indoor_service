@@ -20,6 +20,7 @@ def test_model(env,agent,ep_path,recurrent=False,max_step=50):
         z = agent.encode(obs)
         if recurrent:
             z_seq.append(z)
+        print("step",i,"angle",agent.reward(z))
         a,logp = agent.policy(z_seq.copy(),training=False) if recurrent else agent.policy(z,training=False)
         obs,rew,done,info = env.step(a)
         if done:

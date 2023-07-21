@@ -72,10 +72,12 @@ class DoorOpenEnv(GymGazeboEnv):
 
     def _take_action(self, action):
         act = self.get_action(action)
+        self.robot.ftHook.reset_temp()
         self.robot.move(act[0],act[1])
         rospy.sleep(0.5)
+        forcesRecord = self.robot.ftHook.temp_record()
         self.obs_image = self.robot.camARD2.grey_arr((64,64))
-        self.obs_force = self.robot.hook_forces()
+        self.obs_force = self.robot.hook_forces(records=forcesRecord)
         self.curr_angle = self.poseSensor.door_angle()
         self.success = self.curr_angle > 0.45*np.pi # 81 degree
         self.fail = self.is_failed()
@@ -84,20 +86,22 @@ class DoorOpenEnv(GymGazeboEnv):
         return self.success or self.fail
 
     def _compute_reward(self):
-        reward = 0 # step penalty
+        reward = 0
         if self.success:
             reward = 100
         elif self.fail:
             reward = -100
         else:
-            cam_r,_,door_r,_ = self.camera_door_pose()
-            penalty = 5 if cam_r < 0.7*door_r else 0
             angle_change = (self.curr_angle-self.prev_angle)/(np.pi/2)
-            reward = 100*angle_change-penalty-1
+            reward = 100*angle_change-1
             self.prev_angle = self.curr_angle
         return reward
 
     def is_failed(self):
+        # angle_change = abs(self.curr_angle-self.prev_angle)
+        # if angle_change < 1e-3 and self.not_safe(max_force=500):
+        #     print("max forces reached", self.obs_force)
+        #     return True
         """
         Fail when the robot is not out of the room and the side bar is far away from the door
         """
@@ -105,9 +109,13 @@ class DoorOpenEnv(GymGazeboEnv):
         robot_not_out = any(fp[key][0] > 0.0 for key in fp.keys())
         if robot_not_out:
             cam_r,cam_a,door_r,door_a = self.camera_door_pose()
-            if cam_r > 1.1*door_r or cam_a > 1.1*door_a:
+            if cam_r > 1.1*door_r or cam_r < 0.6*door_r or cam_a > 1.1*door_a:
                 return True
         return False
+
+    def not_safe(self, max_force=70):
+        abs_forces = [abs(v) for v in self.obs_force]
+        return max(abs_forces) > max_force
 
     def camera_door_pose(self):
         fp = self.poseSensor.robot_footprint()
