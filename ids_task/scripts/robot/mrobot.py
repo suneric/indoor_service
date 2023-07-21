@@ -119,11 +119,11 @@ class MRobot:
     def plug_forces(self):
         return np.array(self.ftPlug.forces())
 
-    def hook_forces(self,records=None):
-        if records is None:
+    def hook_forces(self,record=None):
+        if record is None:
             return np.array(self.ftHook.forces())
         else:
-            return np.mean(np.array(records),axis=0)
+            return np.mean(np.array(record),axis=0)
 
     def is_safe(self, max_force=20):
         """

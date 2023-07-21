@@ -51,9 +51,11 @@ class JazzyRobot:
         forces = np.array(self.ftPlug.forces())
         return forces
 
-    def hook_forces(self):
-        forces = np.array(self.ftHook.forces())
-        return forces
+    def hook_forces(self,record=None):
+        if record is None:
+            return np.array(self.ftHook.forces())
+        else:
+            return np.mean(np.array(record),axis=0)
 
     def set_plug_joints(self, hdata, vdata):
         if hdata != 0:

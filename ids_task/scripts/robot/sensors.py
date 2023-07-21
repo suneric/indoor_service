@@ -333,7 +333,8 @@ class FTSensor():
         self.kfz = KalmanFilter()
         self.filtered = np.zeros(3)
         self.record = []
-        self.record_temp = []
+        self.record_traj = []
+        self.record_step = []
 
     def _force_cb(self,data):
         force = data.wrench.force
@@ -342,10 +343,17 @@ class FTSensor():
         z = self.kfz.update(force.z)+self.z_comp
         self.filtered = [x,y,z]
         self.record.append(self.filtered)
-        self.record_temp.append(self.filtered)
+        self.record_traj.append(self.filtered)
+        self.record_step.append(self.filtered)
 
     def forces(self):
         return self.filtered
+
+    def reset(self):
+        self.record = []
+
+    def forces_record(self):
+        return self.record
 
     def profile(self, size):
         array = np.zeros((size,3))
@@ -355,17 +363,17 @@ class FTSensor():
             i += 1
         return array
 
-    def reset(self):
-        self.record = []
+    def reset_trajectory(self):
+        self.record_traj = []
 
-    def reset_temp(self):
-        self.record_temp = []
+    def trajectory_record(self):
+        return self.record_traj
 
-    def temp_record(self):
-        return self.record_temp
+    def reset_step(self):
+        self.record_step = []
 
-    def forces_record(self):
-        return self.record
+    def step_record(self):
+        return self.record_step
 
     def check_sensor_ready(self):
         rospy.logdebug("Waiting for force sensor to be READY...")
@@ -386,7 +394,8 @@ class LCSensor:
         self.force_sub = rospy.Subscriber('/'+self.topic, Float32MultiArray, self._force_cb)
         self.filtered = np.zeros(3)
         self.record = []
-        self.record_temp = []
+        self.record_traj = []
+        self.record_step = []
 
     def _force_cb(self,data):
         force = data.data # raw LC_x,LC_y,LC_z
@@ -403,10 +412,17 @@ class LCSensor:
             z = force[0]+8.8
         self.filtered = [x,y,z]
         self.record.append(self.filtered)
-        self.record_temp.append(self.filtered)
+        self.record_traj.append(self.filtered)
+        self.record_step.append(self.filtered)
 
     def forces(self):
         return self.filtered
+
+    def reset(self):
+        self.record = []
+
+    def forces_record(self):
+        return np.array(self.record)
 
     def profile(self,size):
         array = np.zeros((size,3))
@@ -416,17 +432,17 @@ class LCSensor:
             i += 1
         return array
 
-    def reset(self):
-        self.record = []
+    def reset_trajectory(self):
+        self.record_traj = []
 
-    def reset_temp(self):
-        self.record_temp = []
+    def trajectory_record(self):
+        return self.record_traj
 
-    def temp_record(self):
-        return np.array(self.record_temp)
+    def reset_step(self):
+        self.record_step = []
 
-    def forces_record(self):
-        return np.array(self.record)
+    def step_record(self):
+        return self.record_step
 
     def check_sensor_ready(self):
         rospy.logdebug("Waiting for loadcell to be READY...")

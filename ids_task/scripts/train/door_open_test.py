@@ -85,24 +85,19 @@ class DoorOpenLatent:
 
     def run(self,env,maxStep=50):
         obsCache = []
-        env.robot.ftHook.reset_temp()
+        env.robot.ftHook.reset_trajectory()
         obs, done, step = env.reset(),False, 0
         while not done and step < maxStep:
             z = plot_predict(self.agent,obs,self.saveDir,step)
             act,_ = self.agent.policy(z,training=False)
             r = self.agent.reward(z)
-            obsCache.append(save_environment(env,z,act,r,self.saveDir,step))
+            obsCache.append(save_environment(env.robot.camARD2,env.robot.ftHook,z,act,r,self.saveDir,step))
             print("step",step,"reward",r,"action",act)
             obs, _, done, _ = env.step(act)
             step += 1
-        forceProfile = env.robot.ftHook.temp_record()
+        forceProfile = env.robot.ftHook.trajectory_record()
         plot_trajectory(forceProfile,obsCache,self.saveDir)
         return env.success, step
-
-    def retrain(self,baselinePath,currentPath,epochs=500):
-        current = load_observation(currentPath)
-        baseline = load_observation(baselinePath)
-        self.agent.rep.retrain(current,baseline,epochs=epochs)
 
 """
 Run door pulling test with different policies
@@ -111,10 +106,25 @@ def run_pulling_test(env,model_dir,policies,retrain):
     res = []
     for policy in policies:
         test = DoorOpenPPO(model_dir) if policy == 'ppo' else DoorOpenLatent(model_dir)
+
         if retrain and policy=='latent':
-            baseline_path = os.path.join(sys.path[0],"../../dump/collection/env_0/latent")
-            current_path = os.path.join(sys.path[0],"../../dump/collection/env_1/latent")
-            test.retrain(baseline_path,current_path)
+            collection_path = os.path.join(sys.path[0],"../../dump/collection/")
+            b1 = load_observation(os.path.join(collection_path,"env_27/latent"))
+            b2 = load_observation(os.path.join(collection_path,"env_28/latent"))
+            b3 = load_observation(os.path.join(collection_path,"env_31/latent"))
+            baseline = dict(
+                image=np.concatenate((b1["image"],b2['image'],b3['image']),axis=0),
+                force=np.concatenate((b1['force'],b2['force'],b3['force']),axis=0),
+                )
+            c1 = load_observation(os.path.join(collection_path,"env0_27/latent"))
+            c2 = load_observation(os.path.join(collection_path,"env0_28/latent"))
+            c3 = load_observation(os.path.join(collection_path,"env0_31/latent"))
+            current = dict(
+                image=np.concatenate((c1["image"],c2['image'],c3['image']),axis=0),
+                force=np.concatenate((c1['force'],c2['force'],c3['force']),axis=0),
+                )
+            test.agent.rep.retrain(current,baseline,epochs=5000)
+
         successCount,numStep,count = 0,[],len(INITRANDOM)
         for i in range(count):
             env.set_init_positions(INITRANDOM[i])
@@ -129,19 +139,17 @@ def run_pulling_test(env,model_dir,policies,retrain):
 def pulling_collect(env,model_dir,save_dir):
     agent = Agent((64,64,1),3,4,3)
     agent.load(os.path.join(model_dir,"l3ppo"))
-    #actions = [2,2,3,3,2,3,2,3,2,3,2,3,2,3,2,2,2,2,2,2,2,2,0,0,0,0,2,0]
-    actions = [2,3,3,2,3,2,3,2,3,2,3,2,3,2,2,2,2,2,2,2,2,0,0,0,2,0,0]
+    actions = [2,2,3,3,2,3,2,3,2,3,2,3,2,3,2,2,2,2,2,2,2,2,0,0,0,0,2,0]
+    #actions = [2,3,3,2,3,2,3,2,3,2,3,2,3,2,2,2,2,2,2,2,2,0,0,0,2,0,0]
+    #actions = [2,3,3,2,3,3,2,3,3,2,3,3,2,3,3,2,3,3,2,2,0,2,2,2,2,2,0,0,2,0,0]
     env.set_init_positions(INITRANDOM[0])
-    obs, done, obs_cache,latent = env.reset(),False, [],[]
+    obs, done, obs_cache = env.reset(), False, []
     for i in range(len(actions)):
         obs_cache.append(obs)
-        imagePath = os.path.join(save_dir,"step{}".format(i))
-        z = plot_predict(agent.encode,agent.decode,obs,imagePath)
-        latent.append(z)
+        plot_predict(agent,obs,save_dir,i)
+        print("step",i,"action",actions[i])
         obs, rew, done, info = env.step(actions[i])
-    latentPath = os.path.join(save_dir,"latent")
-    save_observation(latentPath,obs_cache)
-    plot_latent(np.array(latent), latentPath)
+    save_observation(obs_cache, os.path.join(save_dir,"latent"))
     return env.success
 
 def get_args():

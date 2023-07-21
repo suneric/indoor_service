@@ -13,14 +13,13 @@ from train.utility import *
 class PullingTask:
     def __init__(self, robot, policy_dir):
         self.robot = robot
-        # self.agent = PPO((64,64,1),3,4)
-        # self.agent.load(os.path.join(policy_dir,'ppo/pi_net/2900'))
         self.agent = Agent((64,64,1),3,4,3)
         self.agent.load(os.path.join(policy_dir,"l3ppo"))
+        self.saveDir = os.path.join(sys.path[0],"../dump/test/experiment")
 
     def get_action(self,action):
-        vx, vz = 0.7, np.pi/2
-        act_list = [[vx,0.0],[0,-vz],[0,vz],[-vx,0]]
+        vx, vz = 0.8, 0.4*np.pi
+        act_list = [(vx,0.0),(0,-vz),(0,vz),(-vx,0)]
         return act_list[action]
 
     def retrain(self,currentPath,baselinePath,epochs=500):
@@ -29,55 +28,62 @@ class PullingTask:
         self.agent.rep.retrain(current,baseline,epochs=epochs)
 
     def perform(self):
-        baseline_path = os.path.join(sys.path[0],"../dump/collection/env_26/latent")
-        current_path = os.path.join(sys.path[0],"../dump/collection/real_26/latent")
-        self.retrain(current_path,baseline_path)
         self.pulling()
         return True
 
     def collect(self,model_dir,save_dir):
+        #action31 = [2,3,3,3,3,3,3,3,3,2,3,2,3,2,2,2,2,2,2,2,3,2,2,2,2,2,0,0,2,0,0]
+        #action37 = [2,3,3,3,3,3,3,2,3,2,3,2,3,2,2,2,2,2,2,2,2,3,2,2,3,2,2,2,2,0,2,2,2,2,2,0,0]
+        actions = [3,3,2,3,2,3,2,3,2,3,2,3,2,2,2,2,2,2,2,2,0,0,0,2,0,0]
         agent = Agent((64,64,1),3,4,3)
         agent.load(os.path.join(model_dir,"l3ppo"))
-        actions = [2,3,3,3,3,3,3,3,3,2,3,2,3,2,3,2,3,2,2,2,2,0,0,0,2,0,0]
-        obs_cache,latent = [],[]
+        obs_cache = []
+        image = self.robot.camARD1.grey_arr((64,64))
+        force = self.robot.hook_forces()
         for i in range(len(actions)):
-            image = self.robot.camARD1.grey_arr((64,64))
-            force = self.robot.hook_forces()
             obs = dict(image=image, force=force/np.linalg.norm(force))
             obs_cache.append(obs)
-            imagePath = os.path.join(save_dir,"step{}".format(i))
-            z = plot_predict(agent.encode,agent.decode,obs,imagePath)
-            latent.append(z)
-            print(actions[i])
-            act = self.get_action(actions[i])
-            self.robot.move(act[0],act[1])
+            plot_predict(agent,obs,save_dir,i)
+            vx,vz = self.get_action(actions[i])
+            print("step",i,"action",actions[i],vx,vz)
+            self.robot.ftHook.reset_step()
+            self.robot.move(vx,vz)
             rospy.sleep(0.5)
+            forcesRecord = self.robot.ftHook.step_record()
+            force = self.robot.hook_forces(record=forcesRecord)
             self.robot.stop()
-            rospy.sleep(1)
-        latentPath = os.path.join(save_dir,"latent")
-        save_observation(latentPath,obs_cache)
-        plot_latent(np.array(latent), latentPath)
+            rospy.sleep(1.0)
+            image = self.robot.camARD1.grey_arr((64,64))
+        save_observation(obs_cache, os.path.join(save_dir,"latent"))
 
     def pulling(self, max_step=30):
-        step, latent = 0, []
+        step, obsCache = 0, []
+        image = self.robot.camARD1.grey_arr((64,64))
+        force = self.robot.hook_forces()
+        self.robot.ftHook.reset_trajectory()
         while step < max_step:
-            image = self.robot.camARD1.grey_arr((64,64))
-            force = self.robot.hook_forces()
             obs = dict(image=image, force=force/np.linalg.norm(force))
-            dump_path = os.path.join(sys.path[0],"../dump/test/experiment/step{}".format(step))
-            z = plot_predict(self.agent.encode,self.agent.decode,obs,dump_path)
-            latent.append(z)
-            action, _ = self.agent.policy(z,training=False)
-            act = self.get_action(action)
-            print(act)
-            self.robot.move(act[0],act[1])
+            z = plot_predict(self.agent,obs,self.saveDir,step)
+            act, _ = self.agent.policy(z,training=False)
+            r = self.agent.reward(z)
+            print("step",step,"reward",r,"action",act)
+            obsCache.append(save_environment(self.robot.camARD1,self.robot.ftHook,z,act,r,self.saveDir,step))
+            if step < 3:
+                act = 3
+            vx,vz = self.get_action(act)
+            self.robot.ftHook.reset_step()
+            self.robot.move(vx,vz)
             rospy.sleep(0.5)
+            forcesRecord = self.robot.ftHook.step_record()
+            force = self.robot.hook_forces(record=forcesRecord)
             self.robot.stop()
             rospy.sleep(1)
+            image = self.robot.camARD1.grey_arr((64,64))
             step += 1
         self.robot.stop()
-        latent_path = os.path.join(sys.path[0],"../dump/test/experiment/latent")
-        plot_latent(np.array(latent), latent_path)
+        forceProfile = self.robot.ftHook.trajectory_record()
+        plot_trajectory(forceProfile,obsCache,self.saveDir)
+
 """
 Real Robot Door Open Task
 """
@@ -116,5 +122,5 @@ if __name__ == "__main__":
     policy_dir = os.path.join(sys.path[0],"policy/pulling")
     save_dir = os.path.join(sys.path[0],"../dump/collection/")
     task = JazzyDoorOpen(robot, yolo_dir, policy_dir)
-    #task.collect(policy_dir,save_dir)
-    task.perform()
+    task.collect(policy_dir,save_dir)
+    #task.perform()

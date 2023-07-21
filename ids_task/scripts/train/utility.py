@@ -100,6 +100,7 @@ def plot_latent(latent,saveDir):
     ax.set_zlabel('Dim 2')
     plt.savefig(latentPath+"_3d")
     plt.close(fig)
+
     fig = plt.figure(figsize=(9,3), constrained_layout=True)
     gs = fig.add_gridspec(1,3,width_ratios=[1,1,1])
     ax0 = fig.add_subplot(gs[0])
@@ -129,11 +130,11 @@ def plot_latent(latent,saveDir):
 def save_image(file_path, array, binary=True):
     cv.imwrite(file_path, array*255 if binary else array)
 
-def save_environment(env,z,act,rew,saveDir,idx):
-    imagePath = os.path.join(saveDir,"obs_step{}.png".format(idx))
-    image = env.robot.camARD2.grey_arr(resolution=(400,400))
-    cv.imwrite(imagePath,255*(image+0.5))
-    force = env.robot.ftHook.forces()
+def save_environment(camera,loadcell,z,act,rew,saveDir,idx):
+    #imagePath = os.path.join(saveDir,"obs_step{}.png".format(idx))
+    #image = camera.grey_arr(resolution=(400,400))
+    #cv.imwrite(imagePath,255*(image+0.5))
+    force = loadcell.forces()
     return [idx,force[0],force[1],force[2],z[0],z[1],z[2],act,rew]
 
 def plot_trajectory(forces,obsCache,saveDir):
@@ -165,7 +166,7 @@ def plot_forces(data,saveDir,useTime=False):
     plt.savefig(filePath)
     plt.close(fig)
 
-def save_observation(file_path, obs_cache):
+def save_observation(obs_cache,file_path):
     obs_len = len(obs_cache)
     data = np.zeros((obs_len,3+64*64),dtype=np.float32)
     for i in range(obs_len):
@@ -175,12 +176,12 @@ def save_observation(file_path, obs_cache):
     df = pd.DataFrame(data)
     df.to_csv(file_path+".csv")
 
-def load_observation(file_path):
+def load_observation(file_path,idxs=None):
     data = pd.read_csv(file_path+".csv")
-    obs_len = len(data.index)
+    obs_len = len(data.index) if idxs is None else len(idxs)
     images, forces = np.zeros((obs_len,64,64)), np.zeros((obs_len,3))
     for i in range(obs_len):
-        row = data.iloc[i]
+        row = data.iloc[i] if idxs is None else data.iloc[idxs[i]]
         forces[i] = row[1:4]
         images[i] = np.reshape(np.array(row[4:4100]),(64,64))
     return dict(image=images,force=forces)
