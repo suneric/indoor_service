@@ -104,7 +104,7 @@ class DoorOpenEnv(GymGazeboEnv):
             # fail when detected force is too large
             angle_change = abs(self.curr_angle-self.prev_angle)
             abs_forces = [abs(v) for v in self.obs_force]
-            if angle_change < 1e-3 and max(abs_forces) > 500
+            if angle_change < 1e-3 and max(abs_forces) > 500:
                 print("max forces reached", self.obs_force)
                 return True
             # fail when the robot is not out of the room and the side bar is far away from the door
