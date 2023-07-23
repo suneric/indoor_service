@@ -102,17 +102,17 @@ class DoorOpenEnv(GymGazeboEnv):
         robot_not_out = any(fp[key][0] > 0.0 for key in fp.keys())
         if robot_not_out:
             # fail when detected force is too large
-            angle_change = abs(self.curr_angle-self.prev_angle)
-            abs_forces = [abs(v) for v in self.obs_force]
-            if angle_change < 1e-3 and max(abs_forces) > 500:
-                print("max forces reached", self.obs_force)
-                return True
+            # angle_change = abs(self.curr_angle-self.prev_angle)
+            # abs_forces = [abs(v) for v in self.obs_force]
+            # if angle_change < 1e-3 and max(abs_forces) > 500:
+            #     print("max forces reached", self.obs_force)
+            #     return True
             # fail when the robot is not out of the room and the side bar is far away from the door
             cam_r = np.sqrt(fp['camera'][0]**2+fp['camera'][1]**2)
             cam_a = np.arctan2(fp['camera'][0],fp['camera'][1])
             door_r = self.door_length
             door_a = self.poseSensor.door_angle()
-            if cam_r > 1.1*door_r or cam_a > 1.1*door_a:
+            if cam_r > 1.1*door_r or cam_r < 0.7*door_r or cam_a > 1.1*door_a:
                 print("lose contact with the door", cam_r, cam_a)
                 return True
         return False

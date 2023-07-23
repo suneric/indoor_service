@@ -16,7 +16,7 @@ def test_model(env,agent,ep_path,recurrent=False,max_step=50):
     obs, done = env.reset(),False
     z_seq = zero_seq(agent.latent_dim,agent.seq_len) if recurrent else None
     for i in range(max_step):
-        plot_predict(agent.encode,agent.decode,obs,os.path.join(ep_path,"step{}".format(i)))
+        plot_predict(agent,obs,ep_path,i)
         z = agent.encode(obs)
         if recurrent:
             z_seq.append(z)
