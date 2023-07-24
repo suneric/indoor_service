@@ -212,9 +212,8 @@ class Agent:
     def __init__(self,image_shape,force_dim,action_dim,latent_dim):
         self.latent_dim = latent_dim
         self.action_dim = action_dim
-        self.rep = LatentVRep(image_shape,force_dim,latent_dim,action_dim)
-        self.ppo = LatentForcePPO(latent_dim,action_dim)
-        self.recurrent = False if seq_len is None else True
+        self.rep = LatentVRep(image_shape,latent_dim)
+        self.ppo = LatentForcePPO(latent_dim,force_dim,action_dim)
 
     def encode(self,image):
         img = tf.expand_dims(tf.convert_to_tensor(image), 0)
@@ -252,9 +251,6 @@ class Agent:
         image_buf = data['image']
         mu,sigma,z = self.rep.encoder(tf.convert_to_tensor(image_buf))
         z_buf = tf.squeeze(z).numpy()
-        if self.recurrent:
-            idxs = data['index']
-            z_buf = latent_seq(self.latent_dim,self.seq_len,z_buf,idxs)
         frc_buf, act_buf,ret_buf,adv_buf,logp_buf= data['force'],data['action'],data['ret'],data['adv'],data['logprob']
         self.ppo.train((z_buf,frc_buf,act_buf,ret_buf,adv_buf,logp_buf),size,pi_iter=pi_iter,q_iter=q_iter)
 

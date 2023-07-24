@@ -7,7 +7,7 @@ import rospy
 import numpy as np
 import tensorflow as tf
 from datetime import datetime
-from agent.latent import ReplayBuffer, Agent
+from agent.latent_v import ReplayBuffer, Agent
 from env.env_door_open import DoorOpenEnv
 from utility import *
 from agent.util import zero_seq
@@ -86,7 +86,7 @@ def lfppo_train(env, num_episodes, train_freq, max_steps, warmup, model_dir):
             ep_path = os.path.join(model_dir,"ep{}".format(ep+1))
             os.mkdir(ep_path)
             agent.save(ep_path)
-            test_model(env,agent,ep_path,recurrent)
+            #test_model(env,agent,ep_path)
 
     return ep_returns
 
