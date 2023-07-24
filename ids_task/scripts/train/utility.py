@@ -86,6 +86,21 @@ def plot_predict(agent,obs,saveDir,idx):
     plt.close(fig)
     return z
 
+def plot_vision(agent,obs,saveDir,idx):
+    fig, axs = plt.subplots(1,2)
+    z = agent.encode(obs['image'])
+    r_image = agent.decode(z)
+    axs[0].imshow(obs['image'],cmap='gray')
+    axs[0].set_xticks([])
+    axs[0].set_yticks([])
+    axs[1].imshow(r_image,cmap='gray')
+    axs[1].set_xticks([])
+    axs[1].set_yticks([])
+    imagePath = os.path.join(saveDir,"vae_step{}".format(idx))
+    plt.savefig(imagePath)
+    plt.close(fig)
+    return z
+
 def plot_latent(latent,saveDir):
     latentPath = os.path.join(saveDir,"latent")
     fig = plt.figure()

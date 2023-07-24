@@ -237,6 +237,70 @@ def latent_reward(latent_dim,act='relu',out_act='tanh'):
     # print(model.summary())
     return model
 
+"""
+vision encoder
+"""
+def vision_encoder(image_shape,latent_dim,act='relu'):
+    v_input = keras.Input(shape=image_shape)
+    vh = layers.Conv2D(filters=32,kernel_size=(3,3),strides=2,padding='same',activation=act)(v_input)
+    vh = layers.Conv2D(filters=16,kernel_size=(3,3),strides=2,padding='same',activation=act)(vh)
+    vh = layers.Conv2D(filters=8,kernel_size=(3,3),strides=2,padding='same',activation=act)(vh)
+    vh = layers.Flatten()(vh)
+    vh = layers.Dense(32,activation=act)(vh)
+    vh = layers.Dense(64,activation=act)(vh)
+    mu = layers.Dense(latent_dim,name="z_mean")(h)
+    logv = layers.Dense(latent_dim,name="z_logv")(h)
+    z = Sampling()([mu,logv])
+    model = keras.Model(inputs=v_input,outputs=[mu,logv,z],name='vision_encoder')
+    print(model.summary())
+    return model
+
+"""
+vision decoder
+"""
+def vision_decoder(latent_dim,act='elu'):
+    z_input = keras.Input(shape=(latent_dim,))
+    vh = layers.Dense(32,activation=act)(z_input)
+    vh = layers.Dense(512, activation=act)(vh)
+    vh = layers.Reshape((8,8,8))(vh)
+    vh = layers.Conv2DTranspose(filters=8,kernel_size=3,strides=2,padding='same',activation=act)(vh)
+    vh = layers.Conv2DTranspose(filters=16,kernel_size=3,strides=2,padding='same',activation=act)(vh)
+    vh = layers.Conv2DTranspose(filters=32,kernel_size=3,strides=2,padding='same',activation=act)(vh)
+    v_output = layers.Conv2DTranspose(filters=1,kernel_size=3,padding='same',activation='tanh')(vh)
+    v_output = 0.5*v_output # output in [-0.5,0.5]
+    model = keras.Model(inputs=z_input,outputs=v_output,name='vision_decoder')
+    print(model.summary())
+    return model
+
+"""
+z + force actor network
+"""
+def latent_force_actor(latent_dim,force_dim,output_dim,act='relu'):
+    z_input = keras.Input(shape=(latent_dim,))
+    f_input = keras.Input(shape=(force_dim,))
+    input = layers.concatenate([z_input, f_input])
+    h = layers.Dense(32, activation=act)(input)
+    h = layers.Dense(32, activation=act)(h)
+    output = layers.Dense(output_dim,activation='linear')(h)
+    model = keras.Model(inputs=[z_input,f_input],outputs=output,name='latent_force_actor')
+    # print(model.summary())
+    return model
+
+"""
+z + force critic network
+"""
+def latent_force_critic(latent_dim,force_dim,act='relu'):
+    z_input = keras.Input(shape=(latent_dim,))
+    f_input = keras.Input(shape=(force_dim,))
+    input = layers.concatenate([z_input, f_input])
+    h = layers.Dense(32, activation=act)(input)
+    h = layers.Dense(32, activation=act)(h)
+    output = layers.Dense(1,activation='linear')(h)
+    model = keras.Model(inputs=[z_input,f_input],outputs=output,name='latent_critic')
+    # print(model.summary())
+    return model
+
+
 def fv_encoder(image_shape,force_dim,latent_dim,act='relu'):
     v_input = keras.Input(shape=image_shape)
     vh = layers.Conv2D(filters=32,kernel_size=(3,3),strides=2,padding='same',activation='relu')(v_input)

@@ -72,14 +72,12 @@ class DoorOpenEnv(GymGazeboEnv):
 
     def _take_action(self, action):
         act = self.get_action(action)
-        self.robot.ftHook.reset_step()
         self.robot.move(act[0],act[1])
         rospy.sleep(0.5)
-        forcesRecord = self.robot.ftHook.step_record()
-        self.obs_force = self.robot.hook_forces(record=forcesRecord)
         self.obs_image = self.robot.camARD2.grey_arr((64,64))
+        self.obs_force = self.robot.hook_forces()
         self.curr_angle = self.poseSensor.door_angle()
-        self.success = self.curr_angle > 0.45*np.pi # 81 degree
+        self.success = self.is_success()
         self.fail = self.is_failed()
 
     def _is_done(self):
@@ -102,11 +100,10 @@ class DoorOpenEnv(GymGazeboEnv):
         robot_not_out = any(fp[key][0] > 0.0 for key in fp.keys())
         if robot_not_out:
             # fail when detected force is too large
-            # angle_change = abs(self.curr_angle-self.prev_angle)
-            # abs_forces = [abs(v) for v in self.obs_force]
-            # if angle_change < 1e-3 and max(abs_forces) > 500:
-            #     print("max forces reached", self.obs_force)
-            #     return True
+            abs_forces = [abs(v) for v in self.obs_force]
+            if self.curr_angle < 0.06 and max(abs_forces) > 500:
+                print("max forces reached", self.obs_force, "current angle", self.curr_angle)
+                return True
             # fail when the robot is not out of the room and the side bar is far away from the door
             cam_r = np.sqrt(fp['camera'][0]**2+fp['camera'][1]**2)
             cam_a = np.arctan2(fp['camera'][0],fp['camera'][1])
@@ -116,6 +113,9 @@ class DoorOpenEnv(GymGazeboEnv):
                 print("lose contact with the door", cam_r, cam_a)
                 return True
         return False
+
+    def is_success(self):
+        return self.curr_angle > 0.45*np.pi # 81 degree
 
     def get_action(self, action):
         vx, vz = 2.0, 2*np.pi # scale of linear and angular velocity
