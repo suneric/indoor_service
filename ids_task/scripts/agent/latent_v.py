@@ -245,7 +245,7 @@ class Agent:
         mu,sigma,z = self.rep.encoder(tf.convert_to_tensor(data['image']))
         zs = tf.squeeze(z).numpy()
         frcs,acts,rets,advs,logps= data['force'],data['action'],data['ret'],data['adv'],data['logprob']
-        self.ppo.train((zs,rcs,acts,rets,advs,logps),size,pi_iter=pi_iter,q_iter=q_iter)
+        self.ppo.train((zs,frcs,acts,rets,advs,logps),size,pi_iter=pi_iter,q_iter=q_iter)
 
     def save(self,path):
         self.rep.save(os.path.join(path,"encoder"), os.path.join(path,"decoder"), os.path.join(path,"reward"))
