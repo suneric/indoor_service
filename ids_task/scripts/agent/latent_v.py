@@ -17,7 +17,6 @@ class ReplayBuffer:
         self.adv = np.zeros(capacity, dtype=np.float32)
         self.gamma, self.lamda = gamma, lamda
         self.ptr,self.traj_idx,self.capacity = 0,0,capacity
-        self.idx_list = [self.traj_idx]
 
     def add_experience(self,obs,act,rew,val,logp):
         self.image[self.ptr] = obs['image']
@@ -36,16 +35,13 @@ class ReplayBuffer:
         self.adv[path_slice] = discount_cumsum(deltas, self.gamma*self.lamda) # GAE
         self.ret[path_slice] = discount_cumsum(rews, self.gamma)[:-1] # rewards-to-go,
         self.traj_idx = self.ptr
-        self.idx_list.append(self.traj_idx)
 
     def all_experiences(self):
         size = self.ptr
         s = slice(0,size)
         adv_mean, adv_std = np.mean(self.adv[s]), np.std(self.adv[s])
         self.adv[s] = (self.adv[s]-adv_mean) / adv_std
-        traj_indices = self.idx_list.copy()
         self.ptr, self.traj_idx = 0, 0
-        self.idx_list = [self.traj_idx]
         return dict(
             image = self.image[s],
             force = self.force[s],
@@ -54,7 +50,6 @@ class ReplayBuffer:
             ret = self.ret[s],
             adv = self.adv[s],
             logprob = self.logprob[s],
-            index = traj_indices, #trajectory indices
         ), size
 
 """Representation Model in Latent Space, VAE
@@ -86,7 +81,7 @@ class LatentVRep(keras.Model):
 
     def train(self,buffer,size,epochs=100,batch_size=32):
         print("training latent representation model, epoches {}, batch size {}".format(epochs, batch_size))
-        image_buf, reward_buf = buffer
+        image_buf,reward_buf = buffer
         for _ in range(epochs):
             idxs = np.random.choice(size,batch_size)
             image = tf.convert_to_tensor(image_buf[idxs])
@@ -216,16 +211,16 @@ class Agent:
         self.ppo = LatentForcePPO(latent_dim,force_dim,action_dim)
 
     def encode(self,image):
-        img = tf.expand_dims(tf.convert_to_tensor(image), 0)
+        img = tf.expand_dims(tf.convert_to_tensor(image),0)
         mu,logv,z = self.rep.encoder(img)
         return tf.squeeze(z).numpy()
 
     def decode(self,z):
-        img_pred = self.rep.decoder(tf.expand_dims(tf.convert_to_tensor(z), 0))
+        img_pred = self.rep.decoder(tf.expand_dims(tf.convert_to_tensor(z),0))
         return tf.squeeze(img_pred).numpy()
 
     def reward(self,z):
-        r = self.rep.reward(tf.expand_dims(tf.convert_to_tensor(z), 0))
+        r = self.rep.reward(tf.expand_dims(tf.convert_to_tensor(z),0))
         return tf.squeeze(r).numpy()
 
     def policy(self,latent,force,training=True):
@@ -243,16 +238,14 @@ class Agent:
         val = self.ppo.q([z,frc])
         return tf.squeeze(val).numpy()
 
-    def train_rep(self,data,size,rep_iter=100,batch_size=64):
-        image_buf, reward_buf = data['image'], data['reward']
-        self.rep.train((image_buf,reward_buf),size,epochs=rep_iter)
+    def train_rep(self,data,size,rep_iter=100,batch_size=32):
+        self.rep.train((data['image'],data['reward']),size,epochs=rep_iter)
 
-    def train_ppo(self,data,size,pi_iter=80,q_iter=80,batch_size=64):
-        image_buf = data['image']
-        mu,sigma,z = self.rep.encoder(tf.convert_to_tensor(image_buf))
-        z_buf = tf.squeeze(z).numpy()
-        frc_buf, act_buf,ret_buf,adv_buf,logp_buf= data['force'],data['action'],data['ret'],data['adv'],data['logprob']
-        self.ppo.train((z_buf,frc_buf,act_buf,ret_buf,adv_buf,logp_buf),size,pi_iter=pi_iter,q_iter=q_iter)
+    def train_ppo(self,data,size,pi_iter=80,q_iter=80,batch_size=32):
+        mu,sigma,z = self.rep.encoder(tf.convert_to_tensor(data['image']))
+        zs = tf.squeeze(z).numpy()
+        frcs,acts,rets,advs,logps= data['force'],data['action'],data['ret'],data['adv'],data['logprob']
+        self.ppo.train((zs,rcs,acts,rets,advs,logps),size,pi_iter=pi_iter,q_iter=q_iter)
 
     def save(self,path):
         self.rep.save(os.path.join(path,"encoder"), os.path.join(path,"decoder"), os.path.join(path,"reward"))

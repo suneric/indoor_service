@@ -226,17 +226,17 @@ class Agent:
         self.recurrent = False if seq_len is None else True
 
     def encode(self,obs):
-        frc = tf.expand_dims(tf.convert_to_tensor(obs['force']), 0)
-        img = tf.expand_dims(tf.convert_to_tensor(obs['image']), 0)
+        frc = tf.expand_dims(tf.convert_to_tensor(obs['force']),0)
+        img = tf.expand_dims(tf.convert_to_tensor(obs['image']),0)
         mu,logv,z = self.rep.encoder([img,frc])
         return tf.squeeze(z).numpy()
 
     def decode(self,z):
-        img_pred,frc_pred = self.rep.decoder(tf.expand_dims(tf.convert_to_tensor(z), 0))
+        img_pred,frc_pred = self.rep.decoder(tf.expand_dims(tf.convert_to_tensor(z),0))
         return tf.squeeze(img_pred).numpy(), tf.squeeze(frc_pred).numpy()
 
     def reward(self,z):
-        r = self.rep.reward(tf.expand_dims(tf.convert_to_tensor(z), 0))
+        r = self.rep.reward(tf.expand_dims(tf.convert_to_tensor(z),0))
         return tf.squeeze(r).numpy()
 
     def policy(self,z,training=True):
@@ -247,22 +247,20 @@ class Agent:
         return tf.squeeze(act).numpy(),tf.squeeze(logp).numpy()
 
     def value(self,z):
-        val = self.ppo.q(tf.expand_dims(tf.convert_to_tensor(z), 0))
+        val = self.ppo.q(tf.expand_dims(tf.convert_to_tensor(z),0))
         return tf.squeeze(val).numpy()
 
-    def train_rep(self,data,size,rep_iter=100,batch_size=64):
-        image_buf, force_buf, reward_buf = data['image'], data['force'], data['reward']
-        self.rep.train((image_buf,force_buf, reward_buf),size,epochs=rep_iter)
+    def train_rep(self,data,size,rep_iter=100,batch_size=32):
+        self.rep.train((data['image'],data['force'],data['reward']),size,epochs=rep_iter)
 
-    def train_ppo(self,data,size,pi_iter=80,q_iter=80,batch_size=64):
-        image_buf, force_buf = data['image'], data['force']
-        mu,sigma,z = self.rep.encoder([tf.convert_to_tensor(image_buf),tf.convert_to_tensor(force_buf)])
-        z_buf = tf.squeeze(z).numpy()
+    def train_ppo(self,data,size,pi_iter=80,q_iter=80,batch_size=32):
+        mu,sigma,z = self.rep.encoder([tf.convert_to_tensor(data['image']),tf.convert_to_tensor(data['force'])])
+        zs = tf.squeeze(z).numpy()
         if self.recurrent:
             idxs = data['index']
-            z_buf = latent_seq(self.latent_dim,self.seq_len,z_buf,idxs)
-        act_buf,ret_buf,adv_buf,logp_buf= data['action'],data['ret'],data['adv'],data['logprob']
-        self.ppo.train((z_buf,act_buf,ret_buf,adv_buf,logp_buf),size,pi_iter=pi_iter,q_iter=q_iter)
+            zs = latent_seq(self.latent_dim,self.seq_len,zs,idxs)
+        acts,rets,advs,logps = data['action'],data['ret'],data['adv'],data['logprob']
+        self.ppo.train((zs,acts,rets,advs,logps),size,pi_iter=pi_iter,q_iter=q_iter)
 
     def save(self,path):
         self.rep.save(os.path.join(path,"encoder"), os.path.join(path,"decoder"), os.path.join(path,"reward"))
