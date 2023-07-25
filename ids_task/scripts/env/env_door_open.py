@@ -20,13 +20,14 @@ def normalize(force):
     return force/np.linalg.norm(force)
 
 class DoorOpenEnv(GymGazeboEnv):
-    def __init__(self, continuous = False, door_length=0.9, name='mrobot'):
+    def __init__(self, continuous = False, door_length=0.9, name='mrobot', use_step_force=False):
         super(DoorOpenEnv, self).__init__(
             start_init_physics_parameters=False,
             reset_world_or_sim="WORLD"
         )
         self.continuous = continuous
         self.door_length = door_length
+        self.use_step_force = use_step_force
         self.observation_space = ((64,64,1),3) # image and force
         if self.continuous:
             self.action_space = Box(-1.0,1.0,(2,),dtype=np.float32)
@@ -72,10 +73,12 @@ class DoorOpenEnv(GymGazeboEnv):
 
     def _take_action(self, action):
         act = self.get_action(action)
+        self.robot.ftHook.reset_step()
         self.robot.move(act[0],act[1])
         rospy.sleep(0.5)
+        step_force = self.robot.ftHook.step_record() if self.use_step_force else None
+        self.obs_force = self.robot.hook_forces(record=step_force)
         self.obs_image = self.robot.camARD2.grey_arr((64,64))
-        self.obs_force = self.robot.hook_forces()
         self.curr_angle = self.poseSensor.door_angle()
         self.success = self.is_success()
         self.fail = self.is_failed()
@@ -91,7 +94,9 @@ class DoorOpenEnv(GymGazeboEnv):
             reward = -100
         else:
             angle_change = (self.curr_angle-self.prev_angle)/(np.pi/2)
-            reward = 100*angle_change-1
+            cam_position = self.camera_radius()-0.7*self.door_length
+            penalty = 0 if cam_position > 0 else 10*cam_position
+            reward = 100*angle_change + penalty - 1
             self.prev_angle = self.curr_angle
         return reward
 
@@ -113,6 +118,11 @@ class DoorOpenEnv(GymGazeboEnv):
                 print("lose contact with the door", cam_r, cam_a)
                 return True
         return False
+
+    def camera_radius(self):
+        fp = self.poseSensor.robot_footprint()
+        cam_r = np.sqrt(fp['camera'][0]**2+fp['camera'][1]**2)
+        return cam_r
 
     def is_success(self):
         return self.curr_angle > 0.45*np.pi # 81 degree
