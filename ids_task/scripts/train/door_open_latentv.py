@@ -97,4 +97,4 @@ if __name__=="__main__":
     env = DoorOpenEnv(continuous=False,name='jrobot')
     ep_returns = lfppo_train(env,args.max_ep,args.train_freq,args.max_step,args.warmup,model_dir)
     env.close()
-    plot_episodic_returns("latent_ppo_train", ep_returns, model_dir)
+    plot_episodic_returns("latent_force_ppo_train", ep_returns, model_dir)
