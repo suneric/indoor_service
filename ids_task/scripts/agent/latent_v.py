@@ -5,9 +5,27 @@ from tensorflow_probability import distributions as tfpd
 from .model import *
 from .util import *
 
-class ReplayBuffer:
-    def __init__(self,capacity,image_shape,force_dim,gamma=0.99,lamda=0.95):
+class ObservationBuffer:
+    def __init__(self,capacity,image_shape):
         self.image = np.zeros([capacity]+list(image_shape), dtype=np.float32)
+        self.angle = np.zeros(capacity, dtype=np.float32)
+        self.ptr,self.size,self.capacity = 0,0,capacity
+
+    def add_observation(self,image,angle):
+        self.image[self.ptr] = image
+        self.angle[self.ptr] = angle
+        self.ptr = (self.ptr+1) % self.capacity
+        self.size = min(self.size+1, self.capacity)
+        return self.ptr-1
+
+    def get_observation(self,idxs):
+        return dict(
+            image = self.image[idxs],
+            angle = self.angle[idxs],
+        )
+
+class ReplayBuffer:
+    def __init__(self,capacity,force_dim,gamma=0.99,lamda=0.95):
         self.force = np.zeros((capacity, force_dim), dtype=np.float32)
         self.action = np.zeros(capacity, dtype=np.int32)
         self.reward = np.zeros(capacity, dtype=np.float32)
@@ -18,9 +36,8 @@ class ReplayBuffer:
         self.gamma, self.lamda = gamma, lamda
         self.ptr,self.traj_idx,self.capacity = 0,0,capacity
 
-    def add_experience(self,obs,act,rew,val,logp):
-        self.image[self.ptr] = obs['image']
-        self.force[self.ptr] = obs['force']
+    def add_experience(self,frc,act,rew,val,logp):
+        self.force[self.ptr] = frc
         self.action[self.ptr] = act
         self.reward[self.ptr] = rew
         self.value[self.ptr] = val
@@ -43,7 +60,6 @@ class ReplayBuffer:
         self.adv[s] = (self.adv[s]-adv_mean) / adv_std
         self.ptr, self.traj_idx = 0, 0
         return dict(
-            image = self.image[s],
             force = self.force[s],
             reward = self.reward[s],
             action = self.action[s],
@@ -62,8 +78,8 @@ class LatentVRep(keras.Model):
         self.reward = latent_reward(latent_dim,out_act='sigmoid') # door angle [0,1] for 0 to pi/2
         self.optimizer = tf.keras.optimizers.Adam(lr)
 
-    def retrain(self,obs_buf,baseline,epochs=100):
-        img = tf.convert_to_tensor(obs_buf['image'])
+    def retrain(self,data,baseline,epochs=100):
+        img = tf.convert_to_tensor(data['image'])
         img_base = tf.convert_to_tensor(baseline['image'])
         _,_,z_base = self.encoder(img_base)
         img_base = self.decoder(z_base)
@@ -79,19 +95,19 @@ class LatentVRep(keras.Model):
             self.optimizer.apply_gradients(zip(grad, self.trainable_variables))
             print("loss {:.3f}".format(loss))
 
-    def train(self,buffer,size,epochs=100,batch_size=32):
+    def train(self,buffer,epochs=100,batch_size=32):
         print("training latent representation model, epoches {}, batch size {}".format(epochs, batch_size))
-        image_buf,reward_buf = buffer
         for _ in range(epochs):
-            idxs = np.random.choice(size,batch_size)
-            image = tf.convert_to_tensor(image_buf[idxs])
-            rew = tf.convert_to_tensor(reward_buf[idxs])
-            info = self.update_representation(image,rew)
+            idxs = np.random.choice(buffer.size,batch_size)
+            data = buffer.get_observation(idxs)
+            image = tf.convert_to_tensor(data['image'])
+            angle = tf.convert_to_tensor(data['angle'])
+            info = self.update_representation(image,angle)
             print("epoch {}, losses: {:.2f},{:.2f},{:.2f},{:.2f}".format(
                 _,
-                info['total_loss'].numpy(),
-                info['pred_loss'].numpy(),
+                info['loss'].numpy(),
                 info['kl_loss'].numpy(),
+                info['img_loss'].numpy(),
                 info['rew_loss'].numpy()
             ))
 
@@ -108,9 +124,9 @@ class LatentVRep(keras.Model):
         grad = tape.gradient(loss, self.trainable_variables)
         self.optimizer.apply_gradients(zip(grad, self.trainable_variables))
         return dict(
-            total_loss=loss,
-            pred_loss=img_loss,
+            loss=loss,
             kl_loss=kl_loss,
+            img_loss=img_loss,
             rew_loss=rew_loss,
         )
 
@@ -166,7 +182,7 @@ class LatentForcePPO(keras.Model):
         self.q_optimizer.apply_gradients(zip(q_grad, self.q.trainable_variables))
         return q_loss
 
-    def train(self, buffer, size, pi_iter=80, q_iter=80, batch_size=32):
+    def train(self,buffer,size,pi_iter=80,q_iter=80,batch_size=32):
         print("training latent ppo, epoches {}:{}, batch size {}".format(pi_iter,q_iter,batch_size))
         z_buf,frc_buf,act_buf,ret_buf,adv_buf,logp_buf = buffer
         for _ in range(pi_iter):
@@ -238,14 +254,15 @@ class Agent:
         val = self.ppo.q([z,frc])
         return tf.squeeze(val).numpy()
 
-    def train_rep(self,data,size,rep_iter=100,batch_size=32):
-        self.rep.train((data['image'],data['reward']),size,epochs=rep_iter)
+    def train_rep(self,buffer,iter=100,batch_size=64):
+        self.rep.train(buffer,epochs=iter,batch_size=batch_size)
 
-    def train_ppo(self,data,size,pi_iter=80,q_iter=80,batch_size=32):
-        mu,sigma,z = self.rep.encoder(tf.convert_to_tensor(data['image']))
+    def train_ppo(self,obsData,ppoBuffer,pi_iter=100,q_iter=100,batch_size=64):
+        mu,sigma,z = self.rep.encoder(tf.convert_to_tensor(obsData['image']))
         zs = tf.squeeze(z).numpy()
+        data,size = ppoBuffer.all_experiences()
         frcs,acts,rets,advs,logps= data['force'],data['action'],data['ret'],data['adv'],data['logprob']
-        self.ppo.train((zs,frcs,acts,rets,advs,logps),size,pi_iter=pi_iter,q_iter=q_iter)
+        self.ppo.train((zs,frcs,acts,rets,advs,logps),size,pi_iter=pi_iter,q_iter=q_iter,batch_size=batch_size)
 
     def save(self,path):
         self.rep.save(os.path.join(path,"encoder"), os.path.join(path,"decoder"), os.path.join(path,"reward"))

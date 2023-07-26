@@ -7,27 +7,22 @@ import rospy
 import numpy as np
 import tensorflow as tf
 from datetime import datetime
-from agent.latent import ReplayBuffer, Agent
+from agent.latent import ObservationBuffer, ReplayBuffer, Agent
 from env.env_door_open import DoorOpenEnv
 from utility import *
-from agent.util import zero_seq
 
 def test_model(env,agent,ep_path,recurrent=False,max_step=50):
     obs, done = env.reset(),False
-    z_seq = zero_seq(agent.latent_dim,agent.seq_len) if recurrent else None
     for i in range(max_step):
         plot_predict(agent,obs,ep_path,i)
         z = agent.encode(obs)
-        if recurrent:
-            z_seq.append(z)
-        print("step",i,"angle",agent.reward(z))
-        a,logp = agent.policy(z_seq.copy(),training=False) if recurrent else agent.policy(z,training=False)
+        print("step",i,"angle",agent.reward(z),"true angle",env.door_angle())
+        a,logp = agent.policy(z,training=False)
         obs,rew,done,info = env.step(a)
         if done:
             break
 
-def lppo_train(env, num_episodes, train_freq, max_steps, seq_len, warmup, model_dir):
-    recurrent = False if seq_len is None else True
+def lppo_train(env, num_episodes, train_freq, max_steps, warmup, model_dir):
     image_shape = env.observation_space[0]
     force_dim = env.observation_space[1]
     action_dim = env.action_space.n
@@ -35,56 +30,44 @@ def lppo_train(env, num_episodes, train_freq, max_steps, seq_len, warmup, model_
     summaryWriter = tf.summary.create_file_writer(model_dir)
 
     latent_dim = 3
-    capacity = train_freq+max_steps
-    buffer = ReplayBuffer(capacity,image_shape,force_dim)
-    agent = Agent(image_shape,force_dim,action_dim,latent_dim,seq_len)
+    obsBuffer = ObservationBuffer(50000,image_shape,force_dim)
+    ppoBuffer = ReplayBuffer(capacity = train_freq+max_steps)
+    agent = Agent(image_shape,force_dim,action_dim,latent_dim)
 
-    # warmup for training representation model
-    warmup_images = np.zeros([warmup]+list(image_shape), dtype=np.float32)
-    warmup_forces = np.zeros((warmup, force_dim), dtype=np.float32)
-    warmup_rewards = np.zeros(warmup, dtype=np.float32)
-    obs, done = env.reset(), False
+    # warmup for representation model
+    obs,done = env.reset(),False
     for i in range(warmup):
         print("pre train step {}".format(i))
-        warmup_images[i] = obs['image']
-        warmup_forces[i] = obs['force']
-        nobs, rew, done, info = env.step(env.action_space.sample())
-        warmup_rewards[i] = info["door"][1]/(0.5*np.pi)
-        obs = nobs
+        obsBuffer.add_observation(obs,env.door_angle())
+        nobs,rew,done,info = env.step(env.action_space.sample())
         if done:
-            obs, done = env.reset(), False
-    agent.train_rep(dict(image=warmup_images,force=warmup_forces,reward=warmup_rewards),warmup,rep_iter=warmup)
+            obs,done = env.reset(),False
+        else:
+            obs = nobs
+    agent.train_rep(obsBuffer,iter=warmup)
 
-    # start
-    ep_returns, t, success_counter, best_ep_return = [], 0, 0, -np.inf
+    # start behavior training
+
+    ep_returns,t,success_counter,best_ep_return,obsIndices = [],0,0,-np.inf,[]
     for ep in range(num_episodes):
-        obs, done, ep_ret, step = env.reset(), False, 0, 0
-        z_seq = zero_seq(latent_dim,seq_len) if recurrent else None
+        obs,done,ep_ret,step = env.reset(),False,0,0
         while not done and step < max_steps:
+            obsIndices.append(obsBuffer.add_observation(obs,env.door_angle()))
             z = agent.encode(obs)
-            if recurrent:
-                z_seq.append(z)
-            act, logp = agent.policy(z_seq.copy()) if recurrent else agent.policy(z)
-            val = agent.value(z_seq.copy()) if recurrent else agent.value(z)
-            nobs, rew, done, info = env.step(act)
-            door_angle = info["door"][1]/(0.5*np.pi)
-            buffer.add_experience(obs,act,door_angle,val,logp)
-            obs, ep_ret, step, t = nobs, ep_ret+rew, step+1, t+1
+            act, logp = agent.policy(z)
+            val = agent.value(z)
+            nobs,rew,done,info = env.step(act)
+            ppoBuffer.add_experience(act,rew,val,logp)
+            obs,ep_ret,step,t = nobs,ep_ret+rew,step+1,t+1
+        last_value = 0 if done else agent.value(agent.encode(obs))
+        ppoBuffer.end_trajectry(last_value)
 
-        last_value = 0
-        if not done:
-            z = agent.encode(obs)
-            if recurrent:
-                z_seq.append(z)
-            last_value = agent.value(z_seq.copy()) if recurrent else agent.value(z)
-
-        buffer.end_trajectry(last_value)
-
-        if buffer.ptr >= train_freq or (ep+1) == num_episodes:
-            data, size = buffer.all_experiences()
-            agent.train_rep(data,size,rep_iter=300)
-            agent.train_ppo(data,size,pi_iter=100,q_iter=100)
-
+        if ppoBuffer.ptr >= train_freq or (ep+1) == num_episodes:
+            agent.train_rep(obsBuffer,iter=200)
+            obsData = obsBuffer.get_observation(obsIndices)
+            agent.train_ppo(obsData,ppoBuffer,pi_iter=100,q_iter=100)
+            obsIndices = []
+            
         ep_returns.append(ep_ret)
         success_counter = success_counter+1 if env.success else success_counter
         print("Episode *{}*: Return {:.4f}, Total Step {}, Success Count {} ".format(ep,ep_ret,t,success_counter))
@@ -107,6 +90,6 @@ if __name__=="__main__":
     rospy.init_node('latent_ppo_train', anonymous=True)
     model_dir = os.path.join(sys.path[0],"../../saved_models/door_open/latent", datetime.now().strftime("%Y-%m-%d-%H-%M"))
     env = DoorOpenEnv(continuous=False,name='jrobot')
-    ep_returns = lppo_train(env,args.max_ep,args.train_freq,args.max_step,args.seq_len,args.warmup,model_dir)
+    ep_returns = lppo_train(env,args.max_ep,args.train_freq,args.max_step,args.warmup,model_dir)
     env.close()
     plot_episodic_returns("latent_ppo_train", ep_returns, model_dir)

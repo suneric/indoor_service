@@ -93,10 +93,8 @@ class DoorOpenEnv(GymGazeboEnv):
         elif self.fail:
             reward = -100
         else:
-            angle_change = (self.curr_angle-self.prev_angle)/(np.pi/2)
-            cam_position = self.camera_radius()-0.7*self.door_length
-            penalty = 0 if cam_position > 0 else 10*cam_position
-            reward = 100*angle_change + penalty - 1
+            angle_change = (self.curr_angle-self.prev_angle)/(0.5*np.pi)
+            reward = 100*angle_change-1
             self.prev_angle = self.curr_angle
         return reward
 
@@ -106,7 +104,7 @@ class DoorOpenEnv(GymGazeboEnv):
         if robot_not_out:
             # fail when detected force is too large
             abs_forces = [abs(v) for v in self.obs_force]
-            if self.curr_angle < 0.06 and max(abs_forces) > 1000:
+            if self.curr_angle < 0.06 and max(abs_forces) > 500:
                 print("max forces reached", self.obs_force, "current angle", self.curr_angle)
                 return True
             # fail when the robot is not out of the room and the side bar is far away from the door
@@ -119,10 +117,11 @@ class DoorOpenEnv(GymGazeboEnv):
                 return True
         return False
 
-    def camera_radius(self):
-        fp = self.poseSensor.robot_footprint()
-        cam_r = np.sqrt(fp['camera'][0]**2+fp['camera'][1]**2)
-        return cam_r
+    def door_angle(self): # make door_angle 0-1
+        door_a = self.poseSensor.door_angle()
+        # print("door angle", door_a, door_a/(0.5*np.pi))
+        return door_a/(0.5*np.pi)
+
 
     def is_success(self):
         return self.curr_angle > 0.45*np.pi # 81 degree

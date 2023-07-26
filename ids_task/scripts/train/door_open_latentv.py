@@ -7,7 +7,7 @@ import rospy
 import numpy as np
 import tensorflow as tf
 from datetime import datetime
-from agent.latent_v import ReplayBuffer, Agent
+from agent.latent_v import ObservationBuffer, ReplayBuffer, Agent
 from env.env_door_open import DoorOpenEnv
 from utility import *
 from agent.util import zero_seq
@@ -17,7 +17,7 @@ def test_model(env,agent,ep_path,max_step=50):
     for i in range(max_step):
         plot_vision(agent,obs,ep_path,i)
         z = agent.encode(obs['image'])
-        print("step",i,"angle",agent.reward(z))
+        print("step",i,"angle",agent.reward(z),"true angle",env.door_angle())
         a,logp = agent.policy(z,obs['force'],training=False)
         obs,rew,done,info = env.step(a)
         if done:
@@ -31,47 +31,42 @@ def lfppo_train(env, num_episodes, train_freq, max_steps, warmup, model_dir):
     summaryWriter = tf.summary.create_file_writer(model_dir)
 
     latent_dim = 3
-    capacity = train_freq+max_steps
-    buffer = ReplayBuffer(capacity,image_shape,force_dim)
+    obsBuffer = ObservationBuffer(50000,image_shape)
+    ppoBuffer = ReplayBuffer(train_freq+max_steps,force_dim)
     agent = Agent(image_shape,force_dim,action_dim,latent_dim)
 
     # warmup for training representation model
-    warmup_images = np.zeros([warmup]+list(image_shape), dtype=np.float32)
-    warmup_rewards = np.zeros(warmup, dtype=np.float32)
-    obs, done = env.reset(), False
+    obs,done = env.reset(),False
     for i in range(warmup):
         print("pre train step {}".format(i))
-        warmup_images[i] = obs['image']
-        nobs, rew, done, info = env.step(env.action_space.sample())
-        warmup_rewards[i] = info["door"][1]/(0.5*np.pi)
-        obs = nobs
+        obsBuffer.add_observation(obs['image'],env.door_angle())
+        nobs,rew,done,info = env.step(env.action_space.sample())
         if done:
-            obs, done = env.reset(), False
-    agent.train_rep(dict(image=warmup_images,reward=warmup_rewards),warmup,rep_iter=warmup)
+            obs,done = env.reset(),False
+        else:
+            obs = nobs
+    agent.train_rep(obsBuffer,iter=warmup)
 
-    # start
-    ep_returns, t, success_counter, best_ep_return = [], 0, 0, -np.inf
+    # start behavior training
+    ep_returns,t,success_counter,best_ep_return,obsIndices = [],0,0,-np.inf,[]
     for ep in range(num_episodes):
-        obs, done, ep_ret, step = env.reset(), False, 0, 0
+        obs,done,ep_ret,step = env.reset(),False,0,0
         while not done and step < max_steps:
+            obsIndices.append(obsBuffer.add_observation(obs['image'],env.door_angle()))
             z = agent.encode(obs['image'])
-            act, logp = agent.policy(z,obs['force'])
+            act,logp = agent.policy(z,obs['force'])
             val = agent.value(z,obs['force'])
-            nobs, rew, done, info = env.step(act)
-            door_angle = info["door"][1]/(0.5*np.pi)
-            buffer.add_experience(obs,act,door_angle,val,logp)
-            obs, ep_ret, step, t = nobs, ep_ret+rew, step+1, t+1
+            nobs,rew,done,info = env.step(act)
+            ppoBuffer.add_experience(obs['force'],act,rew,val,logp)
+            obs,ep_ret,step,t = nobs,ep_ret+rew,step+1,t+1
+        last_value = 0 if done else agent.value(agent.encode(obs['image']),obs['force'])
+        ppoBuffer.end_trajectry(last_value)
 
-        last_value = 0
-        if not done:
-            z = agent.encode(obs['image'])
-            last_value = agent.value(z,obs['force'])
-        buffer.end_trajectry(last_value)
-
-        if buffer.ptr >= train_freq or (ep+1) == num_episodes:
-            data, size = buffer.all_experiences()
-            agent.train_rep(data,size,rep_iter=300)
-            agent.train_ppo(data,size,pi_iter=100,q_iter=100)
+        if ppoBuffer.ptr >= train_freq or (ep+1) == num_episodes:
+            agent.train_rep(obsBuffer,iter=200)
+            obsData = obsBuffer.get_observation(obsIndices)
+            agent.train_ppo(obsData,ppoBuffer,pi_iter=100,q_iter=100)
+            obsIndices = []
 
         ep_returns.append(ep_ret)
         success_counter = success_counter+1 if env.success else success_counter
@@ -82,11 +77,11 @@ def lfppo_train(env, num_episodes, train_freq, max_steps, warmup, model_dir):
         if (ep+1) >= 1000 and ep_ret > best_ep_return:
             best_ep_return = ep_ret
             agent.save(os.path.join(model_dir,"best"))
-        if (ep+1) % 50 == 0 or (ep+1==num_episodes):
+        if (ep+1) % 5 == 0 or (ep+1==num_episodes):
             ep_path = os.path.join(model_dir,"ep{}".format(ep+1))
             os.mkdir(ep_path)
             agent.save(ep_path)
-            #test_model(env,agent,ep_path)
+            test_model(env,agent,ep_path)
 
     return ep_returns
 
@@ -94,7 +89,7 @@ if __name__=="__main__":
     args = get_args()
     rospy.init_node('latent_ppo_train', anonymous=True)
     model_dir = os.path.join(sys.path[0],"../../saved_models/door_open/latentv", datetime.now().strftime("%Y-%m-%d-%H-%M"))
-    env = DoorOpenEnv(continuous=False,name='jrobot')
+    env = DoorOpenEnv(continuous=False,name='jrobot',use_step_force=True)
     ep_returns = lfppo_train(env,args.max_ep,args.train_freq,args.max_step,args.warmup,model_dir)
     env.close()
     plot_episodic_returns("latent_force_ppo_train", ep_returns, model_dir)
