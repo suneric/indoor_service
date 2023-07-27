@@ -14,8 +14,7 @@ from utility import *
 def test_model(env,agent,ep_path,max_step=50):
     obs, done = env.reset(),False
     for i in range(max_step):
-        plot_predict(agent,obs,ep_path,i)
-        z = agent.encode(obs)
+        z = plot_predict(agent,obs,ep_path,i)
         print("step",i,"angle",agent.reward(z),"true angle",env.door_angle())
         a,logp = agent.policy(z,training=False)
         obs,rew,done,info = env.step(a)
@@ -29,10 +28,9 @@ def lppo_train(env, num_episodes, train_freq, max_steps, warmup, model_dir):
     print("create door open environment for latent ppo", image_shape, force_dim, action_dim)
     summaryWriter = tf.summary.create_file_writer(model_dir)
 
-    latent_dim = 3
     obsBuffer = ObservationBuffer(50000,image_shape,force_dim)
-    ppoBuffer = ReplayBuffer(capacity = train_freq+max_steps)
-    agent = Agent(image_shape,force_dim,action_dim,latent_dim)
+    ppoBuffer = ReplayBuffer(capacity=train_freq+max_steps)
+    agent = Agent(image_shape,force_dim,action_dim,latent_dim=3)
 
     # warmup for representation model
     obs,done = env.reset(),False
@@ -47,14 +45,13 @@ def lppo_train(env, num_episodes, train_freq, max_steps, warmup, model_dir):
     agent.train_rep(obsBuffer,iter=warmup)
 
     # start behavior training
-
     ep_returns,t,success_counter,best_ep_return,obsIndices = [],0,0,-np.inf,[]
     for ep in range(num_episodes):
         obs,done,ep_ret,step = env.reset(),False,0,0
         while not done and step < max_steps:
             obsIndices.append(obsBuffer.add_observation(obs,env.door_angle()))
             z = agent.encode(obs)
-            act, logp = agent.policy(z)
+            act,logp = agent.policy(z)
             val = agent.value(z)
             nobs,rew,done,info = env.step(act)
             ppoBuffer.add_experience(act,rew,val,logp)
@@ -74,9 +71,6 @@ def lppo_train(env, num_episodes, train_freq, max_steps, warmup, model_dir):
         with summaryWriter.as_default():
             tf.summary.scalar('episode reward', ep_ret, step=ep)
 
-        if (ep+1) >= 1000 and ep_ret > best_ep_return:
-            best_ep_return = ep_ret
-            agent.save(os.path.join(model_dir,"best"))
         if (ep+1) % 50 == 0 or (ep+1==num_episodes):
             ep_path = os.path.join(model_dir,"ep{}".format(ep+1))
             os.mkdir(ep_path)
@@ -89,7 +83,7 @@ if __name__=="__main__":
     args = get_args()
     rospy.init_node('latent_ppo_train', anonymous=True)
     model_dir = os.path.join(sys.path[0],"../../saved_models/door_open/latent", datetime.now().strftime("%Y-%m-%d-%H-%M"))
-    env = DoorOpenEnv(continuous=False,name='jrobot')
+    env = DoorOpenEnv(continuous=False,name='jrobot',use_step_force=True)
     ep_returns = lppo_train(env,args.max_ep,args.train_freq,args.max_step,args.warmup,model_dir)
     env.close()
     plot_episodic_returns("latent_ppo_train", ep_returns, model_dir)

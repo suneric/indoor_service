@@ -112,7 +112,7 @@ class DoorOpenEnv(GymGazeboEnv):
             cam_a = np.arctan2(fp['camera'][0],fp['camera'][1])
             door_r = self.door_length
             door_a = self.poseSensor.door_angle()
-            if cam_r > 1.1*door_r or cam_a > 1.1*door_a:
+            if cam_r > 1.1*door_r or cam_r < 0.7*door_r or cam_a > 1.1*door_a:
                 print("lose contact with the door", cam_r, cam_a)
                 return True
         return False

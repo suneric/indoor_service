@@ -60,12 +60,11 @@ class ReplayBuffer:
         self.adv[s] = (self.adv[s]-adv_mean) / adv_std
         self.ptr, self.traj_idx = 0, 0
         return dict(
-            force = self.force[s],
-            reward = self.reward[s],
-            action = self.action[s],
+            frc = self.force[s],
+            act = self.action[s],
             ret = self.ret[s],
             adv = self.adv[s],
-            logprob = self.logprob[s],
+            logp = self.logprob[s],
         ), size
 
 """Representation Model in Latent Space, VAE
@@ -221,8 +220,6 @@ class LatentForcePPO(keras.Model):
 """
 class Agent:
     def __init__(self,image_shape,force_dim,action_dim,latent_dim):
-        self.latent_dim = latent_dim
-        self.action_dim = action_dim
         self.rep = LatentVRep(image_shape,latent_dim)
         self.ppo = LatentForcePPO(latent_dim,force_dim,action_dim)
 
@@ -261,7 +258,7 @@ class Agent:
         mu,sigma,z = self.rep.encoder(tf.convert_to_tensor(obsData['image']))
         zs = tf.squeeze(z).numpy()
         data,size = ppoBuffer.all_experiences()
-        frcs,acts,rets,advs,logps= data['force'],data['action'],data['ret'],data['adv'],data['logprob']
+        frcs,acts,rets,advs,logps= data['frc'],data['act'],data['ret'],data['adv'],data['logp']
         self.ppo.train((zs,frcs,acts,rets,advs,logps),size,pi_iter=pi_iter,q_iter=q_iter,batch_size=batch_size)
 
     def save(self,path):

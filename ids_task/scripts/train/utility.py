@@ -86,14 +86,16 @@ def plot_predict(agent,obs,saveDir,idx):
     plt.close(fig)
     return z
 
-def plot_vision(agent,obs,saveDir,idx):
+def plot_vision(agent,obs,saveDir,idx,angle):
     fig, axs = plt.subplots(1,2)
     z = agent.encode(obs['image'])
     r_image = agent.decode(z)
     axs[0].imshow(obs['image'],cmap='gray')
+    axs[0].set_title("angle {:.4f}".format(angle))
     axs[0].set_xticks([])
     axs[0].set_yticks([])
     axs[1].imshow(r_image,cmap='gray')
+    axs[0].set_title("angle {:.4f}".format(agent.reward(z)))
     axs[1].set_xticks([])
     axs[1].set_yticks([])
     imagePath = os.path.join(saveDir,"vae_step{}".format(idx))

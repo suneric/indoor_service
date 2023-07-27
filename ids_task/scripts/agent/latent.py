@@ -39,9 +39,9 @@ class ReplayBuffer:
         self.ptr,self.traj_idx,self.capacity = 0,0,capacity
 
     def add_experience(self,act,rew,val,logp):
+        self.action[self.ptr] = act
         self.reward[self.ptr] = rew
         self.value[self.ptr] = val
-        self.action[self.ptr] = act
         self.logprob[self.ptr] = logp
         self.ptr += 1
 
@@ -63,8 +63,8 @@ class ReplayBuffer:
         return dict(
             adv = self.adv[s],
             ret = self.ret[s],
-            action = self.action[s],
-            logprob = self.logprob[s],
+            act = self.action[s],
+            logp = self.logprob[s],
         ),size
 
 """Representation Model in Latent Space, VAE
@@ -228,8 +228,6 @@ class LatentPPO(keras.Model):
 """
 class Agent:
     def __init__(self,image_shape,force_dim,action_dim,latent_dim):
-        self.latent_dim = latent_dim
-        self.action_dim = action_dim
         self.rep = LatentRep(image_shape,force_dim,latent_dim,action_dim)
         self.ppo = LatentPPO(latent_dim,action_dim)
 
@@ -266,7 +264,7 @@ class Agent:
         mu,sigma,z = self.rep.encoder([imgs,frcs])
         zs = tf.squeeze(z).numpy()
         data,size = ppoBuffer.all_experiences()
-        acts,rets,advs,logps = data['action'],data['ret'],data['adv'],data['logprob']
+        acts,rets,advs,logps = data['act'],data['ret'],data['adv'],data['logp']
         self.ppo.train((zs,acts,rets,advs,logps),size,pi_iter=pi_iter,q_iter=q_iter,batch_size=batch_size)
 
     def save(self,path):

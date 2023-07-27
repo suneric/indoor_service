@@ -14,9 +14,7 @@ from utility import *
 def test_model(env,agent,ep_path,max_step=50):
     obs, done = env.reset(),False
     for i in range(max_step):
-        plot_vision(agent,obs,ep_path,i)
-        z = agent.encode(obs['image'])
-        print("step",i,"angle",agent.reward(z),"true angle",env.door_angle())
+        z = plot_vision(agent,obs,ep_path,i,env.door_angle())
         a,logp = agent.policy(z,obs['force'],training=False)
         obs,rew,done,info = env.step(a)
         if done:
@@ -73,9 +71,6 @@ def lfppo_train(env, num_episodes, train_freq, max_steps, warmup, model_dir):
         with summaryWriter.as_default():
             tf.summary.scalar('episode reward', ep_ret, step=ep)
 
-        if (ep+1) >= 1000 and ep_ret > best_ep_return:
-            best_ep_return = ep_ret
-            agent.save(os.path.join(model_dir,"best"))
         if (ep+1) % 50 == 0 or (ep+1==num_episodes):
             ep_path = os.path.join(model_dir,"ep{}".format(ep+1))
             os.mkdir(ep_path)
