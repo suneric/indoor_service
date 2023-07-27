@@ -137,7 +137,7 @@ class PPO:
         with tf.GradientTape() as tape:
             tape.watch(self.q.trainable_variables)
             val = self.q([img,frc,jnt]) if self.wantJoint else self.q([img,frc])
-            q_loss = tf.reduce_mean((ret-val)**2)
+            q_loss = tf.reduce_mean(keras.losses.MSE(ret,val))
         q_grad = tape.gradient(q_loss, self.q.trainable_variables)
         self.q_optimizer.apply_gradients(zip(q_grad, self.q.trainable_variables))
 

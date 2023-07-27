@@ -147,7 +147,7 @@ def obs_encoder(image_shape,force_dim,latent_dim,act='relu'):
 """
 observation decoder
 """
-def obs_decoder(latent_dim,act='elu'):
+def obs_decoder(latent_dim,act='elu',scale=0.5):
     z_input = keras.Input(shape=(latent_dim,))
     h = layers.Dense(32,activation=act)(z_input)
     h = layers.Dense(512+16, activation=act)(h)
@@ -157,12 +157,11 @@ def obs_decoder(latent_dim,act='elu'):
     vh = layers.Conv2DTranspose(filters=16,kernel_size=3,strides=2,padding='same',activation=act)(vh)
     vh = layers.Conv2DTranspose(filters=32,kernel_size=3,strides=2,padding='same',activation=act)(vh)
     v_output = layers.Conv2DTranspose(filters=1,kernel_size=3,padding='same',activation='tanh')(vh)
-    v_output = 0.5*v_output # output in [-0.5,0.5]
-
+    v_output = scale*v_output
+    
     fh = layers.Lambda(lambda x: x[:,512:])(h) # split layer
     fh = layers.Dense(32,activation=act)(fh)
     f_output = layers.Dense(3, activation='tanh')(fh)
-
     model = keras.Model(inputs=z_input,outputs=[v_output,f_output],name='obs_decoder')
     # print(model.summary())
     return model
@@ -328,7 +327,7 @@ def fv_encoder(image_shape,force_dim,latent_dim,act='relu'):
 """
 force-vision fusion decoder
 """
-def fv_decoder(latent_dim):
+def fv_decoder(latent_dim,scale=0.5):
     z_input = keras.Input(shape=(latent_dim,))
     h = layers.Dense(32,activation='relu')(z_input)
     h = layers.Dense(32+16, activation='relu')(h)
@@ -340,7 +339,7 @@ def fv_decoder(latent_dim):
     vh = layers.UpSampling2D((2,2))(vh)
     vh = layers.Conv2DTranspose(filters=32,kernel_size=3,strides=2,padding='same',activation='relu')(vh)
     v_output = layers.Conv2DTranspose(filters=1,kernel_size=3,padding='same',activation='tanh')(vh)
-    v_output = 0.5*v_output # output in [-0.5,0.5]
+    v_output = scale*v_output # output in [-0.5,0.5]
 
     fh = layers.Lambda(lambda x: x[:,32:])(h) # split layer
     fh = layers.Dense(32,activation='relu')(fh)

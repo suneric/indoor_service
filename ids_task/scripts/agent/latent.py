@@ -70,11 +70,10 @@ class ReplayBuffer:
 """Representation Model in Latent Space, VAE
 """
 class LatentRep(keras.Model):
-    def __init__(self,image_shape,force_dim,latent_dim,action_dim,lr=1e-4):
+    def __init__(self,image_shape,force_dim,latent_dim,lr=3e-4):
         super().__init__()
-        self.action_dim = action_dim
         self.encoder = obs_encoder(image_shape,force_dim,latent_dim)
-        self.decoder = obs_decoder(latent_dim)
+        self.decoder = obs_decoder(latent_dim,scale=0.5)
         self.reward = latent_reward(latent_dim,out_act='sigmoid',scale=0.5*np.pi)
         self.optimizer = tf.keras.optimizers.Adam(lr)
 
@@ -103,9 +102,9 @@ class LatentRep(keras.Model):
 
     def train(self,buffer,epochs=100,batch_size=32):
         print("training latent representation model, epoches {}, batch size {}".format(epochs,batch_size))
-        self.reward.trainable = False
         self.encoder.trainable = True
         self.decoder.trainable = True
+        self.reward.trainable = False
         for _ in range(epochs):
             idxs = np.random.choice(buffer.size,batch_size)
             obs = buffer.get_observation(idxs)
@@ -153,7 +152,7 @@ class LatentRep(keras.Model):
         with tf.GradientTape() as tape:
             mu,logv,z = self.encoder([img,frc])
             rew_pred = self.reward(z)
-            loss = tf.reduce_mean((rew-rew_pred)**2)
+            loss = tf.reduce_mean(keras.losses.MSE(rew,rew_pred))
         grad = tape.gradient(loss, self.trainable_variables)
         self.optimizer.apply_gradients(zip(grad, self.trainable_variables))
         return loss
@@ -205,7 +204,7 @@ class LatentPPO(keras.Model):
     def update_value(self,zs,rets):
         with tf.GradientTape() as tape:
             vals = self.q(zs)
-            q_loss = tf.reduce_mean((rets-vals)**2)
+            q_loss = tf.reduce_mean(keras.losses.MSE(rets,vals))
         q_grad = tape.gradient(q_loss, self.q.trainable_variables)
         self.q_optimizer.apply_gradients(zip(q_grad, self.q.trainable_variables))
         return q_loss
@@ -247,7 +246,7 @@ class LatentPPO(keras.Model):
 """
 class Agent:
     def __init__(self,image_shape,force_dim,action_dim,latent_dim):
-        self.rep = LatentRep(image_shape,force_dim,latent_dim,action_dim)
+        self.rep = LatentRep(image_shape,force_dim,latent_dim)
         self.ppo = LatentPPO(latent_dim,action_dim)
 
     def encode(self,obs):
