@@ -74,7 +74,7 @@ class LatentVRep(keras.Model):
         super().__init__()
         self.encoder = vision_encoder(image_shape,latent_dim)
         self.decoder = vision_decoder(latent_dim)
-        self.reward = latent_reward(latent_dim,out_act='sigmoid') # door angle [0,1] for 0 to pi/2
+        self.reward = latent_reward(latent_dim,out_act='sigmoid',scale=0.5*np.pi) # door angle [0,1] for 0 to pi/2
         self.optimizer = tf.keras.optimizers.Adam(lr)
 
     def retrain(self,data,baseline,epochs=100):
@@ -82,8 +82,8 @@ class LatentVRep(keras.Model):
         img_base = tf.convert_to_tensor(baseline['image'])
         _,_,z_base = self.encoder(img_base)
         img_base = self.decoder(z_base)
-        self.decoder.trainable = False # freeze decoder
-        self.reward.trainable = False # freeze reward
+        self.decoder.trainable = False
+        self.reward.trainable = False
         for _ in range(epochs):
             with tf.GradientTape() as tape:
                 mu,logv,z = self.encoder(img)
@@ -96,38 +96,56 @@ class LatentVRep(keras.Model):
 
     def train(self,buffer,epochs=100,batch_size=32):
         print("training latent representation model, epoches {}, batch size {}".format(epochs, batch_size))
+        self.encoder.trainable = True
+        self.decoder.trainable = True
+        self.reward.trainable = False
+        for _ in range(epochs):
+            idxs = np.random.choice(buffer.size,batch_size)
+            data = buffer.get_observation(idxs)
+            image = tf.convert_to_tensor(data['image'])
+            info = self.update_representation(image)
+            print("epoch {}, losses: {:.2f},{:.2f},{:.2f}".format(
+                _,
+                info['loss'].numpy(),
+                info['kl_loss'].numpy(),
+                info['img_loss'].numpy()
+            ))
+        print("training latent reward model, epoches {}, batch size {}".format(epochs, batch_size))
+        self.encoder.trainable = False
+        self.decoder.trainable = False
+        self.reward.trainable = True
         for _ in range(epochs):
             idxs = np.random.choice(buffer.size,batch_size)
             data = buffer.get_observation(idxs)
             image = tf.convert_to_tensor(data['image'])
             angle = tf.convert_to_tensor(data['angle'])
-            info = self.update_representation(image,angle)
-            print("epoch {}, losses: {:.2f},{:.2f},{:.2f},{:.2f}".format(
-                _,
-                info['loss'].numpy(),
-                info['kl_loss'].numpy(),
-                info['img_loss'].numpy(),
-                info['rew_loss'].numpy()
-            ))
+            loss = self.update_reward(image,angle)
+            print("epoch {}, loss: {:.2f}".format(_,loss))
 
-    def update_representation(self,img,rew):
+    def update_representation(self,img):
         with tf.GradientTape() as tape:
             mu,logv,z = self.encoder(img)
             img_pred = self.decoder(z) # reconstruction
-            rew_pred = self.reward(z)
-            rew_loss = tf.reduce_mean(keras.losses.MSE(rew,rew_pred))
             img_loss = tf.reduce_mean(tf.reduce_sum(keras.losses.MSE(img,img_pred), axis=(1,2)))
             kl_loss = -0.5*(1+logv-tf.square(mu)-tf.exp(logv))
             kl_loss = tf.reduce_mean(tf.reduce_sum(kl_loss, axis=1))
-            loss = kl_loss+img_loss+rew_loss
+            loss = kl_loss+img_loss
         grad = tape.gradient(loss, self.trainable_variables)
         self.optimizer.apply_gradients(zip(grad, self.trainable_variables))
         return dict(
             loss=loss,
             kl_loss=kl_loss,
             img_loss=img_loss,
-            rew_loss=rew_loss,
         )
+
+    def update_reward(self,img,rew):
+        with tf.GradientTape() as tape:
+            mu,logv,z = self.encoder(img)
+            rew_pred = self.reward(z)
+            loss = tf.reduce_mean((rew-rew_pred)**2)
+        grad = tape.gradient(loss, self.trainable_variables)
+        self.optimizer.apply_gradients(zip(grad, self.trainable_variables))
+        return loss
 
     def save(self, encoder_path, decoder_path, reward_path):
         if not os.path.exists(os.path.dirname(encoder_path)):

@@ -24,7 +24,7 @@ def get_args():
     parser.add_argument('--max_ep', type=int, default=100)
     parser.add_argument('--max_step', type=int, default=30)
     parser.add_argument('--train_freq', type=int, default=300)
-    parser.add_argument('--seq_len', type=int, default=None)
+    parser.add_argument('--z_dim', type=int, default=3)
     parser.add_argument('--warmup', type=int, default=1000)
     return parser.parse_args()
 
@@ -95,7 +95,7 @@ def plot_vision(agent,obs,saveDir,idx,angle):
     axs[0].set_xticks([])
     axs[0].set_yticks([])
     axs[1].imshow(r_image,cmap='gray')
-    axs[0].set_title("angle {:.4f}".format(agent.reward(z)))
+    axs[1].set_title("angle {:.4f}".format(agent.reward(z)))
     axs[1].set_xticks([])
     axs[1].set_yticks([])
     imagePath = os.path.join(saveDir,"vae_step{}".format(idx))

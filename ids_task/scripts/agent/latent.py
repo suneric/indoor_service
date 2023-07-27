@@ -75,7 +75,7 @@ class LatentRep(keras.Model):
         self.action_dim = action_dim
         self.encoder = obs_encoder(image_shape,force_dim,latent_dim)
         self.decoder = obs_decoder(latent_dim)
-        self.reward = latent_reward(latent_dim,out_act='sigmoid') # door angle [0-1]
+        self.reward = latent_reward(latent_dim,out_act='sigmoid',scale=0.5*np.pi)
         self.optimizer = tf.keras.optimizers.Adam(lr)
 
     def retrain(self,data,baseline,epochs=100):
@@ -103,41 +103,60 @@ class LatentRep(keras.Model):
 
     def train(self,buffer,epochs=100,batch_size=32):
         print("training latent representation model, epoches {}, batch size {}".format(epochs,batch_size))
+        self.reward.trainable = False
+        self.encoder.trainable = True
+        self.decoder.trainable = True
+        for _ in range(epochs):
+            idxs = np.random.choice(buffer.size,batch_size)
+            obs = buffer.get_observation(idxs)
+            image = tf.convert_to_tensor(obs['image'])
+            force = tf.convert_to_tensor(obs['force'])
+            info = self.update_representation(image,force)
+            print("epoch {}, losses: {:.2f},{:.2f},{:.2f}".format(
+                _,
+                info['loss'].numpy(),
+                info['kl_loss'].numpy(),
+                info['obs_loss'].numpy(),
+            ))
+        self.encoder.trainable = False
+        self.decoder.trainable = False
+        self.reward.trainable = True
+        print("training latent reward model, epoches {}, batch size {}".format(epochs,batch_size))
         for _ in range(epochs):
             idxs = np.random.choice(buffer.size,batch_size)
             obs = buffer.get_observation(idxs)
             image = tf.convert_to_tensor(obs['image'])
             force = tf.convert_to_tensor(obs['force'])
             angle = tf.convert_to_tensor(obs['angle'])
-            info = self.update_representation(image,force,angle)
-            print("epoch {}, losses: {:.2f},{:.2f},{:.2f},{:.2f}".format(
-                _,
-                info['loss'].numpy(),
-                info['kl_loss'].numpy(),
-                info['obs_loss'].numpy(),
-                info['rew_loss'].numpy()
-            ))
+            loss = self.update_reward(image,force,angle)
+            print("epoch {}, loss: {:.2f}".format(_,loss))
 
-    def update_representation(self,img,frc,rew):
+    def update_representation(self,img,frc):
         with tf.GradientTape() as tape:
             mu,logv,z = self.encoder([img,frc])
             img_pred,frc_pred = self.decoder(z) # reconstruction
-            rew_pred = self.reward(z)
-            rew_loss = tf.reduce_mean(keras.losses.MSE(rew,rew_pred))
             img_loss = tf.reduce_sum(keras.losses.MSE(img,img_pred), axis=(1,2))
             frc_loss = keras.losses.MSE(frc,frc_pred)
             rc_loss = tf.reduce_mean(img_loss)+tf.reduce_mean(frc_loss)
             kl_loss = -0.5*(1+logv-tf.square(mu)-tf.exp(logv))
             kl_loss = tf.reduce_mean(tf.reduce_sum(kl_loss, axis=1))
-            loss = kl_loss+rc_loss+rew_loss
+            loss = kl_loss+rc_loss
         grad = tape.gradient(loss, self.trainable_variables)
         self.optimizer.apply_gradients(zip(grad, self.trainable_variables))
         return dict(
             loss=loss,
             kl_loss=kl_loss,
             obs_loss=rc_loss,
-            rew_loss=rew_loss,
         )
+
+    def update_reward(self,img,frc,rew):
+        with tf.GradientTape() as tape:
+            mu,logv,z = self.encoder([img,frc])
+            rew_pred = self.reward(z)
+            loss = tf.reduce_mean((rew-rew_pred)**2)
+        grad = tape.gradient(loss, self.trainable_variables)
+        self.optimizer.apply_gradients(zip(grad, self.trainable_variables))
+        return loss
 
     def save(self, encoder_path, decoder_path, reward_path):
         if not os.path.exists(os.path.dirname(encoder_path)):

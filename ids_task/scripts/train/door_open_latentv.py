@@ -20,17 +20,16 @@ def test_model(env,agent,ep_path,max_step=50):
         if done:
             break
 
-def lfppo_train(env, num_episodes, train_freq, max_steps, warmup, model_dir):
+def lfppo_train(env,z_dim,num_episodes,train_freq,max_steps,warmup,model_dir):
     image_shape = env.observation_space[0]
     force_dim = env.observation_space[1]
     action_dim = env.action_space.n
-    print("create door open environment for latent ppo", image_shape, force_dim, action_dim)
+    print("create door open environment for latent ppo", z_dim, image_shape, force_dim, action_dim)
     summaryWriter = tf.summary.create_file_writer(model_dir)
 
-    latent_dim = 3
     obsBuffer = ObservationBuffer(50000,image_shape)
     ppoBuffer = ReplayBuffer(train_freq+max_steps,force_dim)
-    agent = Agent(image_shape,force_dim,action_dim,latent_dim)
+    agent = Agent(image_shape,force_dim,action_dim,latent_dim=z_dim)
 
     # warmup for training representation model
     obs,done = env.reset(),False
@@ -84,6 +83,6 @@ if __name__=="__main__":
     rospy.init_node('latent_ppo_train', anonymous=True)
     model_dir = os.path.join(sys.path[0],"../../saved_models/door_open/latentv", datetime.now().strftime("%Y-%m-%d-%H-%M"))
     env = DoorOpenEnv(continuous=False,name='jrobot',use_step_force=True)
-    ep_returns = lfppo_train(env,args.max_ep,args.train_freq,args.max_step,args.warmup,model_dir)
+    ep_returns = lfppo_train(env,args.z_dim,args.max_ep,args.train_freq,args.max_step,args.warmup,model_dir)
     env.close()
     plot_episodic_returns("latent_force_ppo_train", ep_returns, model_dir)

@@ -118,10 +118,7 @@ class DoorOpenEnv(GymGazeboEnv):
         return False
 
     def door_angle(self): # make door_angle 0-1
-        door_a = self.poseSensor.door_angle()
-        # print("door angle", door_a, door_a/(0.5*np.pi))
-        return door_a/(0.5*np.pi)
-
+        return self.poseSensor.door_angle()
 
     def is_success(self):
         return self.curr_angle > 0.45*np.pi # 81 degree

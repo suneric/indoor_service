@@ -228,11 +228,12 @@ def latent_dynamics(latent_dim,action_dim,act='elu',out_act='linear'):
 """
 latent reward
 """
-def latent_reward(latent_dim,act='relu',out_act='tanh'):
+def latent_reward(latent_dim,act='relu',out_act='tanh',scale=1.0):
     z_input = keras.Input(shape=(latent_dim,))
     h = layers.Dense(32, activation=act,kernel_initializer='random_normal')(z_input)
     h = layers.Dense(32, activation=act,kernel_initializer='random_normal')(h)
     output = layers.Dense(1,activation=out_act)(h)
+    output = scale*output
     model = keras.Model(inputs=z_input,outputs=output,name='latent_reward')
     # print(model.summary())
     return model
@@ -258,7 +259,7 @@ def vision_encoder(image_shape,latent_dim,act='relu'):
 """
 vision decoder
 """
-def vision_decoder(latent_dim,act='elu'):
+def vision_decoder(latent_dim,act='elu',scale=0.5):
     z_input = keras.Input(shape=(latent_dim,))
     vh = layers.Dense(32,activation=act)(z_input)
     vh = layers.Dense(512, activation=act)(vh)
@@ -267,7 +268,7 @@ def vision_decoder(latent_dim,act='elu'):
     vh = layers.Conv2DTranspose(filters=16,kernel_size=3,strides=2,padding='same',activation=act)(vh)
     vh = layers.Conv2DTranspose(filters=32,kernel_size=3,strides=2,padding='same',activation=act)(vh)
     v_output = layers.Conv2DTranspose(filters=1,kernel_size=3,padding='same',activation='tanh')(vh)
-    v_output = 0.5*v_output # output in [-0.5,0.5]
+    v_output = scale*v_output # output in [-0.5,0.5]
     model = keras.Model(inputs=z_input,outputs=v_output,name='vision_decoder')
     print(model.summary())
     return model
