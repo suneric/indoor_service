@@ -10,7 +10,6 @@ from datetime import datetime
 from agent.latent_v import ObservationBuffer, ReplayBuffer, Agent
 from env.env_door_open import DoorOpenEnv
 from utility import *
-from agent.util import zero_seq
 
 def test_model(env,agent,ep_path,max_step=50):
     obs, done = env.reset(),False
@@ -77,7 +76,7 @@ def lfppo_train(env, num_episodes, train_freq, max_steps, warmup, model_dir):
         if (ep+1) >= 1000 and ep_ret > best_ep_return:
             best_ep_return = ep_ret
             agent.save(os.path.join(model_dir,"best"))
-        if (ep+1) % 5 == 0 or (ep+1==num_episodes):
+        if (ep+1) % 50 == 0 or (ep+1==num_episodes):
             ep_path = os.path.join(model_dir,"ep{}".format(ep+1))
             os.mkdir(ep_path)
             agent.save(ep_path)

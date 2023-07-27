@@ -11,7 +11,7 @@ from agent.latent import ObservationBuffer, ReplayBuffer, Agent
 from env.env_door_open import DoorOpenEnv
 from utility import *
 
-def test_model(env,agent,ep_path,recurrent=False,max_step=50):
+def test_model(env,agent,ep_path,max_step=50):
     obs, done = env.reset(),False
     for i in range(max_step):
         plot_predict(agent,obs,ep_path,i)
@@ -67,7 +67,7 @@ def lppo_train(env, num_episodes, train_freq, max_steps, warmup, model_dir):
             obsData = obsBuffer.get_observation(obsIndices)
             agent.train_ppo(obsData,ppoBuffer,pi_iter=100,q_iter=100)
             obsIndices = []
-            
+
         ep_returns.append(ep_ret)
         success_counter = success_counter+1 if env.success else success_counter
         print("Episode *{}*: Return {:.4f}, Total Step {}, Success Count {} ".format(ep,ep_ret,t,success_counter))
@@ -81,7 +81,7 @@ def lppo_train(env, num_episodes, train_freq, max_steps, warmup, model_dir):
             ep_path = os.path.join(model_dir,"ep{}".format(ep+1))
             os.mkdir(ep_path)
             agent.save(ep_path)
-            test_model(env,agent,ep_path,recurrent)
+            test_model(env,agent,ep_path)
 
     return ep_returns
 
