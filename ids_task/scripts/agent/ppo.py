@@ -2,7 +2,7 @@ import os
 import numpy as np
 import tensorflow as tf
 from tensorflow_probability import distributions as tfpd
-from .model import actor_network, critic_network
+from .model import *
 from .util import *
 
 class ReplayBuffer:
