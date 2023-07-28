@@ -194,7 +194,7 @@ class LatentForcePPO(keras.Model):
     def update_value(self,zs,frcs,rets):
         with tf.GradientTape() as tape:
             vals = self.q([zs,frcs])
-            q_loss = tf.reduce_mean(keras.losses.MSE(rets-vals))
+            q_loss = tf.reduce_mean(keras.losses.MSE(rets,vals))
         q_grad = tape.gradient(q_loss, self.q.trainable_variables)
         self.q_optimizer.apply_gradients(zip(q_grad, self.q.trainable_variables))
         return q_loss
