@@ -60,9 +60,9 @@ class DoorOpenEnv(GymGazeboEnv):
         )
 
     def _set_init(self):
-        self.reset_robot()
+        reset = self.reset_robot()
         self.success = False
-        self.fail = False
+        self.fail = False if reset else True
         self.prev_angle = self.poseSensor.door_angle()
         self.curr_angle = self.prev_angle
         self.obs_image = self.robot.camARD2.grey_arr((64,64))
@@ -135,11 +135,15 @@ class DoorOpenEnv(GymGazeboEnv):
             act_list = [[vx,0.0],[0,-vz],[0,vz],[-vx,0]]
             return np.array(act_list[action])
 
-    def reset_robot(self):
+    def reset_robot(self,max_time=60):
         self.robot.stop()
-        rate = rospy.Rate(30)
-        while self.poseSensor.door_angle() > 0.11:
+        time, rate = 0, rospy.Rate(1)
+        while self.poseSensor.door_angle() > 0.11 and time <= max_time:
             rate.sleep() # wait door close
+            time += 1
+        if time > max_time:
+            print("too long to wait door close.")
+            return False
         # reset robot position with a random camera position
         rad = np.random.uniform(size=3) if self.initRandom is None else self.initRandom
         cx = 0.01*(rad[0]-0.5) + 0.025
@@ -149,6 +153,7 @@ class DoorOpenEnv(GymGazeboEnv):
         self.robot.reset_robot(rx,ry,rt)
         self.robot.reset_joints(vpos=0.75,hpos=0.13,spos=0,ppos=0)
         self.robot.reset_ft_sensors()
+        return True
 
     def robot_init_pose(self,cx,cy,theta):
         """
