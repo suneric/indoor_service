@@ -76,6 +76,8 @@ def lfppo_train(env,z_dim,num_episodes,train_freq,max_steps,warmup,model_dir):
             agent.save(ep_path)
             test_model(env,agent,ep_path)
 
+    agent.train_rew(obsBuffer,iter=10000)
+
     return ep_returns
 
 if __name__=="__main__":

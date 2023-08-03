@@ -123,7 +123,7 @@ class MRobot:
         if record is None:
             return np.array(self.ftHook.forces())
         else:
-            return np.mean(np.array(record),axis=0)
+            return np.mean(record,axis=0)
 
     def is_safe(self, max_force=20):
         """

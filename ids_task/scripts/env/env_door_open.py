@@ -66,7 +66,7 @@ class DoorOpenEnv(GymGazeboEnv):
         self.prev_angle = self.poseSensor.door_angle()
         self.curr_angle = self.prev_angle
         self.obs_image = self.robot.camARD2.grey_arr((64,64))
-        self.obs_force = self.robot.hook_forces()
+        self.obs_force = self.robot.hook_forces(record=None)
 
     def set_init_positions(self,rad=None):
         self.initRandom = rad
@@ -76,9 +76,9 @@ class DoorOpenEnv(GymGazeboEnv):
         self.robot.ftHook.reset_step()
         self.robot.move(act[0],act[1])
         rospy.sleep(0.5)
-        step_force = self.robot.ftHook.step_record() if self.use_step_force else None
-        self.obs_force = self.robot.hook_forces(record=step_force)
+        step_force = np.array(self.robot.ftHook.step_record()) if self.use_step_force else None
         self.obs_image = self.robot.camARD2.grey_arr((64,64))
+        self.obs_force = self.robot.hook_forces(record=step_force)
         self.curr_angle = self.poseSensor.door_angle()
         self.success = self.is_success()
         self.fail = self.is_failed()
@@ -103,8 +103,7 @@ class DoorOpenEnv(GymGazeboEnv):
         robot_not_out = any(fp[key][0] > 0.0 for key in fp.keys())
         if robot_not_out:
             # fail when detected force is too large
-            abs_forces = [abs(v) for v in self.obs_force]
-            if self.curr_angle < 0.06 and max(abs_forces) > 500:
+            if self.curr_angle < 0.06 and max(abs(self.obs_force)) > 500:
                 print("max forces reached", self.obs_force, "current angle", self.curr_angle)
                 return True
             # fail when the robot is not out of the room and the side bar is far away from the door

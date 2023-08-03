@@ -110,6 +110,8 @@ class LatentVRep(keras.Model):
                 info['kl_loss'].numpy(),
                 info['img_loss'].numpy()
             ))
+
+    def train_reward(self,buffer,epochs=100,batch_size=32):
         print("training latent reward model, epoches {}, batch size {}".format(epochs, batch_size))
         self.encoder.trainable = False
         self.decoder.trainable = False
@@ -271,6 +273,9 @@ class Agent:
 
     def train_rep(self,buffer,iter=100,batch_size=64):
         self.rep.train(buffer,epochs=iter,batch_size=batch_size)
+
+    def train_rew(self,buffer,iter=100,batch_size=64):
+        self.rep.train_reward(buffer,epochs=iter,batch_size=batch_size)
 
     def train_ppo(self,obsData,ppoBuffer,pi_iter=100,q_iter=100,batch_size=64):
         mu,sigma,z = self.rep.encoder(tf.convert_to_tensor(obsData['image']))
