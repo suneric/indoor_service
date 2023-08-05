@@ -8,6 +8,7 @@ import argparse
 import numpy as np
 from agent.ppo import PPO
 from agent.latent import Agent
+# from agent.latentv import Agent
 from env.env_door_open import DoorOpenEnv
 from utility import *
 import pandas as pd
@@ -67,7 +68,7 @@ INITRANDOM = [[3.24664058e-01, 6.79799544e-01, 5.81612962e-01],
 class DoorOpenPPO:
     def __init__(self,model_dir):
         self.agent = PPO((64,64,1),3,4)
-        self.agent.load(os.path.join(model_dir,"ppo/pi_net/2900"))
+        self.agent.load(os.path.join(model_dir,"ppo/pi_net/5000"))
 
     def run(self,env,maxStep=50):
         obs, done, step = env.reset(),False, 0
@@ -80,7 +81,7 @@ class DoorOpenPPO:
 class DoorOpenLatent:
     def __init__(self,model_dir):
         self.agent = Agent((64,64,1),3,4,3)
-        self.agent.load(os.path.join(model_dir,"l3ppo"))
+        self.agent.load(os.path.join(model_dir,"latent/ep4100"))
         self.saveDir = os.path.join(sys.path[0],"../../dump/test/env")
 
     def run(self,env,maxStep=50):
@@ -166,7 +167,7 @@ if __name__ == '__main__':
     policies = ['ppo','latent'] if args.policy is None else [args.policy]
     retrain = False if args.retrain == 0 else True
     model_dir = os.path.join(sys.path[0],"../policy/pulling/")
-    env = DoorOpenEnv(continuous=False, door_length=args.length, name='jrobot')
+    env = DoorOpenEnv(continuous=False, door_length=args.length, name='jrobot', use_step_force=True)
     if args.collect == 1:
         save_dir = os.path.join(sys.path[0],"../../dump/collection/")
         pulling_collect(env,model_dir,save_dir)

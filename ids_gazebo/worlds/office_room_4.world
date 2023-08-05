@@ -314,18 +314,66 @@
       </link>
       <link name="wall_6">
         <collision name="wall_6_collision">
-          <pose>-1.95 1.0 1.08 0 0 0</pose>
+          <pose>-1.95 1.0 1.4 0 0 0</pose>
           <geometry>
             <box>
-              <size>0.1 5 2.16</size>
+              <size>0.1 5 2.8</size>
             </box>
           </geometry>
         </collision>
         <visual name="wall_6_visual">
-          <pose>-1.95 1 1.08 0 0 0</pose>
+          <pose>-1.95 1 1.4 0 0 0</pose>
           <geometry>
             <box>
-              <size>0.1 5 2.16</size>
+              <size>0.1 5 2.8</size>
+            </box>
+          </geometry>
+          <material>
+            <script>
+              <uri>file://media/materials/scripts/Gazebo.material</uri>
+              <name>Gazebo/Green</name>
+            </script>
+          </material>
+        </visual>
+      </link>
+      <link name="wall_7">
+        <collision name="wall_7_collision">
+          <pose>-1.95 1.0 1.4 0 0 0</pose>
+          <geometry>
+            <box>
+              <size>0.1 5 2.8</size>
+            </box>
+          </geometry>
+        </collision>
+        <visual name="wall_7_visual">
+          <pose>0 1 2.9 0 0 0</pose>
+          <geometry>
+            <box>
+              <size>4 5 0.2</size>
+            </box>
+          </geometry>
+          <material>
+            <script>
+              <uri>file://media/materials/scripts/Gazebo.material</uri>
+              <name>Gazebo/CeilingTiled</name>
+            </script>
+          </material>
+        </visual>
+      </link>
+      <link name="wall_8">
+        <collision name="wall_8_collision">
+          <pose>-0.03 1 2.49 0 0 0</pose>
+          <geometry>
+            <box>
+              <size>0.1 4 0.62</size>
+            </box>
+          </geometry>
+        </collision>
+        <visual name="wall_8_visual">
+          <pose>-0.03 1 2.49 0 0 0</pose>
+          <geometry>
+            <box>
+              <size>0.1 4 0.62</size>
             </box>
           </geometry>
           <material>
@@ -537,9 +585,9 @@
 
     <gui fullscreen='0'>
       <camera name='user_camera'>
-        <pose frame=''>1.43231 2.17046 6.28176 0 1.2058 -2.42384</pose>
-        <view_controller>orbit</view_controller>
-        <projection_type>perspective</projection_type>
+       <pose>6.27848 4.67437 5.24865 -0 0.5298 -2.46784</pose>
+       <view_controller>orbit</view_controller>
+       <projection_type>perspective</projection_type>
       </camera>
     </gui>
   </world>
