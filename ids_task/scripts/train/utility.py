@@ -26,6 +26,7 @@ def get_args():
     parser.add_argument('--train_freq', type=int, default=300)
     parser.add_argument('--z_dim', type=int, default=3)
     parser.add_argument('--warmup', type=int, default=1000)
+    parser.add_argument('--train_reward', type=int, default=0)
     return parser.parse_args()
 
 def plot_episodic_returns(name,ep_returns,dir,weight=0.99):
@@ -86,22 +87,37 @@ def plot_predict(agent,obs,saveDir,idx):
     plt.close(fig)
     return z
 
-def plot_vision(agent,obs,saveDir,idx,angle):
+def plot_vision(agent,obs,saveDir,idx,angle=None):
     fig, axs = plt.subplots(1,2)
     z = agent.encode(obs['image'])
     r_image = agent.decode(z)
     axs[0].imshow(obs['image'],cmap='gray')
-    axs[0].set_title("angle {:.4f}".format(angle))
     axs[0].set_xticks([])
     axs[0].set_yticks([])
     axs[1].imshow(r_image,cmap='gray')
-    axs[1].set_title("angle {:.4f}".format(agent.reward(z)))
     axs[1].set_xticks([])
     axs[1].set_yticks([])
+    if angle is not None:
+        axs[0].set_title("angle {:.4f}".format(angle))
+        axs[1].set_title("angle {:.4f}".format(agent.reward(z)))
     imagePath = os.path.join(saveDir,"vae_step{}".format(idx))
     plt.savefig(imagePath)
     plt.close(fig)
     return z
+
+def plot_latent_combined(agent,latent,angle,name):
+    fig = plt.figure(figsize=(9,3), constrained_layout=True)
+    gs = fig.add_gridspec(1,3,width_ratios=[1,1,1])
+    dim0 = fig.add_subplot(gs[0])
+    dim0.set_title('DIM 0')
+    dim1 = fig.add_subplot(gs[1])
+    dim1.set_title('DIM 1')
+    dim2 = fig.add_subplot(gs[2])
+    dim2.set_title('DIM 2')
+    dim0.scatter(angle,latent[:,0])
+    dim1.scatter(angle,latent[:,1])
+    dim2.scatter(angle,latent[:,2])
+    plt.show()
 
 def plot_latent(latent,saveDir):
     latentPath = os.path.join(saveDir,"latent")
@@ -185,20 +201,22 @@ def plot_forces(data,saveDir,useTime=False):
 
 def save_observation(obs_cache,file_path):
     obs_len = len(obs_cache)
-    data = np.zeros((obs_len,3+64*64),dtype=np.float32)
+    data = np.zeros((obs_len,4+64*64),dtype=np.float32)
     for i in range(obs_len):
-        force, image = obs_cache[i]['force'], obs_cache[i]['image'].flatten()
-        data[i][:3] = force
-        data[i][3:] = image
+        angle, force, image = obs_cache[i]['angle'], obs_cache[i]['force'], obs_cache[i]['image'].flatten()
+        data[i][0] = angle
+        data[i][1:4] = force
+        data[i][4:] = image
     df = pd.DataFrame(data)
     df.to_csv(file_path+".csv")
 
 def load_observation(file_path,idxs=None):
     data = pd.read_csv(file_path+".csv")
     obs_len = len(data.index) if idxs is None else len(idxs)
-    images, forces = np.zeros((obs_len,64,64)), np.zeros((obs_len,3))
+    angles,images, forces = np.zeros(obs_len), np.zeros((obs_len,64,64)), np.zeros((obs_len,3))
     for i in range(obs_len):
         row = data.iloc[i] if idxs is None else data.iloc[idxs[i]]
-        forces[i] = row[1:4]
-        images[i] = np.reshape(np.array(row[4:4100]),(64,64))
-    return dict(image=images,force=forces)
+        angles[i] = row[1]
+        forces[i] = row[2:5]
+        images[i] = np.reshape(np.array(row[5:4101]),(64,64))
+    return dict(image=images,force=forces,angle=angles)

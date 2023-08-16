@@ -7,9 +7,9 @@ import rospy
 import argparse
 import numpy as np
 from agent.ppo import PPO
-from agent.latent import Agent
-# from agent.latentv import Agent
+from agent.latent import Agent, ObservationBuffer
 from env.env_door_open import DoorOpenEnv
+from agent.gan import CycleGAN
 from utility import *
 import pandas as pd
 import csv
@@ -68,12 +68,16 @@ INITRANDOM = [[3.24664058e-01, 6.79799544e-01, 5.81612962e-01],
 class DoorOpenPPO:
     def __init__(self,model_dir):
         self.agent = PPO((64,64,1),3,4)
-        self.agent.load(os.path.join(model_dir,"ppo/pi_net/5000"))
+        self.agent.load(os.path.join(model_dir,"ppo/pi_net/4950"))
 
-    def run(self,env,maxStep=50):
+    def run(self,env,i2i_transfer=None,maxStep=50):
         obs, done, step = env.reset(),False, 0
         while not done and step < maxStep:
-            act,_ = self.agent.policy(obs,training=False)
+            img,frc = obs['image'],obs['force']
+            if i2i_transfer:
+                img = i2i_transfer.gen_G(tf.expand_dims(tf.convert_to_tensor(img),0))
+                img = tf.squeeze(img).numpy()
+            act,_ = self.agent.policy(dict(image=img,force=frc),training=False)
             obs, rew, done, info = env.step(act)
             step += 1
         return env.success, step
@@ -84,13 +88,18 @@ class DoorOpenLatent:
         self.agent.load(os.path.join(model_dir,"latent/ep4100"))
         self.saveDir = os.path.join(sys.path[0],"../../dump/test/env")
 
-    def run(self,env,maxStep=50):
-        obsCache = []
+    def run(self,env,i2i_transfer=None,maxStep=50):
+        obsCache, actions = [],[]
         env.robot.ftHook.reset_trajectory()
         obs, done, step = env.reset(),False, 0
         while not done and step < maxStep:
-            z = plot_predict(self.agent,obs,self.saveDir,step)
+            img,frc = obs['image'],obs['force']
+            if i2i_transfer:
+                img = i2i_transfer.gen_G(tf.expand_dims(tf.convert_to_tensor(img),0))
+                img = tf.squeeze(img).numpy()
+            z = plot_predict(self.agent,dict(image=img,force=frc),self.saveDir,step)
             act,_ = self.agent.policy(z,training=False)
+            actions.append(act)
             r = self.agent.reward(z)
             obsCache.append(save_environment(env.robot.camARD2,env.robot.ftHook,z,act,r,self.saveDir,step))
             print("step",step,"reward",r,"action",act)
@@ -98,38 +107,52 @@ class DoorOpenLatent:
             step += 1
         forceProfile = env.robot.ftHook.trajectory_record()
         plot_trajectory(forceProfile,obsCache,self.saveDir)
+        print(actions)
         return env.success, step
+
+# class DoorOpenLatentV:
+#     def __init__(self,model_dir):
+#         self.agent = AgentV((64,64,1),3,4,3)
+#         self.agent.load(os.path.join(model_dir,"latentv/ep3000"))
+#         self.saveDir = os.path.join(sys.path[0],"../../dump/test/env")
+#
+#     def run(self,env,maxStep=50):
+#         obsCache = []
+#         env.robot.ftHook.reset_trajectory()
+#         obs, done, step = env.reset(),False, 0
+#         while not done and step < maxStep:
+#             z = plot_vision(self.agent,obs,self.saveDir,step)
+#             act,_ = self.agent.policy(z,obs['force'],training=False)
+#             r = self.agent.reward(z)
+#             obsCache.append(save_environment(env.robot.camARD2,env.robot.ftHook,z,act,r,self.saveDir,step))
+#             # print("step",step,"reward",r,"action",act)
+#             obs, _, done, _ = env.step(act)
+#             step += 1
+#         forceProfile = env.robot.ftHook.trajectory_record()
+#         plot_trajectory(forceProfile,obsCache,self.saveDir)
+#         return env.success, step
 
 """
 Run door pulling test with different policies
 """
-def run_pulling_test(env,model_dir,policies,retrain):
+def run_pulling_test(env,model_dir,policies,retrain,env_name):
+    i2i_transfer = CycleGAN(image_shape=(64,64,1))
+    model_path = os.path.join(model_dir,"gan/{}".format(env_name))
+    i2i_transfer.load(model_path)
+    print("load i2i transfer from {}".format(model_path))
+    print("run pulling test for {} policies".format(len(policies)))
     res = []
     for policy in policies:
-        test = DoorOpenPPO(model_dir) if policy == 'ppo' else DoorOpenLatent(model_dir)
-
-        if retrain and policy=='latent':
-            collection_path = os.path.join(sys.path[0],"../../dump/collection/")
-            b1 = load_observation(os.path.join(collection_path,"env_27/latent"))
-            b2 = load_observation(os.path.join(collection_path,"env_28/latent"))
-            b3 = load_observation(os.path.join(collection_path,"env_31/latent"))
-            baseline = dict(
-                image=np.concatenate((b1["image"],b2['image'],b3['image']),axis=0),
-                force=np.concatenate((b1['force'],b2['force'],b3['force']),axis=0),
-                )
-            c1 = load_observation(os.path.join(collection_path,"env0_27/latent"))
-            c2 = load_observation(os.path.join(collection_path,"env0_28/latent"))
-            c3 = load_observation(os.path.join(collection_path,"env0_31/latent"))
-            current = dict(
-                image=np.concatenate((c1["image"],c2['image'],c3['image']),axis=0),
-                force=np.concatenate((c1['force'],c2['force'],c3['force']),axis=0),
-                )
-            test.agent.rep.retrain(current,baseline,epochs=5000)
+        test = None
+        if policy == 'ppo':
+            test = DoorOpenPPO(model_dir)
+        elif policy == 'latent':
+            test = DoorOpenLatent(model_dir)
 
         successCount,numStep,count = 0,[],len(INITRANDOM)
         for i in range(count):
             env.set_init_positions(INITRANDOM[i])
-            success, step = test.run(env)
+            success, step = test.run(env,i2i_transfer)
             if success:
                 successCount += 1
                 numStep.append(step)
@@ -137,21 +160,38 @@ def run_pulling_test(env,model_dir,policies,retrain):
         res.append([policy, successCount, np.mean(numStep)])
     return res
 
-def pulling_collect(env,model_dir,save_dir):
-    agent = Agent((64,64,1),3,4,3)
-    agent.load(os.path.join(model_dir,"l3ppo"))
-    actions = [2,2,3,3,2,3,2,3,2,3,2,3,2,3,2,2,2,2,2,2,2,2,0,0,0,0,2,0]
-    #actions = [2,3,3,2,3,2,3,2,3,2,3,2,3,2,2,2,2,2,2,2,2,0,0,0,2,0,0]
-    #actions = [2,3,3,2,3,3,2,3,3,2,3,3,2,3,3,2,3,3,2,2,0,2,2,2,2,2,0,0,2,0,0]
-    env.set_init_positions(INITRANDOM[0])
-    obs, done, obs_cache = env.reset(), False, []
+def pulling_collect_manual(env,policy,model_dir,save_dir):
+    collector = None
+    if policy == 'latent':
+        collector = DoorOpenLatent(model_dir)
+    else:
+        print("undefined policy")
+        return
+
+    actions = [
+        [2,3,3,2,2,2,3,2,3,2,3,2,2,2,3,2,2,3,2,2,2,2,2,3,2,2,2,2,0,2,0,0],
+        [2,3,3,2,3,2,3,2,2,3,2,3,2,2,2,2,0,2,2,2,0,0,2,0],
+        [2,3,3,3,2,2,2,2,2,2,2,2,3,3,2,3,2,3,2,3,2,2,3,2,2,2,2,2,2,0,2,2,0,2,0],
+        [2,3,3,2,3,2,3,2,3,2,2,3,2,2,2,2,0,2,2,2,0,0,2,0],
+        [2,3,3,3,2,3,3,2,3,2,2,3,2,2,3,2,2,2,2,2,2,2,2,2,0],
+        [2,3,3,3,2,3,2,3,2,3,2,2,3,2,2,2,2,2,2,2,2,0,2,0],
+        [2,3,3,3,2,3,3,2,3,2,2,3,2,2,3,2,2,2,2,0,2,2,2,0],
+        [2,3,3,3,2,3,3,2,3,2,3,2,2,3,2,2,2,2,2,2,2,2,0,2],
+        [2,3,3,3,2,2,2,2,2,2,2,2,3,3,2,3,2,3,2,3,2,3,2,2,2,2,2,2,2,0,2,2,0,0],
+        [2,3,3,3,2,3,3,2,2,3,2,3,2,2,3,2,2,2,2,2,0,2,2,2,0]
+    ]
+    # actions = [[2,3,3,2,3,2,3,2,3,2,2,3,2,2,2,2,0,2,2,2,0,0,2,0]]
+    obs_cache = []
     for i in range(len(actions)):
-        obs_cache.append(obs)
-        plot_predict(agent,obs,save_dir,i)
-        print("step",i,"action",actions[i])
-        obs, rew, done, info = env.step(actions[i])
-    save_observation(obs_cache, os.path.join(save_dir,"latent"))
-    return env.success
+        env.set_init_positions(INITRANDOM[i])
+        obs, done = env.reset(), False
+        for j in range(len(actions[i])):
+            obs_cache.append(dict(image=obs['image'],force=obs['force'],angle=env.door_angle()))
+            print("collecting observation case {}, step {}".format(i,j))
+            plot_predict(collector.agent,obs,save_dir,j)
+            obs, rew, done, info = env.step(actions[i][j])
+    save_observation(obs_cache, os.path.join(save_dir,policy))
+    print("{} observation save to".format(len(obs_cache)), save_dir, policy)
 
 def get_args():
     parser = argparse.ArgumentParser()
@@ -159,19 +199,19 @@ def get_args():
     parser.add_argument('--policy', type=str, default=None)
     parser.add_argument('--retrain', type=int, default=0)
     parser.add_argument('--collect',type=int,default=None)
+    parser.add_argument('--env',type=str,default=None)
     return parser.parse_args()
 
 if __name__ == '__main__':
     args = get_args()
     rospy.init_node('door_pull_test', anonymous=True)
     policies = ['ppo','latent'] if args.policy is None else [args.policy]
-    retrain = False if args.retrain == 0 else True
     model_dir = os.path.join(sys.path[0],"../policy/pulling/")
     env = DoorOpenEnv(continuous=False, door_length=args.length, name='jrobot', use_step_force=True)
     if args.collect == 1:
         save_dir = os.path.join(sys.path[0],"../../dump/collection/")
-        pulling_collect(env,model_dir,save_dir)
+        pulling_collect_manual(env,args.policy,model_dir,save_dir)
     else:
-        results = run_pulling_test(env,model_dir,policies,retrain)
+        results = run_pulling_test(env,model_dir,policies,args.retrain,args.env)
         print(results)
     env.close()
