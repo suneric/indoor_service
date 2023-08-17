@@ -60,7 +60,8 @@ def lppo_train(env,z_dim,num_episodes,train_freq,max_steps,warmup,model_dir):
         ppoBuffer.end_trajectry(last_value)
 
         if ppoBuffer.ptr >= train_freq or (ep+1) == num_episodes:
-            agent.train_rep(obsBuffer,iter=200)
+            if ep < 2000:
+                agent.train_rep(obsBuffer,iter=200)
             obsData = obsBuffer.get_observation(obsIndices)
             agent.train_ppo(obsData,ppoBuffer,pi_iter=100,q_iter=100)
             obsIndices = []
@@ -76,9 +77,6 @@ def lppo_train(env,z_dim,num_episodes,train_freq,max_steps,warmup,model_dir):
             os.mkdir(ep_path)
             agent.save(ep_path)
             test_model(env,agent,ep_path)
-
-    agent.train_rew(obsBuffer,iter=10000)
-    
     return ep_returns
 
 if __name__=="__main__":
