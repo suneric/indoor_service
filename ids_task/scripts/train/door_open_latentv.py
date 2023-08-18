@@ -7,7 +7,7 @@ import rospy
 import numpy as np
 import tensorflow as tf
 from datetime import datetime
-from agent.latent_v import ObservationBuffer, ReplayBuffer, Agent
+from agent.latent_v import ObservationBuffer, ReplayBuffer, AgentV
 from env.env_door_open import DoorOpenEnv
 from utility import *
 
@@ -29,7 +29,7 @@ def lfppo_train(env,z_dim,num_episodes,train_freq,max_steps,warmup,model_dir):
 
     obsBuffer = ObservationBuffer(50000,image_shape)
     ppoBuffer = ReplayBuffer(train_freq+max_steps,force_dim)
-    agent = Agent(image_shape,force_dim,action_dim,latent_dim=z_dim)
+    agent = AgentV(image_shape,force_dim,action_dim,latent_dim=z_dim)
 
     # warmup for training representation model
     obs,done = env.reset(),False

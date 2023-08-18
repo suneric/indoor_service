@@ -210,13 +210,16 @@ def save_observation(obs_cache,file_path):
     df = pd.DataFrame(data)
     df.to_csv(file_path+".csv")
 
-def load_observation(file_path,idxs=None):
-    data = pd.read_csv(file_path+".csv")
-    obs_len = len(data.index) if idxs is None else len(idxs)
-    angles,images, forces = np.zeros(obs_len), np.zeros((obs_len,64,64)), np.zeros((obs_len,3))
-    for i in range(obs_len):
-        row = data.iloc[i] if idxs is None else data.iloc[idxs[i]]
-        angles[i] = row[1]
-        forces[i] = row[2:5]
-        images[i] = np.reshape(np.array(row[5:4101]),(64,64))
-    return dict(image=images,force=forces,angle=angles)
+def load_observation(file_path):
+    idx, capacity = 0, 500
+    angles,images,forces = np.zeros(capacity), np.zeros((capacity,64,64)), np.zeros((capacity,3))
+    files = os.listdir(file_path)
+    for f in files:
+        data = pd.read_csv(os.path.join(file_path,f))
+        for i in range(len(data.index)):
+            row = data.iloc[i]
+            angles[idx] = row[1]
+            forces[idx] = row[2:5]
+            images[idx] = np.reshape(np.array(row[5:4101]),(64,64))
+            idx += 1
+    return dict(image=images[:idx],force=forces[:idx],angle=angles[:idx])

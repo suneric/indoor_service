@@ -77,23 +77,6 @@ class LatentVRep(keras.Model):
         self.reward = latent_reward(latent_dim,out_act='sigmoid',scale=0.5*np.pi) # door angle [0,1] for 0 to pi/2
         self.optimizer = tf.keras.optimizers.Adam(lr)
 
-    def retrain(self,data,baseline,epochs=100):
-        img = tf.convert_to_tensor(data['image'])
-        img_base = tf.convert_to_tensor(baseline['image'])
-        _,_,z_base = self.encoder(img_base)
-        img_base = self.decoder(z_base)
-        self.decoder.trainable = False
-        self.reward.trainable = False
-        for _ in range(epochs):
-            with tf.GradientTape() as tape:
-                mu,logv,z = self.encoder(img)
-                img_pred = self.decoder(z) # reconstruction
-                img_loss = tf.reduce_sum(keras.losses.MSE(img_pred,img_base), axis=(1,2))
-                loss = tf.reduce_mean(img_loss)
-            grad = tape.gradient(loss, self.trainable_variables)
-            self.optimizer.apply_gradients(zip(grad, self.trainable_variables))
-            print("loss {:.3f}".format(loss))
-
     def train(self,buffer,epochs=100,batch_size=32):
         print("training latent representation model, epoches {}, batch size {}".format(epochs, batch_size))
         self.encoder.trainable = True
@@ -238,7 +221,7 @@ class LatentForcePPO(keras.Model):
 
 """RL Agent
 """
-class Agent:
+class AgentV:
     def __init__(self,image_shape,force_dim,action_dim,latent_dim):
         self.rep = LatentVRep(image_shape,latent_dim)
         self.ppo = LatentForcePPO(latent_dim,force_dim,action_dim)

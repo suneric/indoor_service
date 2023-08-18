@@ -8,14 +8,17 @@ import tensorflow as tf
 from robot.jrobot import JazzyRobot
 from agent.ppo import PPO
 from agent.latent import Agent
+from agent.gan import CycleGAN
 from train.utility import *
 
 class PullingTask:
     def __init__(self, robot, policy_dir):
         self.robot = robot
         self.agent = Agent((64,64,1),3,4,3)
-        self.agent.load(os.path.join(policy_dir,"l3ppo"))
+        self.agent.load(os.path.join(policy_dir,"latent/ep4100"))
         self.saveDir = os.path.join(sys.path[0],"../dump/test/experiment")
+        self.i2i = CycleGAN(image_shape=(64,64,1))
+        self.i2i.load(os.path.join(policy_dir,"gan/exp"))
 
     def get_action(self,action):
         vx, vz = 0.8, 0.4*np.pi
@@ -31,50 +34,29 @@ class PullingTask:
         self.pulling()
         return True
 
-    def collect(self,model_dir,save_dir):
-        #action31 = [2,3,3,3,3,3,3,3,3,2,3,2,3,2,2,2,2,2,2,2,3,2,2,2,2,2,0,0,2,0,0]
-        #action37 = [2,3,3,3,3,3,3,2,3,2,3,2,3,2,2,2,2,2,2,2,2,3,2,2,3,2,2,2,2,0,2,2,2,2,2,0,0]
-        actions = [3,3,2,3,2,3,2,3,2,3,2,3,2,2,2,2,2,2,2,2,0,0,0,2,0,0]
-        agent = Agent((64,64,1),3,4,3)
-        agent.load(os.path.join(model_dir,"l3ppo"))
-        obs_cache = []
-        image = self.robot.camARD1.grey_arr((64,64))
-        force = self.robot.hook_forces()
-        for i in range(len(actions)):
-            obs = dict(image=image, force=force/np.linalg.norm(force))
-            obs_cache.append(obs)
-            plot_predict(agent,obs,save_dir,i)
-            vx,vz = self.get_action(actions[i])
-            print("step",i,"action",actions[i],vx,vz)
-            self.robot.move(vx,vz)
-            rospy.sleep(0.5)
-            force = self.robot.hook_forces()
-            self.robot.stop()
-            rospy.sleep(1.0)
-            image = self.robot.camARD1.grey_arr((64,64))
-        save_observation(obs_cache, os.path.join(save_dir,"latent"))
-
     def pulling(self, max_step=30):
         step, obsCache = 0, []
-        image = self.robot.camARD1.grey_arr((64,64))
-        force = self.robot.hook_forces()
+        img = self.robot.camARD1.grey_arr((64,64))
+        frc = self.robot.hook_forces(record=None)
         self.robot.ftHook.reset_trajectory()
         while step < max_step:
-            obs = dict(image=image, force=force/np.linalg.norm(force))
-            z = plot_predict(self.agent,obs,self.saveDir,step)
+            img = self.i2i.gen_G(tf.expand_dims(tf.convert_to_tensor(img),0))
+            img = tf.squeeze(img).numpy()
+            z = plot_predict(self.agent,dict(image=img,force=frc/np.linalg.norm(frc)),self.saveDir,step)
             act, _ = self.agent.policy(z,training=False)
+            if step < 5:
+                act = 3
             r = self.agent.reward(z)
             print("step",step,"reward",r,"action",act)
             obsCache.append(save_environment(self.robot.camARD1,self.robot.ftHook,z,act,r,self.saveDir,step))
-            if step < 3:
-                act = 3
             vx,vz = self.get_action(act)
+            self.robot.ftHook.reset_step()
             self.robot.move(vx,vz)
             rospy.sleep(0.5)
-            force = self.robot.hook_forces()
+            frc = self.robot.hook_forces(record=np.array(self.robot.ftHook.step_record()))
             self.robot.stop()
-            rospy.sleep(1)
-            image = self.robot.camARD1.grey_arr((64,64))
+            rospy.sleep(0.5)
+            img = self.robot.camARD1.grey_arr((64,64))
             step += 1
         self.robot.stop()
         forceProfile = self.robot.ftHook.trajectory_record()
@@ -108,15 +90,10 @@ class JazzyDoorOpen:
             return False
         return True
 
-    def collect(self,model_dir,save_dir):
-        self.pulling.collect(model_dir,save_dir)
-
 if __name__ == "__main__":
     rospy.init_node("experiment", anonymous=True, log_level=rospy.INFO)
     robot = JazzyRobot()
     yolo_dir = os.path.join(sys.path[0],'policy/detection/yolo')
     policy_dir = os.path.join(sys.path[0],"policy/pulling")
-    save_dir = os.path.join(sys.path[0],"../dump/collection/")
     task = JazzyDoorOpen(robot, yolo_dir, policy_dir)
-    task.collect(policy_dir,save_dir)
-    #task.perform()
+    task.perform()

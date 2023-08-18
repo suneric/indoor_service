@@ -16,17 +16,15 @@ register(
   id='DoorOpen-v0',
   entry_point='envs.door_open_env:DoorOpenEnv')
 
-def normalize(force):
-    return force/np.linalg.norm(force)
-
 class DoorOpenEnv(GymGazeboEnv):
-    def __init__(self, continuous = False, door_length=0.9, name='mrobot', use_step_force=False):
+    def __init__(self,continuous=False,door_length=0.9,name='mrobot',use_step_force=False,noise_var=None):
         super(DoorOpenEnv, self).__init__(
             start_init_physics_parameters=False,
             reset_world_or_sim="WORLD"
         )
         self.continuous = continuous
         self.door_length = door_length
+        self.cam_noise = noise_var
         self.use_step_force = use_step_force
         self.observation_space = ((64,64,1),3) # image and force
         if self.continuous:
@@ -50,7 +48,7 @@ class DoorOpenEnv(GymGazeboEnv):
     def _get_observation(self):
         return dict(
             image=self.obs_image,
-            force=normalize(self.obs_force)
+            force=self.obs_force/np.linalg.norm(self.obs_force)
         )
 
     def _post_information(self):
@@ -65,7 +63,7 @@ class DoorOpenEnv(GymGazeboEnv):
         self.fail = False if reset else True
         self.prev_angle = self.poseSensor.door_angle()
         self.curr_angle = self.prev_angle
-        self.obs_image = self.robot.camARD2.grey_arr((64,64),noise_var=0.2)
+        self.obs_image = self.robot.camARD2.grey_arr((64,64),noise_var=self.cam_noise)
         self.obs_force = self.robot.hook_forces(record=None)
 
     def set_init_positions(self,rad=None):
@@ -77,7 +75,7 @@ class DoorOpenEnv(GymGazeboEnv):
         self.robot.move(act[0],act[1])
         rospy.sleep(0.5)
         step_force = np.array(self.robot.ftHook.step_record()) if self.use_step_force else None
-        self.obs_image = self.robot.camARD2.grey_arr((64,64),noise_var=0.2)
+        self.obs_image = self.robot.camARD2.grey_arr((64,64),noise_var=self.cam_noise)
         self.obs_force = self.robot.hook_forces(record=step_force)
         self.curr_angle = self.poseSensor.door_angle()
         self.success = self.is_success()
