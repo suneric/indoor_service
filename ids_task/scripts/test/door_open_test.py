@@ -85,8 +85,8 @@ class DoorOpenPPO:
 
 class DoorOpenLatent:
     def __init__(self,model_dir):
-        self.agent = Agent((64,64,1),3,4,3)
-        self.agent.load(os.path.join(model_dir,"latent/ep4100"))
+        self.agent = Agent((64,64,1),3,4,4)
+        self.agent.load(os.path.join(model_dir,"latent/z4_4000"))
         self.saveDir = os.path.join(sys.path[0],"../../dump/test/latent")
 
     def run(self,env,i2i_transfer=None,maxStep=50):
@@ -175,7 +175,7 @@ def get_args():
     parser.add_argument('--length', type=float, default=0.9)
     parser.add_argument('--policy', type=str, default=None)
     parser.add_argument('--env',type=str, default=None)
-    parser.add_argument('--noise',type=str, default=None)
+    parser.add_argument('--noise',type=float, default=None)
     return parser.parse_args()
 
 if __name__ == '__main__':
