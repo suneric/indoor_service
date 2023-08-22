@@ -14,8 +14,8 @@ from train.utility import *
 class PullingTask:
     def __init__(self, robot, policy_dir):
         self.robot = robot
-        self.agent = Agent((64,64,1),3,4,3)
-        self.agent.load(os.path.join(policy_dir,"latent/ep4100"))
+        self.agent = Agent((64,64,1),3,4,4)
+        self.agent.load(os.path.join(policy_dir,"latent/z4_4000"))
         self.saveDir = os.path.join(sys.path[0],"../dump/test/experiment")
         self.i2i = CycleGAN(image_shape=(64,64,1))
         self.i2i.load(os.path.join(policy_dir,"gan/exp"))
@@ -44,7 +44,7 @@ class PullingTask:
             img = tf.squeeze(img).numpy()
             z = plot_predict(self.agent,dict(image=img,force=frc/np.linalg.norm(frc)),self.saveDir,step)
             act, _ = self.agent.policy(z,training=False)
-            if step < 5:
+            if step < 3:
                 act = 3
             r = self.agent.reward(z)
             print("step",step,"reward",r,"action",act)
@@ -55,7 +55,7 @@ class PullingTask:
             rospy.sleep(0.5)
             frc = self.robot.hook_forces(record=np.array(self.robot.ftHook.step_record()))
             self.robot.stop()
-            rospy.sleep(0.5)
+            rospy.sleep(1.0)
             img = self.robot.camARD1.grey_arr((64,64))
             step += 1
         self.robot.stop()
