@@ -70,18 +70,23 @@ def save_vae(vae, model_dir, name):
     vae.save(encoder_path, decoder_path)
     print("save vae {} weights to {}".format(name, model_dir))
 
-def plot_predict(agent,obs,saveDir,idx):
-    fig, axs = plt.subplots(1,2)
+def plot_predict(agent,obs,saveDir,idx,img=None):
+    fig, axs = plt.subplots(1,3,figsize=(9,3))
     z = agent.encode(obs)
     r_image,r_force = agent.decode(z)
-    axs[0].imshow(obs['image'],cmap='gray')
-    axs[0].set_title("[{:.4f},{:.4f},{:.4f}]".format(obs['force'][0],obs['force'][1],obs['force'][2]))
-    axs[0].set_xticks([])
-    axs[0].set_yticks([])
-    axs[1].imshow(r_image,cmap='gray')
-    axs[1].set_title("[{:.4f},{:.4f},{:.4f}]".format(r_force[0],r_force[1],r_force[2]))
+    if img is not None:
+        axs[0].imshow(img,cmap='gray')
+        # axs[0].set_title("[{:.4f},{:.4f},{:.4f}]".format(obs['force'][0],obs['force'][1],obs['force'][2]))
+        axs[0].set_xticks([])
+        axs[0].set_yticks([])
+    axs[1].imshow(obs['image'],cmap='gray')
+    # axs[1].set_title("[{:.4f},{:.4f},{:.4f}]".format(obs['force'][0],obs['force'][1],obs['force'][2]))
     axs[1].set_xticks([])
     axs[1].set_yticks([])
+    axs[2].imshow(r_image,cmap='gray')
+    # axs[2].set_title("[{:.4f},{:.4f},{:.4f}]".format(r_force[0],r_force[1],r_force[2]))
+    axs[2].set_xticks([])
+    axs[2].set_yticks([])
     imagePath = os.path.join(saveDir,"vae_step{}".format(idx))
     plt.savefig(imagePath)
     plt.close(fig)
@@ -161,7 +166,7 @@ def plot_latent(latent,saveDir):
     plt.close(fig)
 
 def save_image(file_path, array, binary=True):
-    cv.imwrite(file_path, array*255 if binary else array)
+    cv.imwrite(file_path, 255*(array+0.5) if binary else array)
 
 def save_environment(camera,loadcell,z,act,rew,saveDir,idx):
     #imagePath = os.path.join(saveDir,"obs_step{}.png".format(idx))

@@ -40,9 +40,9 @@ class PullingTask:
         frc = self.robot.hook_forces(record=None)
         self.robot.ftHook.reset_trajectory()
         while step < max_step:
-            img = self.i2i.gen_G(tf.expand_dims(tf.convert_to_tensor(img),0))
-            img = tf.squeeze(img).numpy()
-            z = plot_predict(self.agent,dict(image=img,force=frc/np.linalg.norm(frc)),self.saveDir,step)
+            img_t = self.i2i.gen_G(tf.expand_dims(tf.convert_to_tensor(img),0))
+            img_t = tf.squeeze(img_t).numpy()
+            z = plot_predict(self.agent,dict(image=img_t,force=frc/np.linalg.norm(frc)),self.saveDir,step,img)
             act, _ = self.agent.policy(z,training=False)
             if step < 3:
                 act = 3

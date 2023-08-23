@@ -37,7 +37,7 @@ sim_actions = [
 
 #exp_actions = [2,3,3,3,3,3,3,3,3,2,3,2,3,2,2,2,2,2,2,2,3,2,2,2,2,2,0,0,2,0,0]
 #exp_actions = [2,3,3,3,3,3,3,2,3,2,3,2,3,2,2,2,2,2,2,2,2,3,2,2,3,2,2,2,2,0,2,2,2,2,2,0,0]
-#exp_actions = [3,3,2,3,2,3,2,3,2,3,2,3,2,2,2,2,2,2,2,2,0,0,0,2,0,0]
+exp_actions = [3,3,3,3,3,2,3,2,3,2,3,2,2,2,2,2,2,2,2,2,0,0,2,0,0]
 
 def get_args():
     parser = argparse.ArgumentParser()
@@ -60,21 +60,27 @@ def pulling_collect_simulation(door_length,cam_noise,save_dir):
     save_observation(obs_cache, os.path.join(save_dir,"simulation"))
     print("{} observation save to {}".format(len(obs_cache),save_dir))
 
-def pulling_collect_experiment(save_dir):
+def pulling_collect_experiment(robot, save_dir):
+    def get_action(action):
+        vx, vz = 0.8, 0.4*np.pi
+        act_list = [(vx,0.0),(0,-vz),(0,vz),(-vx,0)]
+        return act_list[action]
+
     obs_cache = []
-    robot = JazzyRobot()
     img = robot.camARD1.grey_arr((64,64))
     frc = robot.hook_forces(record=None)
     for i in range(len(exp_actions)):
+        img_path = os.path.join(save_dir,"step_{}.png".format(i))
+        save_image(img_path,robot.camARD1.grey_arr((400,400)))
         obs_cache.append(dict(image=img, force=frc/np.linalg.norm(frc), angle=0.0))
-        vx,vz = self.get_action(exp_actions[i])
+        vx,vz = get_action(exp_actions[i])
         print("collecting observation step {}, action {}".format(i, exp_actions[i]))
         robot.ftHook.reset_step()
         robot.move(vx,vz)
         rospy.sleep(0.5)
         frc = robot.hook_forces(record=np.array(robot.ftHook.step_record()))
         robot.stop()
-        rospy.sleep(0.5)
+        rospy.sleep(1.0)
         img = robot.camARD1.grey_arr((64,64))
     save_observation(obs_cache, os.path.join(save_dir,"experiment"))
     print("{} observation save to {}".format(len(obs_cache),save_dir))
@@ -86,4 +92,6 @@ if __name__ == '__main__':
     if args.simulation == 1:
         pulling_collect_simulation(args.length,args.noise,save_dir)
     else:
-        pulling_collect_experiment(save_dir)
+        robot = JazzyRobot()
+        rospy.sleep(3)
+        pulling_collect_experiment(robot,save_dir)
