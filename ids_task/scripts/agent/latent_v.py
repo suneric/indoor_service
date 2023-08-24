@@ -111,7 +111,7 @@ class LatentVRep(keras.Model):
         with tf.GradientTape() as tape:
             mu,logv,z = self.encoder(img)
             img_pred = self.decoder(z) # reconstruction
-            img_loss = tf.reduce_mean(tf.reduce_sum(keras.losses.MSE(img,img_pred), axis=(1,2)))
+            img_loss = tf.reduce_mean(tf.reduce_sum(keras.losses.MAE(img,img_pred), axis=(1,2)))
             kl_loss = -0.5*(1+logv-tf.square(mu)-tf.exp(logv))
             kl_loss = tf.reduce_mean(tf.reduce_sum(kl_loss, axis=1))
             loss = kl_loss+img_loss
