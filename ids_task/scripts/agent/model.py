@@ -158,7 +158,7 @@ def obs_decoder(latent_dim,act='elu',scale=0.5):
     vh = layers.Conv2DTranspose(filters=32,kernel_size=3,strides=2,padding='same',activation=act)(vh)
     v_output = layers.Conv2DTranspose(filters=1,kernel_size=3,padding='same',activation='tanh')(vh)
     v_output = scale*v_output
-    
+
     fh = layers.Lambda(lambda x: x[:,512:])(h) # split layer
     fh = layers.Dense(32,activation=act)(fh)
     f_output = layers.Dense(3, activation='tanh')(fh)
@@ -227,13 +227,12 @@ def latent_dynamics(latent_dim,action_dim,act='elu',out_act='linear'):
 """
 latent reward
 """
-def latent_reward(latent_dim,act='relu',out_act='tanh',scale=1.0):
+def latent_reward(latent_dim,act='relu',out_act='softmax',output_unit=10):
     z_input = keras.Input(shape=(latent_dim,))
     h = layers.Dense(32, activation=act,kernel_initializer='random_normal')(z_input)
     h = layers.Dense(32, activation=act,kernel_initializer='random_normal')(h)
-    output = layers.Dense(1,activation=out_act)(h)
-    output = scale*output
-    model = keras.Model(inputs=z_input,outputs=output,name='latent_reward')
+    output = layers.Dense(output_unit,activation=out_act)(h)
+    model = keras.Model(inputs=z_input,outputs=output,name='latent_reward_classifier')
     # print(model.summary())
     return model
 

@@ -59,8 +59,10 @@ def lfppo_train(env,z_dim,num_episodes,train_freq,max_steps,warmup,model_dir):
         ppoBuffer.end_trajectry(last_value)
 
         if ppoBuffer.ptr >= train_freq or (ep+1) == num_episodes:
-            if ep < 2500:
-                agent.train_rep(obsBuffer,iter=500)
+            if (ep+1) < 2000:
+                agent.train_rep(obsBuffer,iter=400)
+            else:
+                agent.train_rew(obsBuffer,iter=200)
             obsData = obsBuffer.get_observation(obsIndices)
             agent.train_ppo(obsData,ppoBuffer,pi_iter=100,q_iter=100)
             obsIndices = []
@@ -71,10 +73,12 @@ def lfppo_train(env,z_dim,num_episodes,train_freq,max_steps,warmup,model_dir):
         with summaryWriter.as_default():
             tf.summary.scalar('episode reward', ep_ret, step=ep)
 
-        if (ep+1) % 50 == 0 or (ep+1==num_episodes):
+        if ((ep+1) >= 2000 and (ep+1)%50 == 0) or (ep+1)==num_episodes:
             ep_path = os.path.join(model_dir,"ep{}".format(ep+1))
             os.mkdir(ep_path)
             agent.save(ep_path)
+            if (ep+1)==num_episodes:
+                test_model(env,agent,ep_path)
 
     return ep_returns
 

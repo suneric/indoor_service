@@ -4,6 +4,7 @@ import tensorflow as tf
 from tensorflow_probability import distributions as tfpd
 from .model import *
 from .util import *
+from .classifier import LatentClassifier
 
 class ObservationBuffer:
     def __init__(self,capacity,image_shape):
@@ -74,14 +75,12 @@ class LatentVRep(keras.Model):
         super().__init__()
         self.encoder = vision_encoder(image_shape,latent_dim)
         self.decoder = vision_decoder(latent_dim,scale=0.5)
-        self.reward = latent_reward(latent_dim,out_act='sigmoid',scale=0.5*np.pi) # door angle [0,1] for 0 to pi/2
         self.optimizer = tf.keras.optimizers.Adam(lr)
 
     def train(self,buffer,epochs=100,batch_size=32):
         print("training latent representation model, epoches {}, batch size {}".format(epochs, batch_size))
         self.encoder.trainable = True
         self.decoder.trainable = True
-        self.reward.trainable = False
         for _ in range(epochs):
             idxs = np.random.choice(buffer.size,batch_size)
             data = buffer.get_observation(idxs)
@@ -93,19 +92,6 @@ class LatentVRep(keras.Model):
                 info['kl_loss'].numpy(),
                 info['img_loss'].numpy()
             ))
-
-    def train_reward(self,buffer,epochs=100,batch_size=32):
-        print("training latent reward model, epoches {}, batch size {}".format(epochs, batch_size))
-        self.encoder.trainable = False
-        self.decoder.trainable = False
-        self.reward.trainable = True
-        for _ in range(epochs):
-            idxs = np.random.choice(buffer.size,batch_size)
-            data = buffer.get_observation(idxs)
-            image = tf.convert_to_tensor(data['image'])
-            angle = tf.convert_to_tensor(data['angle'])
-            loss = self.update_reward(image,angle)
-            print("epoch {}, loss: {:.2f}".format(_,loss))
 
     def update_representation(self,img):
         with tf.GradientTape() as tape:
@@ -123,15 +109,6 @@ class LatentVRep(keras.Model):
             img_loss=img_loss,
         )
 
-    def update_reward(self,img,rew):
-        with tf.GradientTape() as tape:
-            mu,logv,z = self.encoder(img)
-            rew_pred = self.reward(z)
-            loss = tf.reduce_mean(keras.losses.MSE(rew,rew_pred))
-        grad = tape.gradient(loss, self.trainable_variables)
-        self.optimizer.apply_gradients(zip(grad, self.trainable_variables))
-        return loss
-
     def save(self, encoder_path, decoder_path, reward_path):
         if not os.path.exists(os.path.dirname(encoder_path)):
             os.makedirs(os.path.dirname(encoder_path))
@@ -139,16 +116,11 @@ class LatentVRep(keras.Model):
         if not os.path.exists(os.path.dirname(decoder_path)):
             os.makedirs(os.path.dirname(decoder_path))
         self.decoder.save_weights(decoder_path)
-        if not os.path.exists(os.path.dirname(reward_path)):
-            os.makedirs(os.path.dirname(reward_path))
-        self.reward.save_weights(reward_path)
 
-    def load(self, encoder_path, decoder_path = None, reward_path=None):
+    def load(self, encoder_path, decoder_path=None):
         self.encoder.load_weights(encoder_path)
         if decoder_path is not None:
             self.decoder.load_weights(decoder_path)
-        if reward_path is not None:
-            self.reward.load_weights(reward_path)
 
 """Latent PPO with input of latent z
 """
@@ -225,6 +197,7 @@ class AgentV:
     def __init__(self,image_shape,force_dim,action_dim,latent_dim):
         self.rep = LatentVRep(image_shape,latent_dim)
         self.ppo = LatentForcePPO(latent_dim,force_dim,action_dim)
+        self.rew = LatentClassifier(latent_dim)
 
     def encode(self,image):
         img = tf.expand_dims(tf.convert_to_tensor(image),0)
@@ -236,7 +209,8 @@ class AgentV:
         return tf.squeeze(img_pred).numpy()
 
     def reward(self,z):
-        r = self.rep.reward(tf.expand_dims(tf.convert_to_tensor(z),0))
+        r = self.rew.angle(tf.expand_dims(tf.convert_to_tensor(z),0))
+        r = tf.argmax(tf.squeeze(r),0)
         return tf.squeeze(r).numpy()
 
     def policy(self,latent,force,training=True):
@@ -258,7 +232,7 @@ class AgentV:
         self.rep.train(buffer,epochs=iter,batch_size=batch_size)
 
     def train_rew(self,buffer,iter=100,batch_size=64):
-        self.rep.train_reward(buffer,epochs=iter,batch_size=batch_size)
+        self.rew.train(buffer,self.rep.encoder,epochs=iter,batch_size=batch_size)
 
     def train_ppo(self,obsData,ppoBuffer,pi_iter=100,q_iter=100,batch_size=64):
         mu,sigma,z = self.rep.encoder(tf.convert_to_tensor(obsData['image']))
@@ -270,7 +244,9 @@ class AgentV:
     def save(self,path):
         self.rep.save(os.path.join(path,"encoder"), os.path.join(path,"decoder"), os.path.join(path,"reward"))
         self.ppo.save(os.path.join(path,"actor"),os.path.join(path,"critic"))
+        self.rew.save(os.path.join(path,"reward"))
 
     def load(self,path):
         self.rep.load(os.path.join(path,"encoder"), os.path.join(path,"decoder"), os.path.join(path,"reward"))
         self.ppo.load(os.path.join(path,"actor"),os.path.join(path,"critic"))
+        self.rew.load(os.path.join(path,"reward"))

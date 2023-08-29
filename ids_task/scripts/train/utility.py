@@ -103,8 +103,8 @@ def plot_vision(agent,obs,saveDir,idx,angle=None):
     axs[1].set_xticks([])
     axs[1].set_yticks([])
     if angle is not None:
-        axs[0].set_title("angle {:.4f}".format(angle))
-        axs[1].set_title("angle {:.4f}".format(agent.reward(z)))
+        axs[0].set_title("angle {}".format(angle_class_index(angle)))
+        axs[1].set_title("angle {}".format(agent.reward(z)))
     imagePath = os.path.join(saveDir,"vae_step{}".format(idx))
     plt.savefig(imagePath)
     plt.close(fig)
@@ -228,3 +228,9 @@ def load_observation(file_path):
             images[idx] = np.reshape(np.array(row[5:4101]),(64,64))
             idx += 1
     return dict(image=images[:idx],force=forces[:idx],angle=angles[:idx])
+
+"""
+divide angle value [0, 0.5*pi] into 10 classes
+"""
+def angle_class_index(value):
+    return int(value/(0.05*np.pi))

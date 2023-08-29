@@ -126,3 +126,9 @@ class OUNoise:
 
     def reset(self):
         self.x_prev = self.x_init if self.x_init is not None else np.zeros_like(self.mu)
+
+"""
+divide angle value [0, 0.5*pi] into 10 classes
+"""
+def angle_class_index(value):
+    return (value/(0.05*np.pi)).astype(int)

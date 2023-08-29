@@ -74,14 +74,12 @@ class LatentRep(keras.Model):
         super().__init__()
         self.encoder = obs_encoder(image_shape,force_dim,latent_dim)
         self.decoder = obs_decoder(latent_dim,scale=0.5)
-        self.reward = latent_reward(latent_dim,act='relu',out_act='sigmoid',scale=0.5*np.pi)
         self.optimizer = tf.keras.optimizers.Adam(lr)
 
     def train(self,buffer,epochs=100,batch_size=32):
         print("training latent representation model, epoches {}, batch size {}".format(epochs,batch_size))
         self.encoder.trainable = True
         self.decoder.trainable = True
-        self.reward.trainable = False
         for _ in range(epochs):
             idxs = np.random.choice(buffer.size,batch_size)
             obs = buffer.get_observation(idxs)
@@ -94,20 +92,6 @@ class LatentRep(keras.Model):
                 info['kl_loss'].numpy(),
                 info['obs_loss'].numpy(),
             ))
-
-    def train_reward(self,buffer,epochs=100,batch_size=32):
-        self.encoder.trainable = False
-        self.decoder.trainable = False
-        self.reward.trainable = True
-        print("training latent reward model, epoches {}, batch size {}".format(epochs,batch_size))
-        for _ in range(epochs):
-            idxs = np.random.choice(buffer.size,batch_size)
-            obs = buffer.get_observation(idxs)
-            image = tf.convert_to_tensor(obs['image'])
-            force = tf.convert_to_tensor(obs['force'])
-            angle = tf.convert_to_tensor(obs['angle'])
-            loss = self.update_reward(image,force,angle)
-            print("epoch {}, loss: {:.2f}".format(_,loss))
 
     def update_representation(self,img,frc):
         with tf.GradientTape() as tape:
@@ -127,32 +111,18 @@ class LatentRep(keras.Model):
             obs_loss=rc_loss,
         )
 
-    def update_reward(self,img,frc,rew):
-        with tf.GradientTape() as tape:
-            mu,logv,z = self.encoder([img,frc])
-            rew_pred = self.reward(z)
-            loss = tf.reduce_mean(keras.losses.MSE(rew,rew_pred))
-        grad = tape.gradient(loss, self.trainable_variables)
-        self.optimizer.apply_gradients(zip(grad, self.trainable_variables))
-        return loss
-
-    def save(self, encoder_path, decoder_path, reward_path):
+    def save(self, encoder_path, decoder_path):
         if not os.path.exists(os.path.dirname(encoder_path)):
             os.makedirs(os.path.dirname(encoder_path))
         self.encoder.save_weights(encoder_path)
         if not os.path.exists(os.path.dirname(decoder_path)):
             os.makedirs(os.path.dirname(decoder_path))
         self.decoder.save_weights(decoder_path)
-        if not os.path.exists(os.path.dirname(reward_path)):
-            os.makedirs(os.path.dirname(reward_path))
-        self.reward.save_weights(reward_path)
 
-    def load(self, encoder_path, decoder_path = None, reward_path=None):
+    def load(self, encoder_path, decoder_path=None):
         self.encoder.load_weights(encoder_path)
         if decoder_path is not None:
             self.decoder.load_weights(decoder_path)
-        if reward_path is not None:
-            self.reward.load_weights(reward_path)
 
 """Latent PPO with input of latent z
 """
@@ -253,13 +223,13 @@ class Agent:
         val = self.ppo.q(tf.expand_dims(tf.convert_to_tensor(z),0))
         return tf.squeeze(val).numpy()
 
-    def train_rep(self,buffer,iter=100,batch_size=64):
+    def train_rep(self,buffer,iter=100,batch_size=32):
         self.rep.train(buffer,epochs=iter,batch_size=batch_size)
 
-    def train_rew(self,buffer,iter=100,batch_size=64):
+    def train_rew(self,buffer,iter=100,batch_size=32):
         self.rep.train_reward(buffer,epochs=iter,batch_size=batch_size)
 
-    def train_ppo(self,obsData,ppoBuffer,pi_iter=80,q_iter=80,batch_size=64):
+    def train_ppo(self,obsData,ppoBuffer,pi_iter=80,q_iter=80,batch_size=32):
         imgs,frcs = tf.convert_to_tensor(obsData['image']),tf.convert_to_tensor(obsData['force'])
         mu,sigma,z = self.rep.encoder([imgs,frcs])
         zs = tf.squeeze(z).numpy()
