@@ -246,7 +246,6 @@ def vision_encoder(image_shape,latent_dim,act='relu'):
     vh = layers.Conv2D(filters=8,kernel_size=(3,3),strides=2,padding='same',activation=act)(vh)
     vh = layers.Flatten()(vh)
     vh = layers.Dense(32,activation=act)(vh)
-    vh = layers.Dense(64,activation=act)(vh)
     mu = layers.Dense(latent_dim,name="z_mean")(vh)
     logv = layers.Dense(latent_dim,name="z_logv")(vh)
     z = Sampling()([mu,logv])

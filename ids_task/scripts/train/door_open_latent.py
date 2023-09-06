@@ -21,7 +21,7 @@ def test_model(env,agent,ep_path,max_step=50):
         if done:
             break
 
-def lppo_train(env,z_dim,num_episodes,train_freq,max_steps,warmup,model_dir):
+def lppo_train(env,z_dim,num_episodes,rep_ep,train_freq,max_steps,warmup,model_dir):
     image_shape = env.observation_space[0]
     force_dim = env.observation_space[1]
     action_dim = env.action_space.n
@@ -60,10 +60,12 @@ def lppo_train(env,z_dim,num_episodes,train_freq,max_steps,warmup,model_dir):
         ppoBuffer.end_trajectry(last_value)
 
         if ppoBuffer.ptr >= train_freq or (ep+1) == num_episodes:
-            if ep < 3000:
+            if (ep+1) < rep_ep:
                 agent.train_rep(obsBuffer,iter=500)
+            else:
+                agent.train_rew(obsBuffer,iter=200)
             obsData = obsBuffer.get_observation(obsIndices)
-            agent.train_ppo(obsData,ppoBuffer,pi_iter=120,q_iter=120)
+            agent.train_ppo(obsData,ppoBuffer,pi_iter=100,q_iter=100)
             obsIndices = []
 
         ep_returns.append(ep_ret)
@@ -72,10 +74,12 @@ def lppo_train(env,z_dim,num_episodes,train_freq,max_steps,warmup,model_dir):
         with summaryWriter.as_default():
             tf.summary.scalar('episode reward', ep_ret, step=ep)
 
-        if (ep >= 3000 and (ep+1) % 50 == 0) or (ep+1==num_episodes):
+        if ((ep+1) >= rep_ep and (ep+1)%50 == 0) or (ep+1)==num_episodes:
             ep_path = os.path.join(model_dir,"ep{}".format(ep+1))
             os.mkdir(ep_path)
             agent.save(ep_path)
+            if (ep+1)==num_episodes:
+                test_model(env,agent,ep_path)
 
     return ep_returns
 
@@ -84,6 +88,6 @@ if __name__=="__main__":
     rospy.init_node('latent_ppo_train', anonymous=True)
     model_dir = os.path.join(sys.path[0],"../../saved_models/door_open/latent", datetime.now().strftime("%Y-%m-%d-%H-%M"))
     env = DoorOpenEnv(continuous=False,name='jrobot',use_step_force=True)
-    ep_returns = lppo_train(env,args.z_dim,args.max_ep,args.train_freq,args.max_step,args.warmup,model_dir)
+    ep_returns = lppo_train(env,args.z_dim,args.max_ep,args.rep_ep,args.train_freq,args.max_step,args.warmup,model_dir)
     env.close()
     plot_episodic_returns("latent_ppo_train", ep_returns, model_dir)

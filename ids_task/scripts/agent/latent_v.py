@@ -109,7 +109,7 @@ class LatentVRep(keras.Model):
             img_loss=img_loss,
         )
 
-    def save(self, encoder_path, decoder_path, reward_path):
+    def save(self, encoder_path, decoder_path):
         if not os.path.exists(os.path.dirname(encoder_path)):
             os.makedirs(os.path.dirname(encoder_path))
         self.encoder.save_weights(encoder_path)
@@ -232,7 +232,7 @@ class AgentV:
         self.rep.train(buffer,epochs=iter,batch_size=batch_size)
 
     def train_rew(self,buffer,iter=100,batch_size=64):
-        self.rew.train(buffer,self.rep.encoder,epochs=iter,batch_size=batch_size)
+        self.rew.train(buffer,self.rep.encoder,epochs=iter,batch_size=batch_size,vision_only=True)
 
     def train_ppo(self,obsData,ppoBuffer,pi_iter=100,q_iter=100,batch_size=64):
         mu,sigma,z = self.rep.encoder(tf.convert_to_tensor(obsData['image']))
@@ -242,11 +242,11 @@ class AgentV:
         self.ppo.train((zs,frcs,acts,rets,advs,logps),size,pi_iter=pi_iter,q_iter=q_iter,batch_size=batch_size)
 
     def save(self,path):
-        self.rep.save(os.path.join(path,"encoder"), os.path.join(path,"decoder"), os.path.join(path,"reward"))
+        self.rep.save(os.path.join(path,"encoder"), os.path.join(path,"decoder"))
         self.ppo.save(os.path.join(path,"actor"),os.path.join(path,"critic"))
         self.rew.save(os.path.join(path,"reward"))
 
     def load(self,path):
-        self.rep.load(os.path.join(path,"encoder"), os.path.join(path,"decoder"), os.path.join(path,"reward"))
+        self.rep.load(os.path.join(path,"encoder"), os.path.join(path,"decoder"))
         self.ppo.load(os.path.join(path,"actor"),os.path.join(path,"critic"))
         self.rew.load(os.path.join(path,"reward"))

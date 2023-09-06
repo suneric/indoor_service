@@ -14,14 +14,15 @@ class LatentClassifier(keras.Model):
         self.loss_fn = keras.losses.CategoricalCrossentropy()
         self.output_unit = output_unit
 
-    def train(self,buffer,encoder,epochs=100,batch_size=32):
+    def train(self,buffer,encoder,epochs=100,batch_size=32,vision_only=True):
         print("training latent reward classifier, epochs {}, batch_size {}".format(epochs,batch_size))
         for _ in range(epochs):
             idxs = np.random.choice(buffer.size,batch_size)
             data = buffer.get_observation(idxs)
             image = tf.convert_to_tensor(data['image'])
+            force = tf.convert_to_tensor(data['force'])
             angle = tf.one_hot(angle_class_index(data['angle']),depth=self.output_unit)
-            mu,logv,z = encoder(image)
+            mu,logv,z = encoder(image) if vision_only else encoder([image,force])
             with tf.GradientTape() as tape:
                 angle_pred = self.angle(z)
                 loss = self.loss_fn(angle,angle_pred)

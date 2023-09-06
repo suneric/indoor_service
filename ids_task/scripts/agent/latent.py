@@ -4,6 +4,7 @@ import tensorflow as tf
 from tensorflow_probability import distributions as tfpd
 from .model import *
 from .util import *
+from .classifier import LatentClassifier
 
 class ObservationBuffer:
     def __init__(self,capacity,image_shape,force_dim):
@@ -197,6 +198,7 @@ class Agent:
     def __init__(self,image_shape,force_dim,action_dim,latent_dim):
         self.rep = LatentRep(image_shape,force_dim,latent_dim)
         self.ppo = LatentPPO(latent_dim,action_dim)
+        self.rew = LatentClassifier(latent_dim)
 
     def encode(self,obs):
         frc = tf.expand_dims(tf.convert_to_tensor(obs['force']),0)
@@ -209,7 +211,8 @@ class Agent:
         return tf.squeeze(img_pred).numpy(), tf.squeeze(frc_pred).numpy()
 
     def reward(self,z):
-        r = self.rep.reward(tf.expand_dims(tf.convert_to_tensor(z),0))
+        r = self.rew.angle(tf.expand_dims(tf.convert_to_tensor(z),0))
+        r = tf.argmax(tf.squeeze(r),0)
         return tf.squeeze(r).numpy()
 
     def policy(self,z,training=True):
@@ -223,13 +226,13 @@ class Agent:
         val = self.ppo.q(tf.expand_dims(tf.convert_to_tensor(z),0))
         return tf.squeeze(val).numpy()
 
-    def train_rep(self,buffer,iter=100,batch_size=32):
+    def train_rep(self,buffer,iter=100,batch_size=64):
         self.rep.train(buffer,epochs=iter,batch_size=batch_size)
 
-    def train_rew(self,buffer,iter=100,batch_size=32):
-        self.rep.train_reward(buffer,epochs=iter,batch_size=batch_size)
+    def train_rew(self,buffer,iter=100,batch_size=64):
+        self.rew.train(buffer,self.rep.encoder,epochs=iter,batch_size=batch_size,vision_only=False)
 
-    def train_ppo(self,obsData,ppoBuffer,pi_iter=80,q_iter=80,batch_size=32):
+    def train_ppo(self,obsData,ppoBuffer,pi_iter=80,q_iter=80,batch_size=64):
         imgs,frcs = tf.convert_to_tensor(obsData['image']),tf.convert_to_tensor(obsData['force'])
         mu,sigma,z = self.rep.encoder([imgs,frcs])
         zs = tf.squeeze(z).numpy()
@@ -238,9 +241,11 @@ class Agent:
         self.ppo.train((zs,acts,rets,advs,logps),size,pi_iter=pi_iter,q_iter=q_iter,batch_size=batch_size)
 
     def save(self,path):
-        self.rep.save(os.path.join(path,"encoder"), os.path.join(path,"decoder"), os.path.join(path,"reward"))
+        self.rep.save(os.path.join(path,"encoder"), os.path.join(path,"decoder"))
         self.ppo.save(os.path.join(path,"actor"),os.path.join(path,"critic"))
+        self.rew.save(os.path.join(path,"reward"))
 
     def load(self,path):
-        self.rep.load(os.path.join(path,"encoder"), os.path.join(path,"decoder"), os.path.join(path,"reward"))
+        self.rep.load(os.path.join(path,"encoder"), os.path.join(path,"decoder"))
         self.ppo.load(os.path.join(path,"actor"),os.path.join(path,"critic"))
+        self.rew.load(os.path.join(path,"reward"))
