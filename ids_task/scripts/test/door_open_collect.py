@@ -21,19 +21,22 @@ INITRANDOM = [[3.24664058e-01, 6.79799544e-01, 5.81612962e-01],
        [3.25103932e-01, 3.35020741e-01, 5.11255196e-01],
        [6.18057055e-02, 9.11729437e-04, 8.22612806e-01]]
 
+# sim_actions = [
+#     [2,3,3,2,2,2,3,2,3,2,3,2,2,2,3,2,2,3,2,2,2,2,2,3,2,2,2,2,0,2,0,0],
+#     [2,3,3,2,3,2,3,2,2,3,2,3,2,2,2,2,0,2,2,2,0,0,2,0],
+#     [2,3,3,3,2,2,2,2,2,2,2,2,3,3,2,3,2,3,2,3,2,2,3,2,2,2,2,2,2,0,2,2,0,2,0],
+#     [2,3,3,2,3,2,3,2,3,2,2,3,2,2,2,2,0,2,2,2,0,0,2,0],
+#     [2,3,3,3,2,3,3,2,3,2,2,3,2,2,3,2,2,2,2,2,2,2,2,2,0],
+#     [2,3,3,3,2,3,2,3,2,3,2,2,3,2,2,2,2,2,2,2,2,0,2,0],
+#     [2,3,3,3,2,3,3,2,3,2,2,3,2,2,3,2,2,2,2,0,2,2,2,0],
+#     [2,3,3,3,2,3,3,2,3,2,3,2,2,3,2,2,2,2,2,2,2,2,0,2],
+#     [2,3,3,3,2,2,2,2,2,2,2,2,3,3,2,3,2,3,2,3,2,3,2,2,2,2,2,2,2,0,2,2,0,0],
+#     [2,3,3,3,2,3,3,2,2,3,2,3,2,2,3,2,2,2,2,2,0,2,2,2,0]
+# ]
 sim_actions = [
-    [2,3,3,2,2,2,3,2,3,2,3,2,2,2,3,2,2,3,2,2,2,2,2,3,2,2,2,2,0,2,0,0],
-    [2,3,3,2,3,2,3,2,2,3,2,3,2,2,2,2,0,2,2,2,0,0,2,0],
-    [2,3,3,3,2,2,2,2,2,2,2,2,3,3,2,3,2,3,2,3,2,2,3,2,2,2,2,2,2,0,2,2,0,2,0],
-    [2,3,3,2,3,2,3,2,3,2,2,3,2,2,2,2,0,2,2,2,0,0,2,0],
-    [2,3,3,3,2,3,3,2,3,2,2,3,2,2,3,2,2,2,2,2,2,2,2,2,0],
-    [2,3,3,3,2,3,2,3,2,3,2,2,3,2,2,2,2,2,2,2,2,0,2,0],
-    [2,3,3,3,2,3,3,2,3,2,2,3,2,2,3,2,2,2,2,0,2,2,2,0],
-    [2,3,3,3,2,3,3,2,3,2,3,2,2,3,2,2,2,2,2,2,2,2,0,2],
     [2,3,3,3,2,2,2,2,2,2,2,2,3,3,2,3,2,3,2,3,2,3,2,2,2,2,2,2,2,0,2,2,0,0],
-    [2,3,3,3,2,3,3,2,2,3,2,3,2,2,3,2,2,2,2,2,0,2,2,2,0]
+    [2,3,3,2,3,2,3,2,3,2,2,3,2,2,2,2,0,2,2,2,0,0,2,0]
 ]
-#sim_actions = [[2,3,3,2,3,2,3,2,3,2,2,3,2,2,2,2,0,2,2,2,0,0,2,0]]
 
 #exp_actions = [2,3,3,3,3,3,3,3,3,2,3,2,3,2,2,2,2,2,2,2,3,2,2,2,2,2,0,0,2,0,0]
 #exp_actions = [2,3,3,3,3,3,3,2,3,2,3,2,3,2,2,2,2,2,2,2,2,3,2,2,3,2,2,2,2,0,2,2,2,2,2,0,0]
@@ -46,9 +49,8 @@ def get_args():
     parser.add_argument('--noise', type=float, default=None)
     return parser.parse_args()
 
-def pulling_collect_simulation(door_length,cam_noise,save_dir):
+def pulling_collect_simulation(env,save_dir):
     obs_cache = []
-    env = DoorOpenEnv(continuous=False,door_length=door_length,name='jrobot',use_step_force=True,noise_var=cam_noise)
     for i in range(len(sim_actions)):
         env.set_init_positions(INITRANDOM[i])
         obs, done = env.reset(), False
@@ -56,7 +58,6 @@ def pulling_collect_simulation(door_length,cam_noise,save_dir):
             obs_cache.append(dict(image=obs['image'],force=obs['force'],angle=env.door_angle()))
             print("collecting observation case {}, step {}, action {}".format(i,j,sim_actions[i][j]))
             obs, rew, done, info = env.step(sim_actions[i][j])
-    env.close()
     save_observation(obs_cache, os.path.join(save_dir,"simulation"))
     print("{} observation save to {}".format(len(obs_cache),save_dir))
 
@@ -90,7 +91,9 @@ if __name__ == '__main__':
     rospy.init_node('door_pull_data_collection', anonymous=True)
     save_dir = os.path.join(sys.path[0],"../../dump/collection/")
     if args.simulation == 1:
-        pulling_collect_simulation(args.length,args.noise,save_dir)
+        env = DoorOpenEnv(continuous=False,door_length=args.length,name='jrobot',use_step_force=True,noise_var=args.noise)
+        pulling_collect_simulation(env,save_dir)
+        env.close()
     else:
         robot = JazzyRobot()
         rospy.sleep(3)
