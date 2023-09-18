@@ -17,7 +17,7 @@ register(
   entry_point='envs.door_open_env:DoorOpenEnv')
 
 class DoorOpenEnv(GymGazeboEnv):
-    def __init__(self,continuous=False,door_length=0.9,name='mrobot',use_step_force=False,noise_var=None):
+    def __init__(self,continuous=False,door_length=0.9,name='mrobot',type="right",use_step_force=False,noise_var=None):
         super(DoorOpenEnv, self).__init__(
             start_init_physics_parameters=False,
             reset_world_or_sim="WORLD"
@@ -41,6 +41,7 @@ class DoorOpenEnv(GymGazeboEnv):
         self.prev_angle = 0
         self.curr_angle = 0
         self.initRandom = None
+        self.type = type
 
     def _check_all_systems_ready(self):
         self.robot.check_ready()
@@ -65,6 +66,9 @@ class DoorOpenEnv(GymGazeboEnv):
         self.curr_angle = self.prev_angle
         self.obs_image = self.robot.camARD2.grey_arr((64,64),noise_var=self.cam_noise)
         self.obs_force = self.robot.hook_forces(record=None)
+        if self.type == "left":
+            self.obs_image = np.fliplr(self.obs_image)
+            self.obs_force[1] = -self.obs_force[1]
 
     def set_init_positions(self,rad=None):
         self.initRandom = rad
@@ -77,6 +81,9 @@ class DoorOpenEnv(GymGazeboEnv):
         step_force = np.array(self.robot.ftHook.step_record()) if self.use_step_force else None
         self.obs_image = self.robot.camARD2.grey_arr((64,64),noise_var=self.cam_noise)
         self.obs_force = self.robot.hook_forces(record=step_force)
+        if self.type == "left":
+            self.obs_image = np.fliplr(self.obs_image)
+            self.obs_force[1] = -self.obs_force[1]
         self.curr_angle = self.poseSensor.door_angle()
         self.success = self.is_success()
         self.fail = self.is_failed()
@@ -92,33 +99,48 @@ class DoorOpenEnv(GymGazeboEnv):
             reward = -100
         else:
             angle_change = (self.curr_angle-self.prev_angle)/(0.5*np.pi)
+            if self.type=="left":
+                angle_change = -angle_change
             reward = 100*angle_change-1
             self.prev_angle = self.curr_angle
         return reward
 
     def is_failed(self):
-        fp = self.poseSensor.robot_footprint()
-        robot_not_out = any(fp[key][0] > 0.0 for key in fp.keys())
-        if robot_not_out:
+        fp = self.poseSensor.robot_footprint(type=self.type)
+        cam_r = np.sqrt(fp['camera'][0]**2+fp['camera'][1]**2)
+        cam_a = np.arctan2(fp['camera'][0],fp['camera'][1])
+        door_r = self.door_length
+        door_a = self.poseSensor.door_angle()
+        robot_not_out = any(fp[key][0] > 0.0 for key in fp.keys()) if self.type=="right" else any(fp[key][0] < 0.0 for key in fp.keys())
+        if robot_not_out and self.type == "right":
             # fail when detected force is too large
             if self.curr_angle < 0.06 and max(abs(self.obs_force)) > 500:
                 print("max forces reached", self.obs_force, "current angle", self.curr_angle)
                 return True
             # fail when the robot is not out of the room and the side bar is far away from the door
-            cam_r = np.sqrt(fp['camera'][0]**2+fp['camera'][1]**2)
-            cam_a = np.arctan2(fp['camera'][0],fp['camera'][1])
-            door_r = self.door_length
-            door_a = self.poseSensor.door_angle()
             if cam_r > 1.1*door_r or cam_r < 0.7*door_r or cam_a > 1.1*door_a:
-                print("lose contact with the door", cam_r, cam_a)
+                print("lose contact with the door", cam_r, door_r, cam_a, door_a)
                 return True
+        if robot_not_out and self.type == "left":
+            # fail when detected force is too large
+            if self.curr_angle > -0.2 and max(abs(self.obs_force)) > 500:
+                print("max forces reached", self.obs_force, "current angle", self.curr_angle)
+                return True
+            # fail when the robot is not out of the room and the side bar is far away from the door
+            if cam_r > 1.1*door_r or cam_r < 0.7*door_r or cam_a < 1.1*door_a:
+                print("lose contact with the door", cam_r, door_r, cam_a, door_a)
+                return True
+
         return False
 
     def door_angle(self): # make door_angle 0-1
         return self.poseSensor.door_angle()
 
     def is_success(self):
-        return self.curr_angle > 0.45*np.pi # 81 degree
+        if self.type == "right":
+            return self.curr_angle > 0.45*np.pi # 81 degree
+        else: # left
+            return self.curr_angle < -0.45*np.pi
 
     def get_action(self, action):
         vx, vz = 2.0, 2*np.pi # scale of linear and angular velocity
@@ -130,23 +152,31 @@ class DoorOpenEnv(GymGazeboEnv):
         else:
             # act_list = [[vx,-vz],[vx,0.0],[vx,vz],[0,-vz],[0,vz],[-vx,-vz],[-vx,0],[-vx,vz]]
             act_list = [[vx,0.0],[0,-vz],[0,vz],[-vx,0]]
+            if self.type == "left":
+                act_list = [[vx,0.0],[0,vz],[0,-vz],[-vx,0]]
             return np.array(act_list[action])
 
     def reset_robot(self,max_time=60):
         self.robot.stop()
         time, rate = 0, rospy.Rate(1)
-        while self.poseSensor.door_angle() > 0.11 and time <= max_time:
-            rate.sleep() # wait door close
-            time += 1
+        if self.type == "right":
+            while self.poseSensor.door_angle() > 0.11 and time <= max_time:
+                rate.sleep() # wait door close
+                time += 1
+        else:
+            while self.poseSensor.door_angle() < -0.18 and time <= max_time:
+                rate.sleep() # wait door close
+                time += 1
         if time > max_time:
             print("too long to wait door close.")
             return False
+
         # reset robot position with a random camera position
         rad = np.random.uniform(size=3) if self.initRandom is None else self.initRandom
-        cx = 0.01*(rad[0]-0.5) + 0.025
         cy = 0.01*(rad[1]-0.5) + self.door_length + 0.045
-        theta = 0.1*np.pi*(rad[2]-0.5) + np.pi
-        rx, ry, rt = self.robot_init_pose(cx,cy,theta)
+        cx = 0.01*(rad[0]-0.5) + 0.025 if self.type=="right" else -0.07
+        theta = 0.1*np.pi*(rad[2]-0.5) + np.pi if self.type =="right" else 0.0
+        rx,ry,rt = self.robot_init_pose(cx,cy,theta)
         self.robot.reset_robot(rx,ry,rt)
         self.robot.reset_joints(vpos=0.75,hpos=0.13,spos=0,ppos=0)
         self.robot.reset_ft_sensors()
@@ -158,7 +188,7 @@ class DoorOpenEnv(GymGazeboEnv):
         """
         camera_offset = (0.49,-0.19)
         if self.name == 'jrobot':
-            camera_offset = (0.63,-0.23) # longer sidebar
+            camera_offset = (0.63,-0.23 if self.type=="right" else 0.23) # longer sidebar
         cam_pose = [[np.cos(theta),np.sin(theta),0,cx],[-np.sin(theta),np.cos(theta),0,cy],[0,0,1,0.75],[0,0,0,1]]
         robot_to_cam_mat = [[1,0,0,camera_offset[0]],[0,1,0,camera_offset[1]],[0,0,1,0],[0,0,0,1]]
         R = np.dot(np.array(cam_pose),np.linalg.inv(np.array(robot_to_cam_mat)))

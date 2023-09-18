@@ -3,15 +3,25 @@
 <robot name="mrobot" xmlns:xacro="https://www.ros.org/wiki/xacro">
   <xacro:arg name="ns" default="" />
   <xacro:arg name="tf_prefix" default=""/>
+  <xacro:arg name="left" default="0"/>
 
   <xacro:include filename="$(find ids_description)/urdf/base_square.urdf.xacro" />
   <xacro:fourwheeler_base_macro/>
 
   <!--frame 3DOF-->
-  <xacro:include filename="$(find ids_description)/urdf/jframe.urdf.xacro" />
-  <xacro:frame_macro parent="link_fbumper">
-    <origin xyz="-0.11 0 0.15" rpy="0 0 0"/>
-  </xacro:frame_macro>
+  <xacro:unless value="$(arg left)">
+    <xacro:include filename="$(find ids_description)/urdf/jframe_r.urdf.xacro" />
+    <xacro:frame_macro parent="link_fbumper">
+      <origin xyz="-0.11 0 0.15" rpy="0 0 0"/>
+    </xacro:frame_macro>
+  </xacro:unless>
+
+  <xacro:if value="$(arg left)">
+    <xacro:include filename="$(find ids_description)/urdf/jframe_l.urdf.xacro" />
+    <xacro:frame_macro parent="link_fbumper">
+      <origin xyz="-0.11 0 0.15" rpy="0 0 0"/>
+    </xacro:frame_macro>
+  </xacro:if>
 
   <!--RGB-D camera, look forward-->
   <xacro:include filename="$(find ids_description)/urdf/realsense.urdf.xacro" />

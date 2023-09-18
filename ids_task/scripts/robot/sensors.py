@@ -530,7 +530,7 @@ class PoseSensor():
     def _model_pose_cb(self,data):
         self.robot_pose = data.pose[data.name.index('mrobot')]
 
-    def robot_footprint(self):
+    def robot_footprint(self, type="right"):
         robot_mat = self.pose_matrix(self.robot_pose)
         lf_trans = [[1,0,0,0.25],[0,1,0,0.25],[0,0,1,0],[0,0,0,1]]
         lr_trans = [[1,0,0,-0.25],[0,1,0,0.25],[0,0,1,0],[0,0,0,1]]
@@ -538,7 +538,8 @@ class PoseSensor():
         rr_trans = [[1,0,0,-0.25],[0,1,0,-0.25],[0,0,1,0],[0,0,0,1]]
         cam_trans = [[1,0,0,0.49],[0,1,0,-0.19],[0,0,1,0],[0,0,0,1]]
         if self.name == 'jrobot':
-            cam_trans = [[1,0,0,0.63],[0,1,0,-0.23],[0,0,1,0],[0,0,0,1]] # longer sidebar
+            cam_trans = [[1,0,0,0.63],[0,1,0,-0.23 if type=="right" else 0.23],[0,0,1,0],[0,0,0,1]] # longer sidebar
+
         lf_mat = np.dot(robot_mat,np.array(lf_trans))
         lr_mat = np.dot(robot_mat,np.array(lr_trans))
         rf_mat = np.dot(robot_mat,np.array(rf_trans))

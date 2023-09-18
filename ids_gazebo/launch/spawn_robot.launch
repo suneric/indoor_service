@@ -1,8 +1,9 @@
 <launch>
   <arg name="name" default="mrobot"/>
-  <arg name="model" default="$(find ids_description)/urdf/mrobot.urdf.xacro"/>
+  <arg name="model" default="$(find ids_description)/urdf/jrobot.urdf.xacro"/>
   <arg name="robot_ns" default=""/>
   <arg name="tf_prefix" default=""/>
+  <arg name="left" default=""/>
 
   <arg name="x" default="1.5"/>
   <arg name="y" default="0.5"/>
@@ -18,7 +19,7 @@
   <!-- <include file="$(find ids_detection)/launch/object_detection.launch"/> -->
 
   <!--spawn mobile robot-->
-  <param name="robot_description" command="$(find xacro)/xacro '$(arg model)' ns:=$(arg robot_ns) tf_prefix:=$(arg tf_prefix)" />
+  <param name="robot_description" command="$(find xacro)/xacro '$(arg model)' left:=$(arg left) ns:=$(arg robot_ns) tf_prefix:=$(arg tf_prefix)" />
   <node name="urdf_spawner" pkg="gazebo_ros" type="spawn_model" respawn="false" output="screen"
         args="-param robot_description
            -urdf

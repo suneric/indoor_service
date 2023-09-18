@@ -177,6 +177,7 @@ def get_args():
     parser.add_argument('--policy', type=str, default=None)
     parser.add_argument('--env',type=str, default=None)
     parser.add_argument('--noise',type=float, default=None)
+    parser.add_argument('--type', type=str, default="right")
     return parser.parse_args()
 
 if __name__ == '__main__':
@@ -184,7 +185,7 @@ if __name__ == '__main__':
     rospy.init_node('door_pull_test', anonymous=True)
     policies = ['ppo','latent','latentv'] if args.policy is None else [args.policy]
     model_dir = os.path.join(sys.path[0],"../policy/pulling/")
-    env = DoorOpenEnv(continuous=False,door_length=args.length,name='jrobot',use_step_force=True,noise_var=args.noise)
+    env = DoorOpenEnv(continuous=False,door_length=args.length,type=args.type,name='jrobot',use_step_force=True,noise_var=args.noise)
     results = run_pulling_test(env,model_dir,policies,args.env)
     print(results)
     env.close()

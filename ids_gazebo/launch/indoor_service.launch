@@ -7,6 +7,7 @@
   <arg name="roll" default="0"/>
   <arg name="pitch" default="0"/>
   <arg name="yaw" default="0"/>
+  <arg name="left" default="0"/>
 
   <!-- We resume the logic in empty_world.launch, changing only the name of the world to be launched -->
   <include file="$(find gazebo_ros)/launch/empty_world.launch">
@@ -27,6 +28,7 @@
     <arg name="roll" value="$(arg roll)"/>
     <arg name="pitch" value="$(arg pitch)"/>
     <arg name="yaw" value="$(arg yaw)"/>
+    <arg name="left" value="$(arg left)"/>
   </include>
 
 </launch>

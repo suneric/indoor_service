@@ -33,10 +33,23 @@ INITRANDOM = [[3.24664058e-01, 6.79799544e-01, 5.81612962e-01],
 #     [2,3,3,3,2,2,2,2,2,2,2,2,3,3,2,3,2,3,2,3,2,3,2,2,2,2,2,2,2,0,2,2,0,0],
 #     [2,3,3,3,2,3,3,2,2,3,2,3,2,2,3,2,2,2,2,2,0,2,2,2,0]
 # ]
-sim_actions = [
-    [2,3,3,3,2,2,2,2,2,2,2,2,3,3,2,3,2,3,2,3,2,3,2,2,2,2,2,2,2,0,2,2,0,0],
-    [2,3,3,2,3,2,3,2,3,2,2,3,2,2,2,2,0,2,2,2,0,0,2,0]
-]
+# sim_actions = [
+#     [2,3,3,3,2,2,2,2,2,2,2,2,3,3,2,3,2,3,2,3,2,3,2,2,2,2,2,2,2,0,2,2,0,0],
+#     [2,3,3,2,3,2,3,2,3,2,2,3,2,2,2,2,0,2,2,2,0,0,2,0]
+# ]
+# left sidebar
+# sim_actions =[
+#     [2,3,2,3,3,2,3,2,3,2,3,2,2,3,2,2,2,2,2,2,2,2,0,0,0],
+#     [2,3,3,2,3,2,3,2,3,2,3,2,3,2,2,2,2,2,2,2,2,2,0,0,0],
+#     [2,3,2,3,3,2,3,2,3,2,3,2,2,3,2,2,2,2,2,2,2,2,0,0,0],
+#     [2,3,2,3,3,2,3,2,3,2,3,2,3,2,2,2,2,2,2,2,2,2,0,0,0],
+#     [2,3,3,2,3,2,3,2,3,2,3,2,3,2,2,2,2,2,2,2,2,2,0,0,0],
+#     [2,3,3,2,3,2,3,2,3,2,3,2,3,2,2,2,2,2,2,2,2,2,0,0,0],
+#     [2,3,2,3,3,2,3,2,3,2,3,2,2,3,2,2,2,2,2,2,2,2,0,0,0],
+#     [2,3,3,2,3,2,3,2,3,2,3,2,3,2,2,2,2,2,2,2,2,2,2,0,0],
+#     [2,3,3,2,3,3,2,2,2,2,2,2,2,2,2,3,2,3,3,2,2,2,2,2,2,2,2,3,3,2,3,2,3,2,3,2,2,3,2,2,2,2,2,2,2,0,0,0,0],
+#     [2,3,3,2,3,3,2,2,2,2,2,2,2,2,2,2,3,3,2,3,2,3,2,3,2,3,2,2,2,2,2,2,2,2,2,0,0,0]
+# ]
 
 #exp_actions = [2,3,3,3,3,3,3,3,3,2,3,2,3,2,2,2,2,2,2,2,3,2,2,2,2,2,0,0,2,0,0]
 #exp_actions = [2,3,3,3,3,3,3,2,3,2,3,2,3,2,2,2,2,2,2,2,2,3,2,2,3,2,2,2,2,0,2,2,2,2,2,0,0]
@@ -47,6 +60,7 @@ def get_args():
     parser.add_argument('--simulation', type=int, default=1)
     parser.add_argument('--length', type=float, default=0.9)
     parser.add_argument('--noise', type=float, default=None)
+    parser.add_argument('--type', type=str, default="right")
     return parser.parse_args()
 
 def pulling_collect_simulation(env,save_dir):
@@ -91,7 +105,7 @@ if __name__ == '__main__':
     rospy.init_node('door_pull_data_collection', anonymous=True)
     save_dir = os.path.join(sys.path[0],"../../dump/collection/")
     if args.simulation == 1:
-        env = DoorOpenEnv(continuous=False,door_length=args.length,name='jrobot',use_step_force=True,noise_var=args.noise)
+        env = DoorOpenEnv(continuous=False,door_length=args.length,type=args.type,name='jrobot',use_step_force=True,noise_var=args.noise)
         pulling_collect_simulation(env,save_dir)
         env.close()
     else:

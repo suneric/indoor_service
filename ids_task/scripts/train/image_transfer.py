@@ -12,14 +12,6 @@ import matplotlib.pyplot as plt
 from utility import *
 import argparse
 
-def get_args():
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--env', type=str, default=None)
-    parser.add_argument('--size', type=int, default=None)
-    parser.add_argument('--iter', type=int, default=300)
-    parser.add_argument('--validate', type=int, default=0)
-    return parser.parse_args()
-
 adv_loss_fn = keras.losses.MeanSquaredError()
 
 def generator_loss_fn(fake):
@@ -49,7 +41,8 @@ def train_i2i(env_name,data_dir,size,iter,save_dir=None):
     )
     model.fit(x=test_images,y=train_images, epochs=iter)
     model_dir = os.path.join(sys.path[0],"../../saved_models/door_open/i2i",env_name)
-    os.mkdir(model_dir)
+    if not os.path.exists(model_dir):
+        os.mkdir(model_dir)
     model.save(model_dir)
 
     if save_dir is not None:
@@ -66,6 +59,14 @@ def train_i2i(env_name,data_dir,size,iter,save_dir=None):
             imagePath = os.path.join(save_dir,"step{}".format(i))
             plt.savefig(imagePath)
             plt.close(fig)
+
+def get_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--env', type=str, default=None)
+    parser.add_argument('--size', type=int, default=None)
+    parser.add_argument('--iter', type=int, default=300)
+    parser.add_argument('--validate', type=int, default=0)
+    return parser.parse_args()
 
 """
 Start Train Image to Image Translation Model
