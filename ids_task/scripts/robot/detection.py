@@ -60,7 +60,7 @@ def draw_detection(image, detect):
         clr = colors[int(info.type)]
         l,t,r,b = int(info.l),int(info.t),int(info.r),int(info.b)
         cv.rectangle(image, (l,t), (r,b), clr, 2)
-        cv.putText(image, label, (l-10,t-10), cv.FONT_HERSHEY_SIMPLEX, 0.5, clr, 1)
+        cv.putText(image, label, (l+5,t-5), cv.FONT_HERSHEY_SIMPLEX, 0.5, clr, 1)
     return image
 
 
@@ -343,11 +343,24 @@ class ObjectDetection:
 
     def lever(self):
         detected = self.detector.detect(type=1,confidence_threshold=0.5)
+        # display_observation("detection", draw_detection(self.sensor.color_image(),detected))
         return detected[-1] if len(detected) > 0 else None
 
     def door(self):
         detected = self.detector.detect(type=0,confidence_threshold=0.5)
+        # display_observation("detection", draw_detection(self.sensor.color_image(),detected))
         return detected[-1] if len(detected) > 0 else None
+
+    def all_targets(self):
+        detects = []
+        doors = self.detector.detect(type=0,confidence_threshold=0.5)
+        for door in doors:
+            detects.append(door)
+        levers = self.detector.detect(type=1,confidence_threshold=0.5)
+        for lever in levers:
+            detects.append(lever)
+        display_observation("detection", draw_detection(self.sensor.color_image(),detects))
+        return detects
 
     """
     type [0:door,1:lever,2:human,3:outlet,4:socket]
