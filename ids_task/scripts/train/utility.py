@@ -74,24 +74,21 @@ def save_vae(vae, model_dir, name):
 def plot_predict(agent,obs,saveDir,idx,img=None):
     fig, axs = plt.subplots(1,3,figsize=(9,3))
     z = agent.encode(obs)
-    r_image,r_force = agent.decode(z)
+    img_r,frc_r = agent.decode(z)
     if img is not None:
         axs[0].imshow(img,cmap='gray')
-        # axs[0].set_title("[{:.4f},{:.4f},{:.4f}]".format(obs['force'][0],obs['force'][1],obs['force'][2]))
         axs[0].set_xticks([])
         axs[0].set_yticks([])
     axs[1].imshow(obs['image'],cmap='gray')
-    # axs[1].set_title("[{:.4f},{:.4f},{:.4f}]".format(obs['force'][0],obs['force'][1],obs['force'][2]))
     axs[1].set_xticks([])
     axs[1].set_yticks([])
-    axs[2].imshow(r_image,cmap='gray')
-    # axs[2].set_title("[{:.4f},{:.4f},{:.4f}]".format(r_force[0],r_force[1],r_force[2]))
+    axs[2].imshow(img_r,cmap='gray')
     axs[2].set_xticks([])
     axs[2].set_yticks([])
     imagePath = os.path.join(saveDir,"vae_step{}".format(idx))
     plt.savefig(imagePath)
     plt.close(fig)
-    return z
+    return z,img_r,frc_r
 
 def plot_vision(agent,obs,saveDir,idx,angle=None):
     fig, axs = plt.subplots(1,2)
@@ -111,84 +108,6 @@ def plot_vision(agent,obs,saveDir,idx,angle=None):
     plt.close(fig)
     return z
 
-def plot_latent_combined(agent,latent,angle,name):
-    fig = plt.figure(figsize=(9,3), constrained_layout=True)
-    gs = fig.add_gridspec(1,3,width_ratios=[1,1,1])
-    dim0 = fig.add_subplot(gs[0])
-    dim0.set_title('DIM 0')
-    dim1 = fig.add_subplot(gs[1])
-    dim1.set_title('DIM 1')
-    dim2 = fig.add_subplot(gs[2])
-    dim2.set_title('DIM 2')
-    dim0.scatter(angle,latent[:,0])
-    dim1.scatter(angle,latent[:,1])
-    dim2.scatter(angle,latent[:,2])
-    plt.show()
-
-def plot_latent(latent,saveDir):
-    latentPath = os.path.join(saveDir,"latent")
-    fig = plt.figure()
-    ax = fig.add_subplot(111, projection='3d')
-    latent = latent.to_numpy()
-    ax.scatter(latent[0,0], latent[0,1], latent[0,2], c='g', marker='o')
-    ax.scatter(latent[1:-1,0], latent[1:-1,1], latent[1:-1,2], c='k', marker='o')
-    ax.scatter(latent[-1,0], latent[-1,1], latent[-1,2], c='b', marker='o')
-    ax.plot(latent[:,0], latent[:,1], latent[:,2], c='k')
-    ax.set_xlabel('Dim 0')
-    ax.set_ylabel('Dim 1')
-    ax.set_zlabel('Dim 2')
-    plt.savefig(latentPath+"_3d")
-    plt.close(fig)
-
-    fig = plt.figure(figsize=(9,3), constrained_layout=True)
-    gs = fig.add_gridspec(1,3,width_ratios=[1,1,1])
-    ax0 = fig.add_subplot(gs[0])
-    ax1 = fig.add_subplot(gs[1])
-    ax2 = fig.add_subplot(gs[2])
-    ax0.scatter(latent[0,0], latent[0,1], c='g', marker='o')
-    ax0.scatter(latent[1:-1,0], latent[1:-1,1], c='k', marker='o')
-    ax0.scatter(latent[-1,0], latent[-1,1], c='b', marker='o')
-    ax0.plot(latent[:,0], latent[:,1], c='k')
-    ax0.set_xlabel('Dim 0')
-    ax0.set_ylabel('Dim 1')
-    ax1.scatter(latent[0,0], latent[0,2], c='g', marker='o')
-    ax1.scatter(latent[1:-1,0], latent[1:-1,2], c='k', marker='o')
-    ax1.scatter(latent[-1,0], latent[-1,2], c='b', marker='o')
-    ax1.plot(latent[:,0], latent[:,2], c='k')
-    ax1.set_xlabel('Dim 0')
-    ax1.set_ylabel('Dim 2')
-    ax2.scatter(latent[0,1], latent[0,2], c='g', marker='o')
-    ax2.scatter(latent[1:-1,1], latent[1:-1,2], c='k', marker='o')
-    ax2.scatter(latent[-1,1], latent[-1,2], c='b', marker='o')
-    ax2.plot(latent[:,1], latent[:,2], c='k')
-    ax2.set_xlabel('Dim 1')
-    ax2.set_ylabel('Dim 2')
-    plt.savefig(latentPath+"_2d")
-    plt.close(fig)
-
-def save_image(file_path, array, binary=True):
-    cv.imwrite(file_path, 255*(array+0.5) if binary else array)
-
-def save_environment(camera,loadcell,z,act,rew,saveDir,idx):
-    #imagePath = os.path.join(saveDir,"obs_step{}.png".format(idx))
-    #image = camera.grey_arr(resolution=(400,400))
-    #cv.imwrite(imagePath,255*(image+0.5))
-    force = loadcell.forces()
-    return [idx,force[0],force[1],force[2],z[0],z[1],z[2],act,rew]
-
-def plot_trajectory(forces,obsCache,saveDir):
-    obs = pd.DataFrame(obsCache)
-    obs.columns = ['step','fx','fy','fz','z0','z1','z2','action','reward']
-    obs.to_csv(os.path.join(saveDir,"observation.csv"))
-    profile = pd.DataFrame(forces)
-    profile.columns= ['fx','fy','fz']
-    profile.to_csv(os.path.join(saveDir,"force_profile.csv"))
-    plot_forces(profile,saveDir,useTime=True)
-    forces = obs[['fx','fy','fz']]
-    plot_forces(forces,saveDir,useTime=False)
-    latent = obs[['z0','z1','z2']]
-    plot_latent(latent,saveDir)
-
 def plot_forces(data,saveDir,useTime=False):
     subset = data[['fx','fy','fz']]
     if useTime:
@@ -204,6 +123,59 @@ def plot_forces(data,saveDir,useTime=False):
     filePath = os.path.join(saveDir,"force_profile" if useTime else "force_step")
     plt.savefig(filePath)
     plt.close(fig)
+
+def save_image(file_path, array, binary=True):
+    cv.imwrite(file_path, 255*(array+0.5) if binary else array)
+
+def save_trajectory(obsCache,forces,saveDir):
+    # [step,img,img_t,img_r,frc,frc_n,frc_r,z,r,act]
+    steps = len(obsCache)
+    data = np.zeros((steps,3*64*64+3*3+4+3),dtype=np.float32)
+    for i in range(steps):
+        data[i][0] = obsCache[i][0] # step
+        data[i][1] = obsCache[i][9] # action
+        data[i][2] = obsCache[i][8] # reward
+        data[i][3:7] = obsCache[i][7] # z
+        data[i][7:10] = obsCache[i][4] # force
+        data[i][10:13] = obsCache[i][5] # normalized force
+        data[i][13:16] = obsCache[i][6] # reconstrcuted force
+        data[i][16:4112] = obsCache[i][1].flatten() # image
+        data[i][4112:8208] = obsCache[i][2].flatten() # translated image
+        data[i][8208:12304] = obsCache[i][3].flatten() # reconstrcuted image
+    pd.DataFrame(data).to_csv(os.path.join(saveDir,"trajectory.csv"))
+    pd.DataFrame(forces).to_csv(os.path.join(saveDir,"force-profile.csv"))
+
+def load_trajectory(traj_file):
+    data = pd.read_csv(traj_file)
+    count = len(data.index)
+    steps,rewards,actions = np.zeros(count),np.zeros(count),np.zeros(count)
+    zs = np.zeros((count,4))
+    forces,n_forces,r_forces = np.zeros((count,3)),np.zeros((count,3)),np.zeros((count,3))
+    images,t_images,r_images = np.zeros((count,64,64)),np.zeros((count,64,64)),np.zeros((count,64,64))
+    for i in range(count):
+        row = data.iloc[i]
+        steps[i] = row[1]
+        actions[i] = row[2]
+        rewards[i] = row[3]
+        zs[i] = row[4:8]
+        forces[i] = row[8:11]
+        n_forces[i] = row[11:14]
+        r_forces[i] = row[14:17]
+        images[i] = np.reshape(np.array(row[17:4113]),(64,64))
+        t_images[i] = np.reshape(np.array(row[4113:8209]),(64,64))
+        r_images[i] = np.reshape(np.array(row[8209:12305]),(64,64))
+    return dict(
+        step=steps,
+        action=actions,
+        reward=rewards,
+        latent=zs,
+        force=forces,
+        n_force=n_forces,
+        r_force=r_forces,
+        image=images,
+        t_image=t_images,
+        r_image=r_images,
+    )
 
 def save_observation(obs_cache,file_path):
     obs_len = len(obs_cache)

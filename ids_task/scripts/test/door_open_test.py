@@ -83,6 +83,24 @@ class DoorOpenPPO:
             step += 1
         return env.success, step
 
+class DoorOpenLatentV:
+    def __init__(self,model_dir):
+        self.agent = AgentV((64,64,1),3,4,4)
+        self.agent.load(os.path.join(model_dir,"latentv/z4_4000"))
+
+    def run(self,env,i2i_transfer=None,maxStep=50):
+        obs, done, step = env.reset(),False, 0
+        while not done and step < maxStep:
+            img,frc = obs['image'],obs['force']
+            if i2i_transfer:
+                img = i2i_transfer.gen_G(tf.expand_dims(tf.convert_to_tensor(img),0))
+                img = tf.squeeze(img).numpy()
+            z = plot_vision(self.agent,dict(image=img,force=frc),self.saveDir,step)
+            act,_ = self.agent.policy(z,frc,training=False)
+            obs, _, done, _ = env.step(act)
+            step += 1
+        return env.success, step
+
 class DoorOpenLatent:
     def __init__(self,model_dir):
         self.agent = Agent((64,64,1),3,4,4)
@@ -95,48 +113,21 @@ class DoorOpenLatent:
         obs, done, step = env.reset(),False, 0
         while not done and step < maxStep:
             img,frc = obs['image'],obs['force']
+            img_t, frc_n = img, frc
             if i2i_transfer:
-                img = i2i_transfer.gen_G(tf.expand_dims(tf.convert_to_tensor(img),0))
-                img = tf.squeeze(img).numpy()
-            z = plot_predict(self.agent,dict(image=img,force=frc),self.saveDir,step,obs['image'])
+                img_t = i2i_transfer.gen_G(tf.expand_dims(tf.convert_to_tensor(img),0))
+                img_t = tf.squeeze(img).numpy()
+            z,img_r,frc_r = plot_predict(self.agent,dict(image=img_t,force=frc_n),self.saveDir,step,obs['image'])
             act,_ = self.agent.policy(z,training=False)
             actions.append(act)
             r = self.agent.reward(z)
-            obsCache.append(save_environment(env.robot.camARD2,env.robot.ftHook,z,act,r,self.saveDir,step))
-            # print("step",step,"reward",r,"action",act)
+            print("step",step,"reward",r,"action",act)
+            obsCache.append([step,img,img_t,img_r,frc,frc_n,frc_r,z,r,act])
             obs, _, done, _ = env.step(act)
             step += 1
         forceProfile = env.robot.ftHook.trajectory_record()
-        plot_trajectory(forceProfile,obsCache,self.saveDir)
-        print(actions)
-        return env.success, step
-
-class DoorOpenLatentV:
-    def __init__(self,model_dir):
-        self.agent = AgentV((64,64,1),3,4,4)
-        self.agent.load(os.path.join(model_dir,"latentv/z4_4000"))
-        self.saveDir = os.path.join(sys.path[0],"../../dump/test/latentv")
-
-    def run(self,env,i2i_transfer=None,maxStep=50):
-        obsCache, actions = [],[]
-        env.robot.ftHook.reset_trajectory()
-        obs, done, step = env.reset(),False, 0
-        while not done and step < maxStep:
-            img,frc = obs['image'],obs['force']
-            if i2i_transfer:
-                img = i2i_transfer.gen_G(tf.expand_dims(tf.convert_to_tensor(img),0))
-                img = tf.squeeze(img).numpy()
-            z = plot_vision(self.agent,dict(image=img,force=frc),self.saveDir,step)
-            act,_ = self.agent.policy(z,frc,training=False)
-            actions.append(act)
-            r = self.agent.reward(z)
-            obsCache.append(save_environment(env.robot.camARD2,env.robot.ftHook,z,act,r,self.saveDir,step))
-            #print("step",step,"reward",r,"action",act)
-            obs, _, done, _ = env.step(act)
-            step += 1
-        forceProfile = env.robot.ftHook.trajectory_record()
-        plot_trajectory(forceProfile,obsCache,self.saveDir)
-        #print(actions)
+        save_trajectory(obsCache,forceProfile,self.saveDir)
+        # print(actions)
         return env.success, step
 
 """

@@ -6,9 +6,11 @@ import numpy as np
 from robot.mrobot import MRobot
 import tensorflow as tf
 from robot.detection import ObjectDetection
-from agent.ppo import PPO
+from agent.latent import Agent
+from agent.gan import CycleGAN
 from tensorflow_probability import distributions as tfpd
 from navigation import *
+from train.utility import *
 
 class ApproachTask:
     def __init__(self, robot, yolo_dir):
@@ -167,10 +169,14 @@ class UnlatchTask:
         return True
 
 class PullingTask:
-    def __init__(self, robot, policy_dir):
+    def __init__(self, robot, policy_dir, env_name=None):
         self.robot = robot
-        self.model = PPO((64,64,1),3,4)
-        self.model.load(os.path.join(policy_dir,'pi_net/5000'))
+        self.saveDir = os.path.join(sys.path[0],"../dump/test/sim")
+        self.i2i = None if env_name is None else CycleGAN(image_shape=(64,64,1))
+        if self.i2i is not None:
+            self.i2i.load(os.path.join(policy_dir,"gan",env_name))
+        self.agent = Agent((64,64,1),3,4,4)
+        self.agent.load(os.path.join(policy_dir,"latent/z4_4000"))
         self.openAngle = 0.45*np.pi # 81 degree
 
     def get_action(self,idx):
@@ -179,32 +185,42 @@ class PullingTask:
         return act_list[idx]
 
     def perform(self, max_steps=30):
-        opened, step = False, 0
-        while not opened and step < max_steps:
-            cv.imshow("up",self.robot.camARD2.color_image())
-            cv.waitKey(1)
-            image = self.robot.camARD2.grey_arr((64,64))
-            force = self.robot.hook_forces()
-            print(force)
-            obs = dict(image=image,force=force/np.linalg.norm(force))
-            action, _ = self.model.policy(obs)
-            act = self.get_action(action)
-            print(act)
-            self.robot.move(act[0],act[1])
+        self.pulling()
+        return True
+
+    def pulling(self, max_step=50):
+        step, obsCache, opened, failed = 0, [], False, False
+        self.robot.ftHook.reset_trajectory()
+        img = self.robot.camARD2.grey_arr((64,64))
+        frc = self.robot.hook_forces(record=None)
+        while not opened and step < max_step:
+            img_t = img
+            if self.i2i is not None:
+                img_t = self.i2i.gen_G(tf.expand_dims(tf.convert_to_tensor(img),0))
+                img_t = tf.squeeze(img_t).numpy()
+            frc_n = frc/np.linalg.norm(frc)
+            z,img_r,frc_r = plot_predict(self.agent,dict(image=img_t,force=frc_n),self.saveDir,step,img)
+            r = self.agent.reward(z)
+            act, _ = self.agent.policy(z,training=False)
+            print("step",step,"action",act,"reward",r)
+            obsCache.append([step,img,img_t,img_r,frc,frc_n,frc_r,z,r,act])
+            vx,vz = self.get_action(act)
+            self.robot.ftHook.reset_step()
+            self.robot.move(vx,vz)
             rospy.sleep(0.5)
-            angle = self.robot.poseSensor.door_angle()
-            failed = angle == 0
-            opened = angle > self.openAngle
-            if failed or opened:
-                break
+            frc = self.robot.hook_forces(record=np.array(self.robot.ftHook.step_record()))
+            self.robot.stop()
+            img = self.robot.camARD1.grey_arr((64,64))
             step += 1
+            angle = self.robot.poseSensor.door_angle()
+            opened = angle > self.openAngle
         self.robot.stop()
+        forceProfile = self.robot.ftHook.trajectory_record()
         if opened:
-            print("=== door is pulled open.")
-            return True
+            save_trajectory(obsCache,forceProfile,self.saveDir)
+            print("door is pulled open.")
         else:
-            print("=== door is not pulled open.")
-            return False
+            print("fail to pull the door open.")
 
 """
 Door opening task
@@ -249,7 +265,7 @@ if __name__ == "__main__":
 
     robot = MRobot()
     yolo_dir = os.path.join(sys.path[0],'policy/detection/yolo')
-    policy_dir = os.path.join(sys.path[0],"policy/pulling/force_vision")
+    policy_dir = os.path.join(sys.path[0],"policy/pulling")
     task = DoorOpeningTask(robot,yolo_dir,policy_dir)
     task.prepare()
     nav = BasicNavigator(robot)
