@@ -20,9 +20,9 @@ def plot_force_profile(data):
     time = np.arange(0,len(data.index))/100
     subset = args.scale*data[['0','1','2']]#.iloc[-200:]
     fig = go.Figure()
-    fig.add_trace(go.Scatter(x=time,y=subset["0"], name="X",mode='lines', marker=dict(size=10,color="#0075DC"),showlegend=True))
-    fig.add_trace(go.Scatter(x=time,y=subset["1"], name="Y",mode='lines', marker=dict(size=10,color="#FFA405"),showlegend=True))
-    fig.add_trace(go.Scatter(x=time,y=subset["2"], name='Z',mode='lines', marker=dict(size=10,color="#FF0180"),showlegend=True))
+    fig.add_trace(go.Scatter(x=time,y=subset["0"], name="X",mode='lines', marker=dict(size=10,color="#FF0000"),showlegend=True))
+    fig.add_trace(go.Scatter(x=time,y=subset["1"], name="Y",mode='lines', marker=dict(size=10,color="#008000"),showlegend=True))
+    fig.add_trace(go.Scatter(x=time,y=subset["2"], name='Z',mode='lines', marker=dict(size=10,color="#0000FF"),showlegend=True))
     fig.update_layout(
         title="Forces Profile of Self-Closing Door Pulling",
         yaxis=dict(range=[-60,60]),

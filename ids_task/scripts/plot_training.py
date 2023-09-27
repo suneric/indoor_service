@@ -51,26 +51,26 @@ if __name__ == "__main__":
         policy_dir = os.path.join(sys.path[0],"policy/pulling")
         data_list = get_door_open_training_data(policy_dir)
 
-    #color_list = ['#0075DC','#191919','#00998F','#50EBEC','#FFA405','#FF0180']
-    color_list = ['#0075DC','#FFA405','#FF0180']
+    #color_list = ['#0075DC','#191919','#00998F','#50EBEC','#FFA405','#FF0180','#A52A2A','#008000','#00008B']
+    color_list = ['#0000FF','#000000','#FF0000']
     fig = go.Figure()
     for i in range(len(data_list)):
         policy, record = data_list[i][0], data_list[i][1]
-        fig.add_trace(go.Scatter(x = record['Step'], y = smoothExponential(record['Value'],0.99),name=policy, marker=dict(color=color_list[i])))
+        fig.add_trace(go.Scatter(x = record['Step'], y = smoothExponential(record['Value'],0.995),name=policy, marker=dict(color=color_list[i])))
 
     fig.update_layout(
         title="Door Pulling Training Performance",
-        xaxis_title="Episodes",
+        xaxis_title="Episode",
         yaxis_title="Total Reward",
-        legend_title="Policies",
+        legend_title="Policy",
         legend=dict(
-            x=0.6,
+            x=0.7,
             y=0.1,
             traceorder="normal",
         ),
         font=dict(
             family="Arial",
-            size=20,
+            size=18,
             color="Black"
         ),
         plot_bgcolor="rgb(255,255,255)",

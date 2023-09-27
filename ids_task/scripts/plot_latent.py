@@ -42,17 +42,17 @@ def plot_comparison(exp,sim):
     steps = len(exp)
     x = np.array(range(1,steps+1))
     fig = make_subplots(rows=4,cols=1)
-    fig.append_trace(go.Scatter(x=x,y=exp[:,0], name="Simulation",mode='lines+markers', marker=dict(size=10,color="#FF0180"),showlegend=True), row=1,col=1)
-    fig.append_trace(go.Scatter(x=x,y=sim[:,0], name="Reality", mode='lines+markers', marker=dict(size=10,color="#0075DC"),showlegend=True), row=1,col=1)
+    fig.append_trace(go.Scatter(x=x,y=exp[:,0], name="Simulation",mode='lines+markers', marker=dict(size=10,color="#0075DC"),showlegend=True), row=1,col=1)
+    fig.append_trace(go.Scatter(x=x,y=sim[:,0], name="Reality", mode='lines+markers', marker=dict(size=10,color="#FF0000"),showlegend=True), row=1,col=1)
     fig['layout']['yaxis']['title'] = 'Dim 1'
-    fig.append_trace(go.Scatter(x=x,y=exp[:,1], mode='lines+markers', marker=dict(size=10,color="#FF0180"),showlegend=False), row=2,col=1)
-    fig.append_trace(go.Scatter(x=x,y=sim[:,1], mode='lines+markers', marker=dict(size=10,color="#0075DC"),showlegend=False), row=2,col=1)
+    fig.append_trace(go.Scatter(x=x,y=exp[:,1], mode='lines+markers', marker=dict(size=10,color="#0075DC"),showlegend=False), row=2,col=1)
+    fig.append_trace(go.Scatter(x=x,y=sim[:,1], mode='lines+markers', marker=dict(size=10,color="#FF0000"),showlegend=False), row=2,col=1)
     fig['layout']['yaxis2']['title'] = 'Dim 2'
-    fig.append_trace(go.Scatter(x=x,y=exp[:,2], mode='lines+markers', marker=dict(size=10,color="#FF0180"),showlegend=False), row=3,col=1)
-    fig.append_trace(go.Scatter(x=x,y=sim[:,2], mode='lines+markers', marker=dict(size=10,color="#0075DC"),showlegend=False), row=3,col=1)
+    fig.append_trace(go.Scatter(x=x,y=exp[:,2], mode='lines+markers', marker=dict(size=10,color="#0075DC"),showlegend=False), row=3,col=1)
+    fig.append_trace(go.Scatter(x=x,y=sim[:,2], mode='lines+markers', marker=dict(size=10,color="#FF0000"),showlegend=False), row=3,col=1)
     fig['layout']['yaxis3']['title'] = 'Dim 3'
-    fig.append_trace(go.Scatter(x=x,y=exp[:,3], mode='lines+markers', marker=dict(size=10,color="#FF0180"),showlegend=False), row=4,col=1)
-    fig.append_trace(go.Scatter(x=x,y=sim[:,3], mode='lines+markers', marker=dict(size=10,color="#0075DC"),showlegend=False), row=4,col=1)
+    fig.append_trace(go.Scatter(x=x,y=exp[:,3], mode='lines+markers', marker=dict(size=10,color="#0075DC"),showlegend=False), row=4,col=1)
+    fig.append_trace(go.Scatter(x=x,y=sim[:,3], mode='lines+markers', marker=dict(size=10,color="#FF0000"),showlegend=False), row=4,col=1)
     fig['layout']['yaxis4']['title'] = 'Dim 4'
     fig['layout']['xaxis4']['title'] = 'Step'
     fig.update_layout(
