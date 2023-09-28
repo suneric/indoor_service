@@ -166,7 +166,7 @@ class InsertTask:
         self.robot = robot
         self.ardDetect = ObjectDetection(robot.camARD1,yolo_dir,scale=1.0,wantDepth=False)
         self.model = DQN(image_shape=(64,64,1),force_dim=3,action_dim=8,joint_dim=2)
-        self.model.load(os.path.join(policy_dir,'q_net/4500'))
+        self.model.load(os.path.join(policy_dir,'q_net/10000'))
         self.socketIdx = socketIdx
         self.bumper = BumpSensor()
 
@@ -322,8 +322,8 @@ if __name__ == "__main__":
     policy_dir = os.path.join(sys.path[0],"policy/plugin/binary")
     task = AutoChargeTask(robot,yolo_dir,policy_dir)
     task.prepare()
-    # nav = BasicNavigator(robot)
-    # nav.move2goal(create_goal(1.63497,1.8,np.pi/2))
+    nav = BasicNavigator(robot)
+    nav.move2goal(create_goal(1.63497,1.8,np.pi/2))
     success = task.perform()
     if success:
         robot.stop()

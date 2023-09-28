@@ -12,6 +12,12 @@ from train.utility import *
 import pandas as pd
 import csv
 
+INITRANDOM=[[0.258719  , 0.07330626, 0.56610852, 0.10443285],
+       [0.72057792, 0.02188886, 0.39296127, 0.71869116],
+       [0.23565716, 0.92488682, 0.24357932, 0.19219257],
+       [0.97820297, 0.05302753, 0.72604936, 0.964616  ],
+       [0.03914569, 0.50547175, 0.54326453, 0.15077354]]
+
 """
 TEST socket plug
 """
@@ -23,6 +29,7 @@ class PlugingTest:
 
     def load_model(self,policy,index):
         if policy != 'random':
+            #model_path = os.path.join(sys.path[0],"../../saved_models/auto_charge/dqn/baseline/q_net",str(index))
             model_path = os.path.join(sys.path[0],"../policy/plugin",policy,"q_net",str(index))
             print("load model from", model_path)
             agent = DQN((64,64,1),3,8,2)
@@ -64,6 +71,7 @@ def run_plug_test(env, policy, index, target, init_rads):
     data_dir = os.path.join(sys.path[0],'../../dump',policy+'_'+str(target))
     if not os.path.exists(data_dir):
         os.mkdir(data_dir)
+    #init_rads = INITRANDOM
     try_count = len(init_rads)
     test = PlugingTest(env,policy,index)
     success_steps, results = [],[]
@@ -99,7 +107,7 @@ def get_args():
 if __name__ == '__main__':
     args = get_args()
     rospy.init_node('plug_test', anonymous=True)
-    indices = [10000,9950,9900,9850,9800,9750,9700,9650,9600,9550,9500] if args.index is None else args.index
+    indices = [10000,9950,9900,9850,9800,9750,9700,9650,9600,9550,9500] if args.index is None else [args.index]
     policies = ['binary','greyscale','blind','random'] if args.policy is None else [args.policy]
     yolo_dir = os.path.join(sys.path[0],'../policy/detection/yolo')
     model_dir = os.path.join(sys.path[0],"policy/plugin/")

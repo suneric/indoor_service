@@ -69,7 +69,7 @@ INITRANDOM = [[3.24664058e-01, 6.79799544e-01, 5.81612962e-01],
 class DoorOpenPPO:
     def __init__(self,model_dir):
         self.agent = PPO((64,64,1),3,4)
-        self.agent.load(os.path.join(model_dir,"ppo/pi/4000"))
+        self.agent.load(os.path.join(model_dir,"pi_net/4000"))
 
     def run(self,env,i2i_transfer=None,maxStep=50):
         obs, done, step = env.reset(),False, 0
@@ -175,7 +175,9 @@ if __name__ == '__main__':
     args = get_args()
     rospy.init_node('door_pull_test', anonymous=True)
     policies = ['ppo','latent','latentv'] if args.policy is None else [args.policy]
+    #model_dir = os.path.join(sys.path[0],"../../saved_models/door_open/ppo/4000")
     model_dir = os.path.join(sys.path[0],"../policy/pulling/")
+    print(model_dir)
     env = DoorOpenEnv(continuous=False,door_length=args.length,type=args.type,name='jrobot',use_step_force=True,noise_var=args.noise)
     results = run_pulling_test(env,model_dir,policies,args.env)
     print(results)

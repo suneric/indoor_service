@@ -11,7 +11,7 @@
   <!--frame 3DOF-->
   <xacro:include filename="$(find ids_description)/urdf/frame.urdf.xacro" />
   <xacro:frame_macro parent="link_fbumper">
-    <origin xyz="-0.11 0 0.15" rpy="0 0 0"/>
+    <origin xyz="-0.11 0 0.14" rpy="0 0 0"/>
   </xacro:frame_macro>
 
   <!--RGB-D camera, look forward-->
