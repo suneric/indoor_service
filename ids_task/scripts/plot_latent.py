@@ -56,20 +56,20 @@ def plot_comparison(exp,sim):
     fig['layout']['yaxis4']['title'] = 'Dim 4'
     fig['layout']['xaxis4']['title'] = 'Step'
     fig.update_layout(
-        title="4-Dimensional Latent States of Door Pulling",
+        #title="4-Dimensional Latent States of Door Pulling",
         yaxis=dict(range=[-3,3]),
         yaxis2=dict(range=[-3,3]),
         yaxis3=dict(range=[-3,3]),
         yaxis4=dict(range=[-3,3]),
         legend_title="Environment",
         legend=dict(
-            x=0.8,
+            x=0.7,
             y=1.2,
             traceorder="normal",
         ),
         font=dict(
             family="Arial",
-            size=18,
+            size=22,
             color="Black"
         ),
         plot_bgcolor="rgb(255,255,255)",

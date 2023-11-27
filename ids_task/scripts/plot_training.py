@@ -44,22 +44,37 @@ def get_door_open_training_data(dir):
     print("found {} records".format(len(data_list)))
     return data_list
 
+def get_auto_charge_training_data(dir):
+    data_list = []
+    for policy in os.listdir(dir):
+        policy_file = os.path.join(dir,policy)
+        if os.path.isdir(policy_file):
+            continue
+        train_record = pd.read_csv(policy_file)
+        policy_name = os.path.splitext(policy)[0]
+        data_list.append((policy_name, train_record))
+    print("found {} records".format(len(data_list)))
+    return data_list
+
 if __name__ == "__main__":
     args = get_args()
     data_list = []
     if args.task == 'door_open':
         policy_dir = os.path.join(sys.path[0],"policy/pulling")
         data_list = get_door_open_training_data(policy_dir)
+    elif args.task == 'auto_charge':
+        policy_dir = os.path.join(sys.path[0],"policy/plugin")
+        data_list = get_auto_charge_training_data(policy_dir)
 
     #color_list = ['#0075DC','#191919','#00998F','#50EBEC','#FFA405','#FF0180','#A52A2A','#008000','#00008B']
     color_list = ['#0000FF','#000000','#FF0000']
     fig = go.Figure()
     for i in range(len(data_list)):
         policy, record = data_list[i][0], data_list[i][1]
-        fig.add_trace(go.Scatter(x = record['Step'], y = smoothExponential(record['Value'],0.995),name=policy, marker=dict(color=color_list[i])))
+        fig.add_trace(go.Scatter(x = record['Step'], y = smoothExponential(record['Value'],0.99),name=policy, marker=dict(color=color_list[i])))
 
     fig.update_layout(
-        title="Door Pulling Training Performance",
+        #title="Door Pulling Training Performance",
         xaxis_title="Episode",
         yaxis_title="Total Reward",
         legend_title="Policy",
@@ -70,14 +85,14 @@ if __name__ == "__main__":
         ),
         font=dict(
             family="Arial",
-            size=18,
+            size=22,
             color="Black"
         ),
         plot_bgcolor="rgb(255,255,255)",
         xaxis = dict(
         tickmode = 'array',
-        tickvals = [1000, 2000, 3000, 3999],
-        ticktext = ['1K', '2K', '3K', '4K']
+        tickvals = [1000, 2000, 3000, 3999] if args.task == 'door_open' else [1000,2000,3000,4000,5000,6000,7000,8000,9000,9999],
+        ticktext = ['1K', '2K', '3K', '4K'] if args.task == 'door_open' else ['1K','2K','3K','4K','5K','6K','7K','8K','9K','10K'],
         )
     )
     fig.show()

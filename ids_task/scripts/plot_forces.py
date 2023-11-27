@@ -18,33 +18,35 @@ def get_args():
 
 def plot_force_profile(data):
     time = np.arange(0,len(data.index))/100
+    print(time)
     subset = args.scale*data[['0','1','2']]#.iloc[-200:]
     fig = go.Figure()
-    fig.add_trace(go.Scatter(x=time,y=subset["0"], name="X",mode='lines', marker=dict(size=10,color="#FF0000"),showlegend=True))
-    fig.add_trace(go.Scatter(x=time,y=subset["1"], name="Y",mode='lines', marker=dict(size=10,color="#008000"),showlegend=True))
-    fig.add_trace(go.Scatter(x=time,y=subset["2"], name='Z',mode='lines', marker=dict(size=10,color="#0000FF"),showlegend=True))
+    fig.add_trace(go.Scatter(x=time,y=subset["0"], name="x",mode='lines', marker=dict(size=10,color="#FF0000"),showlegend=True))
+    fig.add_trace(go.Scatter(x=time,y=subset["1"], name="y",mode='lines', marker=dict(size=10,color="#008000"),showlegend=True))
+    fig.add_trace(go.Scatter(x=time,y=subset["2"], name='z',mode='lines', marker=dict(size=10,color="#0000FF"),showlegend=True))
     fig.update_layout(
-        title="Forces Profile of Self-Closing Door Pulling",
-        yaxis=dict(range=[-60,60]),
-        yaxis2=dict(range=[-60,60]),
-        yaxis3=dict(range=[-60,60]),
+        #title="Forces Profile of Self-Closing Door Pulling",
+        yaxis=dict(range=[-50,30]), # (range=[-60,60]) for door_open
+        yaxis2=dict(range=[-50,30]),
+        yaxis3=dict(range=[-50,30]),
         xaxis_title="Time (s)",
         yaxis_title="Force (N)",
         legend_title="Axis",
         legend=dict(
-            x=0.9,
-            y=1.2,
+            x=0.8,
+            y=1.0,
             traceorder="normal",
         ),
         font=dict(
             family="Arial",
-            size=18,
+            size=22,
             color="Black"
         ),
         plot_bgcolor="rgb(255,255,255)",
         xaxis = dict(
         tickmode = 'array',
-        tickvals = [5,10,15,20,25,30,35,40],
+        tickvals = [2,4,6,8,10,12,14,16], # for auto_charge
+        # tickvals = [5,10,15,17,20,25,30,35,40], # for door_open
         )
     )
     fig.show()
@@ -57,7 +59,7 @@ def plot_step_forces(data,normalized=False):
     fig.add_trace(go.Scatter(x=x,y=data[:,1], name="Y",mode='lines', marker=dict(size=10,color="#FFA405"),showlegend=True))
     fig.add_trace(go.Scatter(x=x,y=data[:,2], name='Z',mode='lines', marker=dict(size=10,color="#FF0180"),showlegend=True))
     fig.update_layout(
-        title="3-Axis Forces (Normalized) of Door Pulling" if normalized else "3-Axis Forces of Door Pulling",
+        #title="3-Axis Forces (Normalized) of Door Pulling" if normalized else "3-Axis Forces of Door Pulling",
         yaxis=dict(range=[-1,1]),
         yaxis2=dict(range=[-1,1]),
         yaxis3=dict(range=[-1,1]),
@@ -94,7 +96,7 @@ def plot_force_comparison(exp,sim,normalized=False):
     fig['layout']['yaxis3']['title'] = 'Z Force (N)'
     fig['layout']['xaxis3']['title'] = 'Step'
     fig.update_layout(
-        title="3-Axis Forces (Normalized) of Door Pulling" if normalized else "3-Axis Forces of Door Pulling",
+        #title="3-Axis Forces (Normalized) of Door Pulling" if normalized else "3-Axis Forces of Door Pulling",
         yaxis=dict(range=[-50,50]),
         yaxis2=dict(range=[-50,50]),
         yaxis3=dict(range=[-50,50]),
@@ -115,7 +117,7 @@ def plot_force_comparison(exp,sim,normalized=False):
 
 if __name__ == '__main__':
     args = get_args()
-    collection_dir = os.path.join(sys.path[0],"../dump/test/")
+    collection_dir = os.path.join(sys.path[0],"../dump/test")
     normalized = args.normalized == 1
     if args.profile is not None:
         file = os.path.join(collection_dir,args.profile)
