@@ -157,7 +157,7 @@
 
       <!--hook for door opening-->
       <joint name="joint_frame_hook" type="revolute">
-        <origin xyz="0.31 -0.23 0.05" rpy="0 0 0"/>
+        <origin xyz="0.165 -0.23 0.05" rpy="0 0 0"/>
         <parent link="link_frame"/>
         <child link="link_hook"/>
         <axis xyz="0 -1 0"/>
@@ -165,13 +165,13 @@
       </joint>
       <link name="link_hook">
         <visual>
-          <origin rpy="0 0 0" xyz="0 0 0"/>
+          <origin rpy="0 0 0" xyz="0.145 0 0"/>
           <geometry>
             <box size="0.4 0.02 0.01"/>
           </geometry>
         </visual>
         <collision>
-          <origin rpy="0 0 0" xyz="0 0 0"/>
+          <origin rpy="0 0 0" xyz="0.145 0 0"/>
           <geometry>
             <box size="0.4 0.02 0.01"/>
           </geometry>
@@ -192,7 +192,7 @@
       </link>
 
       <joint name="joint_hook_tip" type="fixed">
-        <origin xyz="0.2 0 0" rpy="0 0 0"/>
+        <origin xyz="0.345 0 0" rpy="0 0 0"/>
         <parent link="link_hook"/>
         <child link="link_tip"/>
       </joint>
