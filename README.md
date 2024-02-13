@@ -20,3 +20,10 @@ This is a simulation of a mobile robot for performing indoor service, including 
 5. ids_joy
 6. ids_learning
 7. ids_task
+
+## For a new environment
+1. collect 200~300 samples (```python3 door_open_collect.py --simulation [0|1] --type [left|right]```)
+2. image_transfer training (```python3 image_transfer.py --env [none|specific env name] --size [200~300] --iter [300~100] --validate [0|1]```)
+3. test the trained policy
+  - simulation (```python3 door_open_test.py --policy [latent|latentv|ppo|none] --type [left|right]```)
+  - experiment (```python3 door_open_experiment.py```)

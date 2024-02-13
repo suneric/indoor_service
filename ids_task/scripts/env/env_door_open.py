@@ -11,6 +11,7 @@ import tf.transformations as tft
 from .gym_gazebo import GymGazeboEnv
 from robot.mrobot import MRobot
 from robot.sensors import PoseSensor
+import cv2 as cv
 
 register(
   id='DoorOpen-v0',
@@ -81,6 +82,9 @@ class DoorOpenEnv(GymGazeboEnv):
         step_force = np.array(self.robot.ftHook.step_record()) if self.use_step_force else None
         self.obs_image = self.robot.camARD2.grey_arr((64,64),noise_var=self.cam_noise)
         self.obs_force = self.robot.hook_forces(record=step_force)
+        cv.imshow(self.type,self.obs_image)
+        cv.waitKey(1)
+        print("detect forces", self.obs_force)
         if self.type == "left":
             self.obs_image = np.fliplr(self.obs_image)
             self.obs_force[1] = -self.obs_force[1]
@@ -143,7 +147,7 @@ class DoorOpenEnv(GymGazeboEnv):
             return self.curr_angle < -0.45*np.pi
 
     def get_action(self, action):
-        vx, vz = 2.0, 2*np.pi # scale of linear and angular velocity
+        vx, vz = 1.0, 2*np.pi # scale of linear and angular velocity
         if self.continuous:
             # a discrete continuous space [[~-1.0],[~-0.5*pi]], [[1.0~],[0.5*pi~]]
             act_x = (np.sign(action[0])+action[0])*vx
@@ -178,7 +182,8 @@ class DoorOpenEnv(GymGazeboEnv):
         theta = 0.1*np.pi*(rad[2]-0.5) + np.pi if self.type =="right" else 0.0
         rx,ry,rt = self.robot_init_pose(cx,cy,theta)
         self.robot.reset_robot(rx,ry,rt)
-        self.robot.reset_joints(vpos=0.75,hpos=0.13,spos=0,ppos=0)
+        hpos=0.13 if self.type == "right" else -0.13
+        self.robot.reset_joints(vpos=0.75,hpos=hpos,spos=0,ppos=0)
         self.robot.reset_ft_sensors()
         return True
 

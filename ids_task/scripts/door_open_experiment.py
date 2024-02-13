@@ -142,8 +142,7 @@ class ApproachTask:
         self.robot.stop()
         return True
 
-
-
+# right sidebar pulling a right swing door
 class PullingTask:
     def __init__(self, robot, policy_dir):
         self.robot = robot
@@ -209,14 +208,99 @@ class PullingTask:
         forceProfile = self.robot.ftHook.trajectory_record()
         save_trajectory(obsCache,forceProfile,self.saveDir)
 
+# left sidebar pulling a left swing door
+class PullingLeftTask:
+    def __init__(self, robot, policy_dir):
+        self.robot = robot
+        self.saveDir = os.path.join(sys.path[0],"../dump/test/exp_l")
+        self.i2i = CycleGAN(image_shape=(64,64,1))
+        self.i2i.load(os.path.join(policy_dir,"gan/exp_l"))
+        self.agent = Agent((64,64,1),3,4,4)
+        self.agent.load(os.path.join(policy_dir,"latent/z4_4000"))
+
+    def get_action(self,action):
+        vx, vz = 0.7, 0.5*np.pi
+        act_list = [(vx,0.0),(0,vz),(0,-vz),(-vx,0)]
+        return act_list[action]
+
+    def perform(self):
+        self.pulling()
+        return True
+
+    def step_action(self,img,frc,action,obsCache,step):
+        img = np.fliplr(img)
+        frc[1] = -frc[1]
+        frc[2] = -frc[2]
+        img_t = self.i2i.gen_G(tf.expand_dims(tf.convert_to_tensor(img),0))
+        img_t = tf.squeeze(img_t).numpy()
+        frc_n = frc/np.linalg.norm(frc)
+        z,img_r,frc_r = plot_predict(self.agent,dict(image=img_t,force=frc_n),self.saveDir,step,img)
+        r = self.agent.reward(z)
+        act, _ = self.agent.policy(z,training=False)
+        print("step",step,"action",act,"reward",r)
+        obsCache.append([step,img,img_t,img_r,frc,frc_n,frc_r,z,r,act])
+        print("step {}, change action from {} to {}".format(step,act,action))
+        vx,vz = self.get_action(action)
+        self.robot.move(vx,vz)
+        rospy.sleep(0.5)
+        frc = self.robot.hook_forces(record=np.array(self.robot.ftHook.step_record()))
+        self.robot.stop()
+        rospy.sleep(1.0)
+        img = self.robot.camARD1.grey_arr((64,64))
+        return img,frc,step+1
+
+    """
+    pull self-closing door using agent with encoding observation into latent space
+    """
+    def pulling(self, max_step=30):
+        step, obsCache, r = 0, [], 0
+        self.robot.ftHook.reset_trajectory()
+        img = self.robot.camARD1.grey_arr((64,64))
+        frc = self.robot.hook_forces(record=None)
+        while step < max_step and r < 8:
+            img = np.fliplr(img)
+            frc[1] = -frc[1]
+            frc[2] = -frc[2]
+
+            img_t = self.i2i.gen_G(tf.expand_dims(tf.convert_to_tensor(img),0))
+            img_t = tf.squeeze(img_t).numpy()
+            frc_n = frc/np.linalg.norm(frc)
+            z,img_r,frc_r = plot_predict(self.agent,dict(image=img_t,force=frc_n),self.saveDir,step,img)
+            r = self.agent.reward(z)
+            act, _ = self.agent.policy(z,training=False)
+            print("step",step,"action",act,"reward",r)
+            obsCache.append([step,img,img_t,img_r,frc,frc_n,frc_r,z,r,act])
+            if r < 2 and step < 4: # pull back for the first two
+                print("step {}, change action from {} to 3".format(step,act))
+                act = 3
+            vx,vz = self.get_action(act)
+            self.robot.ftHook.reset_step()
+            self.robot.move(vx,vz)
+            rospy.sleep(0.5)
+            frc = self.robot.hook_forces(record=np.array(self.robot.ftHook.step_record()))
+            self.robot.stop()
+            rospy.sleep(1.0)
+            img = self.robot.camARD1.grey_arr((64,64))
+            step += 1
+
+        # continue to push
+        img,frc,step = self.step_action(img,frc,2,obsCache,step)
+        img,frc,step = self.step_action(img,frc,2,obsCache,step)
+        img,frc,step = self.step_action(img,frc,0,obsCache,step)
+
+        self.robot.stop()
+        forceProfile = self.robot.ftHook.trajectory_record()
+        save_trajectory(obsCache,forceProfile,self.saveDir)
+
 """
 Real Robot Door Open Task
 """
 class JazzyDoorOpen:
     def __init__(self, robot, yolo_dir, policy_dir):
         self.robot = robot
-        self.approach = ApproachTask(robot,yolo_dir)
+        #self.approach = ApproachTask(robot,yolo_dir)
         #self.pulling = PullingTask(robot,policy_dir)
+        self.pulling = PullingLeftTask(robot,policy_dir)
 
     def prepare(self):
         self.robot.terminate()
@@ -232,13 +316,14 @@ class JazzyDoorOpen:
         print("== door open completed.")
 
     def perform(self):
-        print("== prepare for door pulling.")
-        success = self.approach.perform()
-        if not success:
-            return False
-        # success = self.pulling.perform()
+        # print("== prepare for door pulling.")
+        # success = self.approach.perform()
         # if not success:
         #     return False
+        rospy.sleep(5.0)
+        success = self.pulling.perform()
+        if not success:
+            return False
         return True
 
 if __name__ == "__main__":

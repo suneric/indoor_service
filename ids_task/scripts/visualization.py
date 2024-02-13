@@ -36,6 +36,7 @@ class Visualizer:
                 # fig.suptitle("Sensor Information {:.2f} s".format(time.time()-start))
                 img = self.camera.color_image((400,400),code='rgb')
                 if img is not None:
+                    img = np.fliplr(img)
                     cam.imshow(img)
                 profile = self.loadcell.profile(size=1000)
                 # print(self.loadcell.forces())
@@ -57,6 +58,7 @@ class Visualizer:
         cam.set_xticks([])
         cam.set_yticks([])
         if image is not None:
+            image = np.fliplr(image)
             cam.imshow(image)
         forces = self.loadcell.profile(size=1000)
         frc = fig.add_subplot(gs[1])
