@@ -38,21 +38,25 @@ def plot_latent(latent):
     dim3.plot(x,latent[:,3],'b-',marker='o')
     plt.show()
 
-def plot_comparison(exp,sim):
+def plot_comparison(exp,expl,sim):
     steps = len(exp)
     x = np.array(range(1,steps+1))
     fig = make_subplots(rows=4,cols=1)
-    fig.append_trace(go.Scatter(x=x,y=exp[:,0], name="Simulation",mode='lines+markers', marker=dict(size=10,color="#0075DC"),showlegend=True), row=1,col=1)
-    fig.append_trace(go.Scatter(x=x,y=sim[:,0], name="Reality", mode='lines+markers', marker=dict(size=10,color="#FF0000"),showlegend=True), row=1,col=1)
+    fig.append_trace(go.Scatter(x=x,y=exp[:,0], name="Simulation (right-hand swinging door)",mode='lines+markers', marker=dict(size=10,color="#0075DC"),showlegend=True), row=1,col=1)
+    fig.append_trace(go.Scatter(x=x,y=sim[:,0], name="Reality (right-hand swinging door)", mode='lines+markers', marker=dict(size=10,color="#FF0000"),showlegend=True), row=1,col=1)
+    fig.append_trace(go.Scatter(x=x,y=expl[:,0], name="Reality (left-hand swinging door)", mode='lines+markers', marker=dict(size=10,color="#5b2c6f"),showlegend=True), row=1,col=1)
     fig['layout']['yaxis']['title'] = 'Dim 1'
     fig.append_trace(go.Scatter(x=x,y=exp[:,1], mode='lines+markers', marker=dict(size=10,color="#0075DC"),showlegend=False), row=2,col=1)
     fig.append_trace(go.Scatter(x=x,y=sim[:,1], mode='lines+markers', marker=dict(size=10,color="#FF0000"),showlegend=False), row=2,col=1)
+    fig.append_trace(go.Scatter(x=x,y=expl[:,1], mode='lines+markers', marker=dict(size=10,color="#5b2c6f"),showlegend=False), row=2,col=1)
     fig['layout']['yaxis2']['title'] = 'Dim 2'
     fig.append_trace(go.Scatter(x=x,y=exp[:,2], mode='lines+markers', marker=dict(size=10,color="#0075DC"),showlegend=False), row=3,col=1)
     fig.append_trace(go.Scatter(x=x,y=sim[:,2], mode='lines+markers', marker=dict(size=10,color="#FF0000"),showlegend=False), row=3,col=1)
+    fig.append_trace(go.Scatter(x=x,y=expl[:,2], mode='lines+markers', marker=dict(size=10,color="#5b2c6f"),showlegend=False), row=3,col=1)
     fig['layout']['yaxis3']['title'] = 'Dim 3'
     fig.append_trace(go.Scatter(x=x,y=exp[:,3], mode='lines+markers', marker=dict(size=10,color="#0075DC"),showlegend=False), row=4,col=1)
     fig.append_trace(go.Scatter(x=x,y=sim[:,3], mode='lines+markers', marker=dict(size=10,color="#FF0000"),showlegend=False), row=4,col=1)
+    fig.append_trace(go.Scatter(x=x,y=expl[:,3], mode='lines+markers', marker=dict(size=10,color="#5b2c6f"),showlegend=False), row=4,col=1)
     fig['layout']['yaxis4']['title'] = 'Dim 4'
     fig['layout']['xaxis4']['title'] = 'Step'
     fig.update_layout(
@@ -63,7 +67,7 @@ def plot_comparison(exp,sim):
         yaxis4=dict(range=[-3,3]),
         legend_title="Environment",
         legend=dict(
-            x=0.7,
+            x=0.5,
             y=1.2,
             traceorder="normal",
         ),
@@ -73,6 +77,10 @@ def plot_comparison(exp,sim):
             color="Black"
         ),
         plot_bgcolor="rgb(255,255,255)",
+        xaxis = dict(
+        tickmode = 'array',
+        tickvals = [5,10,15,20,25]
+        )
     )
     fig.show()
 
@@ -84,8 +92,10 @@ if __name__ == '__main__':
         latent = data["latent"]
         plot_latent(latent)
     else:
+        expl = load_trajectory(os.path.join(collection_dir,'exp_l',"trajectory.csv"))
         exp = load_trajectory(os.path.join(collection_dir,'exp',"trajectory.csv"))
         sim = load_trajectory(os.path.join(collection_dir,'sim',"trajectory.csv"))
+        expl_latent = expl["latent"]
         exp_latent = exp["latent"]
         sim_latent = sim["latent"]
-        plot_comparison(exp_latent,sim_latent)
+        plot_comparison(exp_latent,expl_latent,sim_latent)

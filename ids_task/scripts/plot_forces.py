@@ -8,33 +8,25 @@ import argparse
 import pandas as pd
 from train.utility import load_trajectory
 
-def get_args():
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--profile', type=str, default=None)
-    parser.add_argument('--scale', type=int, default=1)
-    parser.add_argument('--data', type=str, default=None)
-    parser.add_argument('--normalized', type=int, default=0)
-    return parser.parse_args()
-
-def plot_force_profile(data):
+def plot_force_profile(data, reverse_y):
     time = np.arange(0,len(data.index))/100
     print(time)
     subset = args.scale*data[['0','1','2']]#.iloc[-200:]
     fig = go.Figure()
     fig.add_trace(go.Scatter(x=time,y=subset["0"], name="x",mode='lines', marker=dict(size=10,color="#FF0000"),showlegend=True))
-    fig.add_trace(go.Scatter(x=time,y=subset["1"], name="y",mode='lines', marker=dict(size=10,color="#008000"),showlegend=True))
+    fig.add_trace(go.Scatter(x=time,y=-subset["1"] if reverse_y==1 else subset["1"], name="y",mode='lines', marker=dict(size=10,color="#008000"),showlegend=True))
     fig.add_trace(go.Scatter(x=time,y=subset["2"], name='z',mode='lines', marker=dict(size=10,color="#0000FF"),showlegend=True))
     fig.update_layout(
         #title="Forces Profile of Self-Closing Door Pulling",
-        yaxis=dict(range=[-50,30]), # (range=[-60,60]) for door_open
-        yaxis2=dict(range=[-50,30]),
-        yaxis3=dict(range=[-50,30]),
+        yaxis=dict(range=[-60,60] if reverse_y else [-60,60]), # (range=[-60,60]) for door_open
+        yaxis2=dict(range=[-60,60] if reverse_y else [-60,60]),
+        yaxis3=dict(range=[-60,60] if reverse_y else [-60,60]),
         xaxis_title="Time (s)",
         yaxis_title="Force (N)",
         legend_title="Axis",
         legend=dict(
-            x=0.8,
-            y=1.0,
+            x=0.9,
+            y=1.1,
             traceorder="normal",
         ),
         font=dict(
@@ -45,8 +37,8 @@ def plot_force_profile(data):
         plot_bgcolor="rgb(255,255,255)",
         xaxis = dict(
         tickmode = 'array',
-        tickvals = [2,4,6,8,10,12,14,16], # for auto_charge
-        # tickvals = [5,10,15,17,20,25,30,35,40], # for door_open
+        # tickvals = [2,4,6,8,10,12,14,16], # for auto_charge
+        tickvals = [5,10,15,20,25,30,35,40], # for door_open
         )
     )
     fig.show()
@@ -115,6 +107,15 @@ def plot_force_comparison(exp,sim,normalized=False):
     )
     fig.show()
 
+def get_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--profile', type=str, default=None)
+    parser.add_argument('--reverse_y',type=int, default=0)
+    parser.add_argument('--scale', type=float, default=1)
+    parser.add_argument('--data', type=str, default=None)
+    parser.add_argument('--normalized', type=int, default=0)
+    return parser.parse_args()
+
 if __name__ == '__main__':
     args = get_args()
     collection_dir = os.path.join(sys.path[0],"../dump/test")
@@ -122,7 +123,7 @@ if __name__ == '__main__':
     if args.profile is not None:
         file = os.path.join(collection_dir,args.profile)
         data = pd.read_csv(file)
-        plot_force_profile(data)
+        plot_force_profile(data, args.reverse_y)
     else:
         if args.data is not None:
             data = load_trajectory(os.path.join(collection_dir,args.data,"trajectory.csv"))
