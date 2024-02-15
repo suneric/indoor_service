@@ -2,12 +2,23 @@
 
 ## Door Pulling Comparison - with latest trained policies after 4000 episodes
 (```python3 door_open_test.py --policy [latent|latentv|ppo|none] --type [left|right]```)
+with CycleGAN image translation
 50-Test, Success count/average steps of different policies applied in different environments
 | \ | env-0 | env-1 | env-2 | env-3 | env-4 | env-5 | env-6 (2.0 m/s) | env-7 | env-6 (1.0 m/s) |
 | :----: | :----: | :----: | :----: | :----: | :----: | :----: | :----: |:----:| :----: |
 | PPO | 41/28.97 | 41/30.04 | 18/29.66 | 16/23.12 | 6/32.83 | 49/27.06 | 24/30.71 | 9/48.33 | 28/44.43 |
 | Latent-z4 | 49/23.75 | 48/26.68 | 45/26.15 | 50/23.24 | 40/35.85 | 49/23.61 | 38/41.05 | 49/45.67 | 50/37.8|
 | LatentV-z4 | 46/24.96 | 33/26.57 | 42/25.69 | 31/22.61 | 40/37.12 | 39/22.94 | 45/30.28 | 35/46.74 | 50/39.66 |
+
+without CycleGAN image translation
+50-Test, Success count/average steps of different policies applied in different environments
+| \ | env-0 | env-1 | env-2 | env-3 | env-4 | env-5 | env-6 (2.0 m/s) | env-7 |
+| :----: | :----: | :----: | :----: | :----: | :----: | :----: | :----: |:----:|
+| PPO | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| Latent-z4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| LatentV-z4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+
+
 ### Policies
 - PPO
 - Latent PPO (with image to image transfer, 4 latent variables)

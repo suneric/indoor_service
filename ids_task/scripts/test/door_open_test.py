@@ -77,8 +77,8 @@ class DoorOpenPPO:
             img,frc = obs['image'],obs['force']
             if i2i_transfer:
                 img_t = i2i_transfer.gen_G(tf.expand_dims(tf.convert_to_tensor(img),0))
-                img_t = tf.squeeze(img_t).numpy()
-            act,_ = self.agent.policy(dict(image=img_t,force=frc),training=False)
+                img = tf.squeeze(img_t).numpy()
+            act,_ = self.agent.policy(dict(image=img,force=frc),training=False)
             print("step",step,"action",act)
             obs, rew, done, info = env.step(act)
             step += 1
@@ -96,8 +96,8 @@ class DoorOpenLatentV:
             img,frc = obs['image'],obs['force']
             if i2i_transfer:
                 img_t = i2i_transfer.gen_G(tf.expand_dims(tf.convert_to_tensor(img),0))
-                img_t = tf.squeeze(img_t).numpy()
-            z = plot_vision(self.agent,dict(image=img_t,force=frc),self.saveDir,step)
+                img = tf.squeeze(img_t).numpy()
+            z = plot_vision(self.agent,dict(image=img,force=frc),self.saveDir,step)
             act,_ = self.agent.policy(z,frc,training=False)
             print("step",step,"action",act)
             obs, _, done, _ = env.step(act)
@@ -118,13 +118,13 @@ class DoorOpenLatent:
             img,frc = obs['image'],obs['force']
             if i2i_transfer:
                 img_t = i2i_transfer.gen_G(tf.expand_dims(tf.convert_to_tensor(img),0))
-                img_t = tf.squeeze(img_t).numpy()
-            z,img_r,frc_r = plot_predict(self.agent,dict(image=img_t,force=frc),self.saveDir,step,obs['image'])
+                img = tf.squeeze(img_t).numpy()
+            z,img_r,frc_r = plot_predict(self.agent,dict(image=img,force=frc),self.saveDir,step,obs['image'])
             act,_ = self.agent.policy(z,training=False)
             actions.append(act)
             r = self.agent.reward(z)
             print("step",step,"reward",r,"action",act)
-            obsCache.append([step,img,img_t,img_r,frc,frc,frc_r,z,r,act])
+            obsCache.append([step,obs['image'],img,img_r,frc,frc,frc_r,z,r,act])
             obs, _, done, _ = env.step(act)
             step += 1
         forceProfile = env.robot.ftHook.trajectory_record()

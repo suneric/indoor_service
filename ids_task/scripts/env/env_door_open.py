@@ -147,7 +147,7 @@ class DoorOpenEnv(GymGazeboEnv):
             return self.curr_angle < -0.45*np.pi
 
     def get_action(self, action):
-        vx, vz = 1.0, 2*np.pi # scale of linear and angular velocity
+        vx, vz = 2.0, 2*np.pi # scale of linear and angular velocity
         if self.continuous:
             # a discrete continuous space [[~-1.0],[~-0.5*pi]], [[1.0~],[0.5*pi~]]
             act_x = (np.sign(action[0])+action[0])*vx
