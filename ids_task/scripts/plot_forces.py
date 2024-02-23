@@ -13,14 +13,14 @@ def plot_force_profile(data, reverse_y):
     print(time)
     subset = args.scale*data[['0','1','2']]#.iloc[-200:]
     fig = go.Figure()
-    fig.add_trace(go.Scatter(x=time,y=subset["0"], name="x",mode='lines', marker=dict(size=10,color="#FF0000"),showlegend=True))
-    fig.add_trace(go.Scatter(x=time,y=-subset["1"] if reverse_y==1 else subset["1"], name="y",mode='lines', marker=dict(size=10,color="#008000"),showlegend=True))
-    fig.add_trace(go.Scatter(x=time,y=subset["2"], name='z',mode='lines', marker=dict(size=10,color="#0000FF"),showlegend=True))
+    fig.add_trace(go.Scatter(x=time,y=subset["0"]-3.8, name="x",mode='lines', marker=dict(size=10,color="#FF0000"),showlegend=True))
+    fig.add_trace(go.Scatter(x=time,y=-subset["1"]-1.28 if reverse_y==1 else subset["1"], name="y",mode='lines', marker=dict(size=10,color="#008000"),showlegend=True))
+    fig.add_trace(go.Scatter(x=time,y=subset["2"]-1, name='z',mode='lines', marker=dict(size=10,color="#0000FF"),showlegend=True))
     fig.update_layout(
         #title="Forces Profile of Self-Closing Door Pulling",
-        yaxis=dict(range=[-60,60] if reverse_y else [-60,60]), # (range=[-60,60]) for door_open
-        yaxis2=dict(range=[-60,60] if reverse_y else [-60,60]),
-        yaxis3=dict(range=[-60,60] if reverse_y else [-60,60]),
+        yaxis=dict(range=[-60,60] if reverse_y else [-50,50]), # (range=[-60,60]) for door_open
+        yaxis2=dict(range=[-60,60] if reverse_y else [-50,50]),
+        yaxis3=dict(range=[-60,60] if reverse_y else [-50,50]),
         xaxis_title="Time (s)",
         yaxis_title="Force (N)",
         legend_title="Axis",

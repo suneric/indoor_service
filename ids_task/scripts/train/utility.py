@@ -129,21 +129,23 @@ def save_image(file_path, array, binary=True):
 
 def save_trajectory(obsCache,forces,saveDir):
     # [step,img,img_t,img_r,frc,frc_n,frc_r,z,r,act]
-    steps = len(obsCache)
-    data = np.zeros((steps,3*64*64+3*3+4+3),dtype=np.float32)
-    for i in range(steps):
-        data[i][0] = obsCache[i][0] # step
-        data[i][1] = obsCache[i][9] # action
-        data[i][2] = obsCache[i][8] # reward
-        data[i][3:7] = obsCache[i][7] # z
-        data[i][7:10] = obsCache[i][4] # force
-        data[i][10:13] = obsCache[i][5] # normalized force
-        data[i][13:16] = obsCache[i][6] # reconstrcuted force
-        data[i][16:4112] = obsCache[i][1].flatten() # image
-        data[i][4112:8208] = obsCache[i][2].flatten() # translated image
-        data[i][8208:12304] = obsCache[i][3].flatten() # reconstrcuted image
-    pd.DataFrame(data).to_csv(os.path.join(saveDir,"trajectory.csv"))
-    pd.DataFrame(forces).to_csv(os.path.join(saveDir,"force-profile.csv"))
+    if obsCache is not None:
+        steps = len(obsCache)
+        data = np.zeros((steps,3*64*64+3*3+4+3),dtype=np.float32)
+        for i in range(steps):
+            data[i][0] = obsCache[i][0] # step
+            data[i][1] = obsCache[i][9] # action
+            data[i][2] = obsCache[i][8] # reward
+            data[i][3:7] = obsCache[i][7] # z
+            data[i][7:10] = obsCache[i][4] # force
+            data[i][10:13] = obsCache[i][5] # normalized force
+            data[i][13:16] = obsCache[i][6] # reconstrcuted force
+            data[i][16:4112] = obsCache[i][1].flatten() # image
+            data[i][4112:8208] = obsCache[i][2].flatten() # translated image
+            data[i][8208:12304] = obsCache[i][3].flatten() # reconstrcuted image
+        pd.DataFrame(data).to_csv(os.path.join(saveDir,"trajectory.csv"))
+    if forces is not None:
+        pd.DataFrame(forces).to_csv(os.path.join(saveDir,"force-profile.csv"))
 
 def load_trajectory(traj_file):
     data = pd.read_csv(traj_file)

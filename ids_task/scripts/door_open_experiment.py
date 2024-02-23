@@ -15,20 +15,21 @@ class ApproachTask:
     def __init__(self, robot, yolo_dir, target="lever"):
         self.robot = robot
         self.target = target
+        self.saveDir = os.path.join(sys.path[0],"../dump/test/exp")
         self.rsdDetect = ObjectDetection(robot.camRSD,yolo_dir,scale=0.001,wantDepth=True)
         self.speedx = 0.4
         self.speedz = 0.6
 
     def perform(self):
-        print("=== Approaching {}.".format(self.target))
-        success = self.align_position()
-        if not success:
-            print("Fail to align {}.".format(self.target))
-            return False
-        success = self.approach_target()
-        if not success:
-            print("Fail to approch {}.".format(self.target))
-            return False
+        # print("=== Approaching {}.".format(self.target))
+        # success = self.align_position()
+        # if not success:
+        #     print("Fail to align {}.".format(self.target))
+        #     return False
+        # success = self.approach_target()
+        # if not success:
+        #     print("Fail to approch {}.".format(self.target))
+        #     return False
         success = self.unlatch_door()
         if not success:
             print("Faile to unlacth door")
@@ -64,25 +65,39 @@ class ApproachTask:
 
     def unlatch_door(self):
         print("unlatch door")
-        self.robot.move(self.speedx,0.0)
-        rate = rospy.Rate(30)
-        while self.robot.is_safe(max_force=5):
+        self.robot.ftPlug.reset_trajectory() # record forces
+        rate = rospy.Rate(200)
+        self.robot.move(0.8*self.speedx,0.0) # move forward
+        while self.robot.is_safe(max_force=5): # touch door if > 5N
             rate.sleep()
-        self.robot.move(-self.speedx,0.0)
+        self.robot.stop()
+        self.robot.move(-self.speedx,0.0) # move backward
         rospy.sleep(0.5)
         self.robot.stop()
-        rospy.sleep(1.0)
+
+        rate = rospy.Rate(30)
         forces = self.robot.plug_forces()
-        while abs(forces[1]) < 1:
-            print("force {:.2f} N".format(forces[1]))
+        while abs(forces[2]) < 5: # touch door handle
+            print("force {:.2f} N".format(forces[2]))
             self.robot.set_plug_joints(0.0,-5.0)
             rate.sleep()
             forces = self.robot.plug_forces()
-        self.robot.set_plug_joints(0.0,-100.0)
-        rospy.sleep(8.0)
-        self.robot.move(-2*self.speedx,0.0)
-        rospy.sleep(2.0)
+        # keep push down to unlock door
+        count,max_count = 0,12
+        while self.robot.is_safe(max_force=50) and count < max_count:
+            print("force {:.2f} N".format(forces[2]))
+            self.robot.set_plug_joints(0.0,-10.0)
+            rate.sleep()
+            forces = self.robot.plug_forces()
+            count += 1
         self.robot.stop()
+        self.robot.move(-1.5*self.speedx,0.0)
+        rospy.sleep(3.0)
+        self.robot.stop()
+
+        forceProfile = self.robot.ftPlug.trajectory_record()
+        save_trajectory(None,forceProfile,self.saveDir)
+
         return True
 
     def align_detection(self, speedz, target=5):
@@ -298,9 +313,9 @@ Real Robot Door Open Task
 class JazzyDoorOpen:
     def __init__(self, robot, yolo_dir, policy_dir):
         self.robot = robot
-        #self.approach = ApproachTask(robot,yolo_dir)
+        self.approach = ApproachTask(robot,yolo_dir)
         #self.pulling = PullingTask(robot,policy_dir)
-        self.pulling = PullingLeftTask(robot,policy_dir)
+        #self.pulling = PullingLeftTask(robot,policy_dir)
 
     def prepare(self):
         self.robot.terminate()
@@ -317,11 +332,11 @@ class JazzyDoorOpen:
 
     def perform(self):
         # print("== prepare for door pulling.")
-        # success = self.approach.perform()
+        success = self.approach.perform()
         # if not success:
         #     return False
-        rospy.sleep(5.0)
-        success = self.pulling.perform()
+        # rospy.sleep(5.0)
+        # success = self.pulling.perform()
         if not success:
             return False
         return True
