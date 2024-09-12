@@ -343,7 +343,7 @@ class ObjectDetection:
 
     def lever(self):
         detected = self.detector.detect(type=1,confidence_threshold=0.5)
-        # display_observation("detection", draw_detection(self.sensor.color_image(),detected))
+        display_observation("detection", draw_detection(self.sensor.color_image(),detected))
         return detected[-1] if len(detected) > 0 else None
 
     def door(self):

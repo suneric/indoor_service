@@ -1,0 +1,568 @@
+<!--environment for training-->
+<sdf version='1.6'>
+  <world name='default'>
+    <include>
+      <uri>model://ground_plane</uri>
+    </include>
+    <model name="hinged_door">
+      <link name="frame">
+        <pose>0.0 0 0 0 0 0</pose>
+        <collision name="collision">
+          <pose>0 0 0 0 0 0</pose>
+          <geometry>
+            <mesh>
+              <uri>file://media/materials/obj/frame.obj</uri>
+              <scale>0.01 0.01 0.01</scale>
+            </mesh>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <pose>0 0 0 0 0 0</pose>
+          <geometry>
+            <mesh>
+              <uri>file://media/materials/obj/frame.obj</uri>
+              <scale>0.01 0.01 0.01</scale>
+            </mesh>
+          </geometry>
+          <material>
+           <script>
+            <uri>file://media/materials/scripts/Gazebo.material</uri>
+            <name>Gazebo/Grey</name>
+           </script>
+          </material>
+        </visual>
+      </link>
+      <link name="door">
+        <pose>-0.045 0 0 0 0 0</pose>
+        <inertial>
+          <mass>10</mass>
+          <pose>0 0 0 0 0 0</pose>
+          <inertia>
+            <ixx>14.7</ixx>
+            <ixy>-0.000861</ixy>
+            <ixz>0</ixz>
+            <iyy>17.4</iyy>
+            <iyz>0</iyz>
+            <izz>2.70675</izz>
+          </inertia>
+        </inertial>
+        <collision name="collision">
+          <pose>0 0 0 0 0 0</pose>
+          <geometry>
+            <mesh>
+              <uri>file://media/materials/obj/door.obj</uri>
+              <scale>0.01 0.01 0.01</scale>
+            </mesh>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <pose>0 0 0 0 0 0</pose>
+          <geometry>
+            <mesh>
+              <uri>file://media/materials/obj/door.obj</uri>
+              <scale>0.01 0.01 0.01</scale>
+            </mesh>
+          </geometry>
+          <material>
+           <script>
+            <uri>file://media/materials/scripts/Gazebo.material</uri>
+            <name>Gazebo/Yellow</name>
+           </script>
+          </material>
+        </visual>
+      </link>
+      <link name="handle">
+        <pose>0.8 -0.045 0.95 0 0 0</pose>
+        <inertial>
+          <mass>1</mass>
+          <pose>0 0 0 0 0 0</pose>
+          <inertia>
+            <ixx>1</ixx>
+            <ixy>0</ixy>
+            <ixz>0</ixz>
+            <iyy>1</iyy>
+            <iyz>0</iyz>
+            <izz>1</izz>
+          </inertia>
+        </inertial>
+        <collision name="collision_1">
+          <pose>0 0 0 0 0 -1.57</pose>
+          <geometry>
+            <mesh>
+              <uri>file://media/materials/obj/handle.obj</uri>
+              <scale>0.01 0.01 0.01</scale>
+            </mesh>
+          </geometry>
+        </collision>
+        <collision name="collision_2">
+          <pose>0 0.045 0 3.14 0 1.57</pose>
+          <geometry>
+            <mesh>
+              <uri>file://media/materials/obj/handle.obj</uri>
+              <scale>0.01 0.01 0.01</scale>
+            </mesh>
+          </geometry>
+        </collision>
+        <visual name="visual_1">
+          <pose>0 0 0 0 0 -1.57</pose>
+          <geometry>
+            <mesh>
+              <uri>file://media/materials/obj/handle.obj</uri>
+              <scale>0.01 0.01 0.01</scale>
+            </mesh>
+          </geometry>
+          <material>
+          <script>
+            <uri>file://media/materials/scripts/Gazebo.material</uri>
+            <name>Gazebo/White</name>
+          </script>
+          </material>
+        </visual>
+        <visual name="visual_2">
+          <pose>0 0.045 0 3.14 0 1.57</pose>
+          <geometry>
+            <mesh>
+              <uri>file://media/materials/obj/handle.obj</uri>
+              <scale>0.01 0.01 0.01</scale>
+            </mesh>
+          </geometry>
+          <material>
+          <script>
+            <uri>file://media/materials/scripts/Gazebo.material</uri>
+            <name>Gazebo/White</name>
+          </script>
+          </material>
+        </visual>
+      </link>
+      <joint name="door_handle" type="revolute">
+        <parent>door</parent>
+        <child>handle</child>
+        <pose>0 0 0 0 0 0</pose>
+        <axis>
+          <xyz>0 1 0</xyz>
+          <limit>
+            <lower>-1</lower>
+            <upper>0</upper>
+            <effort>0</effort>
+            <stiffness>0</stiffness>
+            <dissipation>0</dissipation>
+          </limit>
+          <dynamics>
+            <spring_reference>1</spring_reference>
+            <spring_stiffness>1</spring_stiffness>
+            <damping>0</damping>
+            <friction>0</friction>
+          </dynamics>
+          <use_parent_model_frame>true</use_parent_model_frame>
+        </axis>
+      </joint>
+      <joint name="hinge" type="revolute">
+        <parent>frame</parent>
+        <child>door</child>
+        <pose>0 0 1.05 0 0 0</pose>
+        <axis>
+          <xyz>0 0 1</xyz>
+          <limit>
+            <lower>0</lower>
+            <upper>1.57</upper>
+            <effort>0</effort>
+            <stiffness>0</stiffness>
+            <dissipation>0</dissipation>
+          </limit>
+          <dynamics>
+            <spring_reference>2</spring_reference>
+            <spring_stiffness>2</spring_stiffness>
+            <damping>0</damping>
+            <friction>0</friction>
+          </dynamics>
+          <use_parent_model_frame>true</use_parent_model_frame>
+        </axis>
+      </joint>
+      <joint name="world_joint" type="fixed">
+        <child>frame</child>
+        <parent>world</parent>
+      </joint>
+    </model>
+    <model name="walls">
+      <static>true</static>
+      <link name="wall_1">
+        <collision name="wall_1_collision">
+          <pose>-0.03 1.98 1.08 0 0 0</pose>
+          <geometry>
+            <box>
+              <size>0.1 2.03 2.16</size>
+            </box>
+          </geometry>
+        </collision>
+        <visual name="wall_1_visual">
+          <pose>-0.03 1.98 1.08 0 0 0</pose>
+          <geometry>
+            <box>
+              <size>0.1 2.03 2.16</size>
+            </box>
+          </geometry>
+          <material>
+            <script>
+              <uri>file://media/materials/scripts/Gazebo.material</uri>
+              <name>Gazebo/White</name>
+            </script>
+          </material>
+        </visual>
+      </link>
+      <link name="wall_2">
+        <collision name="wall_2_collision">
+          <pose>-0.03 -0.53 1.08 0 0 0</pose>
+          <geometry>
+            <box>
+              <size>0.1 0.93 2.16</size>
+            </box>
+          </geometry>
+        </collision>
+        <visual name="wall_2_visual">
+          <pose>-0.03 -0.53 1.08 0 0 0</pose>
+          <geometry>
+            <box>
+              <size>0.1 0.93 2.16</size>
+            </box>
+          </geometry>
+          <material>
+            <script>
+              <uri>file://media/materials/scripts/Gazebo.material</uri>
+              <name>Gazebo/White</name>
+            </script>
+          </material>
+        </visual>
+      </link>
+      <link name="wall_3">
+        <collision name="wall_3_collision">
+          <pose>2 3.05 1.08 0 0 0</pose>
+          <geometry>
+            <box>
+              <size>4 0.1 2.16</size>
+            </box>
+          </geometry>
+        </collision>
+        <visual name="wall_3_visual">
+          <pose>2 3.05 1.08 0 0 0</pose>
+          <geometry>
+            <box>
+              <size>4 0.1 2.16</size>
+            </box>
+          </geometry>
+          <material>
+            <script>
+              <uri>file://media/materials/scripts/Gazebo.material</uri>
+              <name>Gazebo/White</name>
+            </script>
+          </material>
+        </visual>
+      </link>
+      <link name="wall_4">
+        <collision name="wall_4_collision">
+          <pose>2 -1.05 1.08 0 0 0</pose>
+          <geometry>
+            <box>
+              <size>4.0 0.1 2.16</size>
+            </box>
+          </geometry>
+        </collision>
+        <visual name="wall_4_visual">
+          <pose>2 -1.05 1.08 0 0 0</pose>
+          <geometry>
+            <box>
+              <size>4.0 0.1 2.16</size>
+            </box>
+          </geometry>
+          <material>
+            <script>
+              <uri>file://media/materials/scripts/Gazebo.material</uri>
+              <name>Gazebo/White</name>
+            </script>
+          </material>
+        </visual>
+      </link>
+      <link name="wall_5">
+        <collision name="wall_5_collision">
+          <pose>3.95 1 1.08 0 0 0</pose>
+          <geometry>
+            <box>
+              <size>0.1 4 2.16</size>
+            </box>
+          </geometry>
+        </collision>
+        <visual name="wall_5_visual">
+          <pose>3.95 1 1.08 0 0 0</pose>
+          <geometry>
+            <box>
+              <size>0.1 4 2.16</size>
+            </box>
+          </geometry>
+          <material>
+            <script>
+              <uri>file://media/materials/scripts/Gazebo.material</uri>
+              <name>Gazebo/White</name>
+            </script>
+          </material>
+        </visual>
+      </link>
+      <link name="wall_6">
+        <collision name="wall_6_collision">
+          <pose>-1.95 1.0 1.08 0 0 0</pose>
+          <geometry>
+            <box>
+              <size>0.1 5 2.16</size>
+            </box>
+          </geometry>
+        </collision>
+        <visual name="wall_6_visual">
+          <pose>-1.95 1 1.4 0 0 0</pose>
+          <geometry>
+            <box>
+              <size>0.1 5 2.16</size>
+            </box>
+          </geometry>
+          <material>
+            <script>
+              <uri>file://media/materials/scripts/Gazebo.material</uri>
+              <name>Gazebo/White</name>
+            </script>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="socket">
+      <static>true</static>
+      <link name="socket_1">
+        <visual name="visual_socket_1">
+          <pose>-1.88 1.5 0.4 1.57 0 1.57</pose>
+          <geometry>
+            <mesh>
+              <uri>file://media/materials/obj/NEMA5-15R-Gray.obj</uri>
+            </mesh>
+          </geometry>
+          <material>
+            <script>
+              <uri>file://media/materials/obj/NEMA5-15R-Gray.mtl</uri>
+            </script>
+          </material>
+        </visual>
+        <collision name="collision_socket_1">
+          <pose>-1.88 1.5 0.4 1.57 0 1.57</pose>
+          <geometry>
+            <mesh>
+              <uri>file://media/materials/obj/NEMA5-15R-Gray.obj</uri>
+            </mesh>
+          </geometry>
+          <surface>
+            <friction>
+              <ode>
+                <mu>0.1</mu>
+                <mu2>0.1</mu2>
+              </ode>
+            </friction>
+          </surface>
+        </collision>
+      </link>
+      <link name="socket_2">
+        <visual name="visual_socket_2">
+          <pose>0.8 2.996 0.4 1.5707963 0 0</pose>
+          <geometry>
+            <mesh>
+              <uri>file://media/materials/obj/NEMA5-15R-Gray.obj</uri>
+              <scale>1 1 1</scale>
+            </mesh>
+          </geometry>
+          <material>
+            <script>
+              <uri>file://media/materials/obj/NEMA5-15R-Gray.mtl</uri>
+            </script>
+          </material>
+        </visual>
+        <collision name="collision_socket_2">
+          <pose>0.8 2.996 0.4 1.5707963 0 0</pose>
+          <geometry>
+            <mesh>
+              <uri>file://media/materials/obj/NEMA5-15R-Gray.obj</uri>
+              <scale>1 1 1</scale>
+            </mesh>
+          </geometry>
+          <surface>
+            <friction>
+              <ode>
+                <mu>0.1</mu>
+                <mu2>0.1</mu2>
+              </ode>
+            </friction>
+          </surface>
+        </collision>
+      </link>
+      <link name="socket_3">
+        <visual name="visual_socket_3">
+          <pose>1.6 2.996 0.4 1.5707963 0 0</pose>
+          <geometry>
+            <mesh>
+              <uri>file://media/materials/obj/NEMA5-15R-Beige.obj</uri>
+              <scale>1 1 1</scale>
+            </mesh>
+          </geometry>
+          <material>
+            <script>
+              <uri>file://media/materials/obj/NEMA5-15R-Beige.mtl</uri>
+            </script>
+          </material>
+        </visual>
+        <collision name="collision_socket_3">
+          <pose>1.6 2.996 0.4 1.5707963 0 0</pose>
+          <geometry>
+            <mesh>
+              <uri>file://media/materials/obj/NEMA5-15R-Gray.obj</uri>
+              <scale>1 1 1</scale>
+            </mesh>
+          </geometry>
+          <surface>
+            <friction>
+              <ode>
+                <mu>0.1</mu>
+                <mu2>0.1</mu2>
+              </ode>
+            </friction>
+          </surface>
+        </collision>
+      </link>
+      <link name="socket_4">
+        <visual name="visual_socket_4">
+          <pose>2.4 2.996 0.4 1.5707963 0 0</pose>
+          <geometry>
+            <mesh>
+              <uri>file://media/materials/obj/NEMA5-15-20R-White.obj</uri>
+              <scale>1 1 1</scale>
+            </mesh>
+          </geometry>
+          <material>
+            <script>
+              <uri>file://media/materials/obj/NEMA5-15-20R-White.mtl</uri>
+            </script>
+          </material>
+        </visual>
+        <collision name="collision_socket_4">
+          <pose>2.4 2.996 0.4 1.5707963 0 0</pose>
+          <geometry>
+            <mesh>
+              <uri>file://media/materials/obj/NEMA5-15-20R-White.obj</uri>
+              <scale>1 1 1</scale>
+            </mesh>
+          </geometry>
+          <surface>
+            <friction>
+              <ode>
+                <mu>0.1</mu>
+                <mu2>0.1</mu2>
+              </ode>
+            </friction>
+          </surface>
+        </collision>
+      </link>
+      <link name="socket_5">
+        <visual name="visual_socket_5">
+          <pose>3.2 2.996 0.4 1.5707963 0 0</pose>
+          <geometry>
+            <mesh>
+              <uri>file://media/materials/obj/NEMA5-15-20R-Zinc.obj</uri>
+              <scale>1 1 1</scale>
+            </mesh>
+          </geometry>
+          <material>
+            <script>
+              <uri>file://media/materials/obj/NEMA5-15-20R-Zinc.mtl</uri>
+            </script>
+          </material>
+        </visual>
+        <collision name="collision_socket_5">
+          <pose>3.2 2.996 0.4 1.5707963 0 0</pose>
+          <geometry>
+            <mesh>
+              <uri>file://media/materials/obj/NEMA5-15-20R-Zinc.obj</uri>
+              <scale>1 1 1</scale>
+            </mesh>
+          </geometry>
+          <surface>
+            <friction>
+              <ode>
+                <mu>0.1</mu>
+                <mu2>0.1</mu2>
+              </ode>
+            </friction>
+          </surface>
+        </collision>
+      </link>
+
+    </model>
+    <light name='light_0' type='directional'>
+      <pose>1 1 2.8 0 -0 0</pose>
+      <diffuse>0.5 0.5 0.5 1</diffuse>
+      <specular>0.1 0.1 0.1 1</specular>
+      <direction>0.1 0.1 -0.9</direction>
+      <attenuation>
+        <range>20</range>
+        <constant>1</constant>
+        <linear>0.01</linear>
+        <quadratic>0.001</quadratic>
+      </attenuation>
+      <cast_shadows>1</cast_shadows>
+    </light>
+    <light name='light_1' type='directional'>
+      <pose>3 1 2.8 0 -0 0</pose>
+      <diffuse>0.5 0.5 0.5 1</diffuse>
+      <specular>0.1 0.1 0.1 1</specular>
+      <direction>0.1 0.1 -0.9</direction>
+      <attenuation>
+        <range>20</range>
+        <constant>1</constant>
+        <linear>0.01</linear>
+        <quadratic>0.001</quadratic>
+      </attenuation>
+      <cast_shadows>1</cast_shadows>
+    </light>
+
+    <light name='light_2' type='directional'>
+      <pose>-1 1 2.8 0 -0 0</pose>
+      <diffuse>0.5 0.5 0.5 1</diffuse>
+      <specular>0.1 0.1 0.1 1</specular>
+      <direction>0.1 0.1 -0.9</direction>
+      <attenuation>
+        <range>20</range>
+        <constant>1</constant>
+        <linear>0.01</linear>
+        <quadratic>0.001</quadratic>
+      </attenuation>
+      <cast_shadows>1</cast_shadows>
+    </light>
+
+    <physics name="default_physics" default="0" type="ode">
+      <max_step_size>0.001</max_step_size>
+      <real_time_factor>1</real_time_factor>
+      <real_time_update_rate>1000</real_time_update_rate>
+      <ode>
+        <solver>
+          <type>quick</type>
+          <iters>1000</iters>
+          <sor>1.3</sor>
+        </solver>
+        <constraints>
+          <cfm>0</cfm>
+          <erp>0.2</erp>
+          <contact_max_correcting_vel>100</contact_max_correcting_vel>
+          <contact_surface_layer>0.001</contact_surface_layer>
+        </constraints>
+      </ode>
+    </physics>
+
+    <gui fullscreen='0'>
+    <camera name='user_camera'>
+      <pose>-2.11979 -3.35501 5.91623 -0 0.837801 1.07535</pose>
+      <view_controller>orbit</view_controller>
+      <projection_type>perspective</projection_type>
+    </camera>
+    </gui>
+  </world>
+</sdf>

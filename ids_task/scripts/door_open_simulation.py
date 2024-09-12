@@ -18,12 +18,12 @@ class ApproachTask:
         self.rsdDetect = ObjectDetection(robot.camRSD, yolo_dir,scale=1.0,wantDepth=True)
 
     def perform(self):
-        print("=== approaching wall outlet.")
+        print("=== approaching door.")
         success = self.align_door_handle()
         if not success:
             print("fail to align door handle.")
             return False
-        success = self.approch_door_handle()
+        success = self.approach_door_handle()
         if not success:
              print("fail to approch door handle.")
              return False
@@ -55,7 +55,7 @@ class ApproachTask:
         self.robot.stop()
         return True
 
-    def approch_door_handle(self, speed=0.5, target=0.7):
+    def approach_door_handle(self, speed=0.5, target=0.8):
         rate = rospy.Rate(10)
         self.robot.move(0.5,0.0)
         detect = self.rsdDetect.lever()
@@ -81,7 +81,7 @@ class UnlatchTask:
         self.robot = robot
         self.ardDetect = ObjectDetection(robot.camARD1,yolo_dir)
 
-    def perform(self):
+    def perform(self, type):
         print("unlatch door")
         success = self.align_door_handle()
         if not success:
@@ -90,9 +90,13 @@ class UnlatchTask:
         else:
             self.touch_door()
             self.unlatch_door()
+            if type == "pull":
+                self.pull_door_open_a_little()
+            elif type == "push":
+                self.push_door_open_a_little()
         return True
 
-    def align_door_handle(self, speed=np.pi/4, target=10):
+    def align_door_handle(self, speed=np.pi/4, target=30):
         detect = self.ardDetect.lever()
         if detect is None:
             print("door handle is undetectable")
@@ -132,17 +136,17 @@ class UnlatchTask:
             self.robot.move(speed,0.0)
             rate.sleep()
             forces= self.robot.plug_forces()
-            print("=== forces: ({:.4f},{:.4f},{:.4f})".format(forces[0],forces[1],forces[2]))
+            print("=== end-effector forces: ({:.4f},{:.4f},{:.4f})".format(forces[0],forces[1],forces[2]))
         self.robot.stop()
         while not self.robot.is_safe(max_force=20):
             self.robot.move(-0.2,0.0)
             rate.sleep()
             forces= self.robot.plug_forces()
-            print("=== forces: ({:.4f},{:.4f},{:.4f})".format(forces[0],forces[1],forces[2]))
+            print("=== end-effector forces: ({:.4f},{:.4f},{:.4f})".format(forces[0],forces[1],forces[2]))
         self.robot.stop()
         return True
 
-    def unlatch_door(self, speed=1.0):
+    def unlatch_door(self):
         # push down door handle
         rate = rospy.Rate(10)
         while self.robot.is_safe(max_force=10):
@@ -151,7 +155,18 @@ class UnlatchTask:
         for i in range(10):
             self.robot.set_plug_joints(0.0,-0.001)
             rate.sleep()
+        self.robot.stop()
+
+    def push_door_open_a_little(self, speed=1.0):
+        # push door unlatch
+        print("push door a little open")
+        self.robot.move(speed,-np.pi/2)
+        rospy.sleep(3)
+        self.robot.stop()
+
+    def pull_door_open_a_little(self, speed=1.0):
         # pull door unlatch
+        print("pull door a little open")
         self.robot.move(-speed,-0.2*np.pi)
         rospy.sleep(3)
         self.robot.stop()
@@ -166,6 +181,30 @@ class UnlatchTask:
         self.robot.stop()
         # release grab
         self.robot.set_plug_joints(0.13,0.2)
+        return True
+
+class PushingTask:
+    def __init__(self, robot):
+        self.robot = robot
+
+    def perform(self):
+        print("push door")
+        self.pushing()
+        return True
+
+    def pushing(self, speed = 1.0):
+        forces = self.robot.plug_forces()
+        rate = rospy.Rate(30)
+        self.robot.reset_joints(vpos=0.75,hpos=0,spos=1.57,ppos=0)
+        while not self.robot.is_safe(max_force=5):
+            rate.sleep()
+            forces = self.robot.plug_forces()
+            print("=== end-effector forces: ({:.4f},{:.4f},{:.4f})".format(forces[0],forces[1],forces[2]))
+            self.robot.move(speed,0.0);
+        # move forward to goal poisition
+        self.robot.move(2*speed,0.0);
+        rospy.sleep(15)
+        self.robot.stop()
         return True
 
 class PullingTask:
@@ -185,6 +224,7 @@ class PullingTask:
         return act_list[idx]
 
     def perform(self, max_steps=30):
+        print("pull door")
         self.pulling()
         return True
 
@@ -231,28 +271,43 @@ class DoorOpeningTask:
         self.approach = ApproachTask(robot, yolo_dir)
         self.unlatch = UnlatchTask(robot, yolo_dir)
         self.pulling = PullingTask(robot, policy_dir)
+        self.pushing = PushingTask(robot);
 
-    def prepare(self):
+    def prepare(self, type):
         print("=== prepare for door opening.")
         self.robot.stop()
-        # self.robot.reset_joints(vpos=0.8,hpos=0,spos=1.57,ppos=0)
-        self.robot.reset_joints(vpos=0.8,hpos=0.13,spos=0,ppos=0)
-        self.robot.lock_joints(v=False,h=False,s=False,p=True)
-        self.robot.reset_robot(0.67,0.8,np.pi+0.1)
+        if type == "pull":
+            self.robot.reset_joints(vpos=0.75,hpos=0,spos=1.57,ppos=0)
+            #self.robot.reset_joints(vpos=0.8,hpos=0.13,spos=0,ppos=0)
+            self.robot.lock_joints(v=False,h=False,s=False,p=True)
+            self.robot.reset_robot(0.67,0.8,np.pi+0.1)
+        elif type == "push":
+            self.robot.reset_joints(vpos=0.75,hpos=0.13,spos=1.57,ppos=0)
+            self.robot.lock_joints(v=False,h=False,s=False,p=True)
+            self.robot.reset_robot(-1.5,0.6,0);
+        else:
+            pass
 
-    def perform(self):
-        # success = self.approach.perform()
-        # if not success:
-        #     print("fail to approach door handle")
-        #     return False
-        # success = self.unlatch.perform()
-        # if not success:
-        #     print("fail to unlatch door")
-        #     return False
-        success = self.pulling.perform()
+    def perform(self, type):
+        success = self.approach.perform()
         if not success:
-            print("fail to pull door open")
+            print("fail to approach door handle")
             return False
+        success = self.unlatch.perform(type)
+        if not success:
+            print("fail to unlatch door")
+            return False
+
+        if type == "pull":
+            success = self.pulling.perform()
+            if not success:
+                print("fail to pull door open")
+                return False
+        elif type == "push":
+            success = self.pushing.perform()
+            if not success:
+                print("fail to push door open")
+                return False
         return True
 
     def terminate(self):
@@ -266,12 +321,13 @@ if __name__ == "__main__":
     robot = MRobot()
     yolo_dir = os.path.join(sys.path[0],'policy/detection/yolo')
     policy_dir = os.path.join(sys.path[0],"policy/pulling")
+    taskType = "push"
     task = DoorOpeningTask(robot,yolo_dir,policy_dir)
-    task.prepare()
-    nav = BasicNavigator(robot)
+    task.prepare(type=taskType)
     # nav.move2goal(create_goal(1.5,0.83,np.pi))
-    success = task.perform()
-    if success: # traverse doorway
+    success = task.perform(type=taskType)
+    if success and taskType == "pull": # traverse doorway
+        nav = BasicNavigator(robot)
         curr = nav.eular_pose(nav.pose)
         rate = rospy.Rate(10)
         while abs(curr[2]) > (1/100)*np.pi:
