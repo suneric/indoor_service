@@ -13,13 +13,13 @@ This is a simulation of a mobile robot for performing indoor service, including 
   - seaborn
 
 ## packages
-1. ids_gazebo
-2. ids_description
-3. ids_control
-4. ids_detection
-5. ids_joy
-6. ids_learning
-7. ids_task
+1. ids_gazebo, environment models
+2. ids_description, robot definition  
+3. ids_control, robot controller, navigation
+4. ids_detection, object detection
+5. ids_joy, joy sticker controller
+6. ids_learning (outdated)
+7. ids_task, simulation, training, and testing of door-opening and self-charging tasks.
 
 ## For a new environment
 1. collect 200~300 samples (```python3 door_open_collect.py --simulation [0|1] --type [left|right]```)
